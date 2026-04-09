@@ -14,5 +14,5 @@ configuration {
     sidebar-mode:               true;
 }
 
-@theme "gruvbox-dark-hard" // Loads a theme from /usr/share/rofi/themes/ or ~/.config/rofi/
+@theme "c64" // Loads a theme from /usr/share/rofi/themes/ or ~/.config/rofi/
 
