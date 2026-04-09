@@ -1,0 +1,70 @@
+{
+  "layer": "top",
+  "position": "top",
+  "height": 36,
+  "spacing": 0,
+  "margin-top": 0,
+  "margin-left": 8,
+  "margin-right": 8,
+  "margin-bottom": -10, // should always be opposite of gaps_out in hyprland.conf
+
+  "modules-left": ["clock"],
+  "modules-center": ["hyprland/workspaces"],
+  "modules-right": ["pulseaudio", "backlight", "network", "battery"], //tray was here, but i removed it. look into optimizing that and figurig out system76-power later
+
+  "hyprland/workspaces": {
+    "format": "{icon}",
+    "on-click": "activate",
+    "format-icons": {
+      "default": "●"
+    },
+    "persistent-workspaces": {
+      "eDP-1": [1, 2, 3, 4, 5],
+      "*": [6, 7, 8, 9, 10]
+    }
+  },
+
+  "backlight": {
+    "device": "intel_backlight", // Replace with your GPU (e.g., "amdgpu_bl0") if it doesn't work
+    "format": "Screen: {percent}%",
+    "on-scroll-up": "brightnessctl set 1%+",
+    "on-scroll-down": "brightnessctl set 1%-",
+    "tooltip": false
+  },
+
+  "clock": {
+    "format": " {:%A, %B %d %H:%M}",
+    "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>"
+  },
+
+  "battery": {
+    "states": {
+      "warning": 30,
+      "critical": 15
+    },
+    "format": "Battery: {capacity}%",
+    "format-charging": "Charging: {capacity}%",
+    "tooltip-format": "{timeTo} — {power:.1f}W"
+  },
+
+  "network": {
+    "format-wifi": "Wifi: {essid} ({signalStrength}%)",
+    "format-ethernet": "LAN: {ipaddr}",
+    "format-disconnected": "No Network",
+    "tooltip-format": "{ifname}: {ipaddr}\n{gwaddr} — {bandwidthUpBits} up / {bandwidthDownBits} down"
+  },
+
+  "pulseaudio": {
+    "max-volume": 150,
+    "format": "Volume: {volume}%",
+    "format-muted": "Muted",
+    "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
+    "on-scroll-up": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+ --limit 1.5",
+    "on-scroll-down": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-",
+  },
+
+  "tray": {
+    "spacing": 8,
+    "icon-size": 16
+  }
+}

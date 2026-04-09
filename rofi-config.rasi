@@ -1,0 +1,18 @@
+configuration {
+    modi:                       "drun,run,window,ssh";
+    font:                       "JetBrains Mono 12";
+    show-icons:                 true;
+    icon-theme:                 "Papirus";
+    terminal:                   "alacritty";
+    drun-display-format:        "{icon} {name}";
+    location:                   0;
+    disable-history:            false;
+    hide-scrollbar:             true;
+    display-drun:               "   Apps ";
+    display-run:                "   Run ";
+    display-window:             "     Window ";
+    sidebar-mode:               true;
+}
+
+@theme "gruvbox-dark-hard" // Loads a theme from /usr/share/rofi/themes/ or ~/.config/rofi/
+
