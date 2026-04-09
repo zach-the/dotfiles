@@ -1,18 +1,101 @@
-configuration {
-    modi:                       "drun,run,window,ssh";
-    font:                       "JetBrains Mono 12";
-    show-icons:                 true;
-    icon-theme:                 "Papirus";
-    terminal:                   "alacritty";
-    drun-display-format:        "{icon} {name}";
-    location:                   0;
-    disable-history:            false;
-    hide-scrollbar:             true;
-    display-drun:               "   Apps ";
-    display-run:                "   Run ";
-    display-window:             "     Window ";
-    sidebar-mode:               true;
+@theme "/dev/null"
+
+/* Approximating macOS Spotlight with a hyprland twist */
+/* Real blur requires a compositor like picom with blur enabled */
+* {
+    bg:           #1c1c1eee;
+    bg-solid:     #1c1c1eff;
+    bg-alt:       #2c2c2ecc;
+    bg-selected:  #00ff9955;
+    fg:           #ffffffff;
+    fg-dim:       #8e8e93ff;
+    fg-secondary: #ebebf599;
+
+    background-color: transparent;
+    text-color:       @fg;
 }
 
-@theme "c64" // Loads a theme from /usr/share/rofi/themes/ or ~/.config/rofi/
+configuration {
+    kb-accept-entry:   "Return,KP_Enter";
+    kb-remove-to-eol:  "";
+    kb-row-up:         "Up,Control+k";
+    kb-row-down:       "Down,Control+j";
+}
 
+window {
+    width:            30%;
+    fixed-height:     false;
+    background-color: @bg;
+    border:           1px;
+    border-color:     #33ccff88;
+    border-radius:    16px;
+    padding:          0;
+}
+
+mainbox {
+    background-color: transparent;
+    padding:          0;
+    spacing:          0;
+}
+
+inputbar {
+    background-color: transparent;
+    padding:          14px 16px;
+    spacing:          0;
+    children:         [ entry ];
+}
+
+prompt {
+    background-color: transparent;
+    text-color:       @fg-dim;
+    margin:           0 10px 0 0;
+}
+
+entry {
+    background-color:  transparent;
+    text-color:        @fg;
+    placeholder:       "Enter";
+    placeholder-color: @fg-dim;
+    cursor:            text;
+    font:              "JetBrains Mono 18";
+}
+
+separator {
+    background-color: #ffffff18;
+    height:           1px;
+    margin:           0 16px;
+}
+
+listview {
+    background-color: transparent;
+    lines:            6;
+    require-input:    true;
+    dynamic:          true;
+    fixed-height:     false;
+    padding:          8px 8px 8px 8px;
+    spacing:          2px;
+}
+
+element {
+    background-color: transparent;
+    text-color:       @fg;
+    padding:          10px 10px;
+    border-radius:    10px;
+}
+
+element selected {
+    background-color: @bg-selected;
+    text-color:       @fg;
+}
+
+element-text {
+    background-color: transparent;
+    text-color:       inherit;
+    vertical-align:   0.5;
+}
+
+element-icon {
+    background-color: transparent;
+    size:             28px;
+    margin:           0 10px 0 0;
+}
