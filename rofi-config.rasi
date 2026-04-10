@@ -20,6 +20,12 @@ configuration {
     kb-remove-to-eol:  "";
     kb-row-up:         "Up,Control+k";
     kb-row-down:       "Down,Control+j";
+
+    modes: [ combi ];
+    combi-modes: [drun, run];
+    combi-hide-mode-prefix: true;
+
+    show-icons: true;
 }
 
 window {
