@@ -1,12 +1,26 @@
 #!/bin/bash
 
+# --- SSH mode config ---
+# These dotfile keys (from the configs map below) are included when running --ssh
+ssh_configs=(
+  "$HOME/.bash_aliases"
+  "$HOME/.bashrc"
+  "$HOME/.config/nvim/init.lua"
+  "$HOME/.config/powerline-shell/config.json"
+)
+
 # --- Argument parsing ---
 mode=""
+ssh_only=false
 case "$1" in
   -u|--update) mode="update" ;;
   -f|--fill)   mode="fill" ;;
+  --ssh)
+    mode="fill"
+    ssh_only=true
+    ;;
   *)
-    echo "Usage: $0 --update|-u | --fill|-f"
+    echo "Usage: $0 --update|-u | --fill|-f | --ssh"
     exit 1
     ;;
 esac
@@ -49,6 +63,15 @@ declare -A configs=(
 for path in "${!configs[@]}"; do
   dot="${configs[$path]}"
 
+  # Skip entries not in ssh_configs when running --ssh
+  if $ssh_only; then
+    match=false
+    for ssh_path in "${ssh_configs[@]}"; do
+      [ "$path" = "$ssh_path" ] && match=true && break
+    done
+    $match || continue
+  fi
+
   if should_process "$path" "$dot"; then
     echo "Linking $path"
     
@@ -71,7 +94,7 @@ done
 keyd_path="/etc/keyd/default.conf"
 keyd_dot="$HOME/dotfiles/keyd-default.conf"
 
-if should_process "$keyd_path" "$keyd_dot"; then
+if ! $ssh_only && should_process "$keyd_path" "$keyd_dot"; then
   echo "Setting up keyd..."
   sudo pacman -S --needed --noconfirm keyd
   sudo mkdir -p /etc/keyd/
