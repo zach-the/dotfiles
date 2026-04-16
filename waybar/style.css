@@ -28,7 +28,7 @@ window#waybar {
 
 #workspaces button:hover {
     color: #33ccff; /* Blue hover effect */
-    background: rgba(51, 204, 255, 0.1);
+    /*background: rgba(51, 204, 255, 0.1);*/
 }
 
 #clock,

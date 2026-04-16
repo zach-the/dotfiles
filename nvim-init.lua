@@ -76,7 +76,8 @@ vim.o.expandtab = true
 vim.o.shiftwidth = 4
 vim.o.tabstop = 4
 vim.o.softtabstop = 4
-vim.o.termguicolors = true
+-- vim.o.termguicolors = true
+vim.opt.termguicolors = false
 vim.o.cursorline = true
 vim.o.cursorcolumn = true
 vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>')
