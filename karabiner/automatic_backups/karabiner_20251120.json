@@ -1,0 +1,38 @@
+{
+    "profiles": [
+        {
+            "complex_modifications": {
+                "rules": [
+                    {
+                        "manipulators": [
+                            {
+                                "description": "Change Caps Lock to Command + Left Control",
+                                "from": { "key_code": "caps_lock" },
+                                "to": [
+                                    {
+                                        "key_code": "left_command",
+                                        "modifiers": ["left_control"]
+                                    }
+                                ],
+                                "type": "basic"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "devices": [
+                {
+                    "identifiers": {
+                        "is_keyboard": true,
+                        "product_id": 801,
+                        "vendor_id": 76
+                    },
+                    "treat_as_built_in_keyboard": true
+                }
+            ],
+            "name": "Default profile",
+            "selected": true,
+            "virtual_hid_keyboard": { "keyboard_type_v2": "ansi" }
+        }
+    ]
+}

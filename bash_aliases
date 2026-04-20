@@ -9,8 +9,8 @@ alias fzv='tmp=$(fzf) && echo $tmp && nvim $tmp'
 alias fzd='tmp=$(fd --type d -d 4 | fzf) && echo $tmp && d $tmp'
 alias e='clear && exit'
 alias ll='ls -lrt'
-alias la='ls -A'
-alias l='ls -CF'
+alias l='ls -lrt'
+alias la='ls -la'
 alias dir='dir --color=auto'
 alias vdir='vdir --color=auto'
 alias fgrep='fgrep --color=auto'
@@ -18,7 +18,6 @@ alias egrep='egrep --color=auto'
 alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo error)" "$(history | tail -n1 | sed -e "s/^\s*[0-9]\+\s*//;s/[;&|]\s*alert$//")"'
 alias py='python3'
 alias tl='tail -Fn 70'
-alias tm='tmux a'
 alias cp='cp -a'
 alias lg='ls -lrga | rg -i'
 alias nvs='nv -O'
@@ -38,24 +37,43 @@ nv() {
     local limit_bytes=$((limit_mb * 1024 * 1024))
     local too_large=false
     local file_report=""
+    
+    # Variables to cache single-file data so we don't recalculate in Step 4
+    local single_human_size=""
+    local single_is_gz=false
 
-    # 2. Pre-check all provided files (handling .gz expansion)
+    # 2. Pre-check all provided files
     for file in "$@"; do
         if [ -f "$file" ]; then
-            local size_bytes
+            local size_bytes=0
             local is_gz=false
-            
+
             if [[ "$file" == *.gz ]]; then
                 # Get uncompressed size from gzip header
                 size_bytes=$(gzip -l "$file" | tail -n 1 | awk '{print $2}')
                 is_gz=true
             else
-                size_bytes=$(stat -c%s "$file")
+                # Portable stat for macOS and Linux
+                if stat --version >/dev/null 2>&1; then
+                    size_bytes=$(stat -c%s "$file") # GNU/Linux
+                else
+                    size_bytes=$(stat -f%z "$file") # BSD/macOS
+                fi
             fi
-            
-            local size_human=$(numfmt --to=iec-i --suffix=B "$size_bytes")
-            
-            if [ "$size_bytes" -gt "$limit_bytes" ]; then
+
+            # Portable size formatting using awk (since macOS lacks numfmt)
+            local size_human=$(awk -v size="${size_bytes:-0}" 'BEGIN {
+                split("B KB MB GB TB", unit);
+                i=1; while (size>=1024 && i<5) {size/=1024; i++}
+                printf "%.1f%s", size, unit[i]
+            }')
+
+            # Cache for Step 4 (only matters if 1 file is passed)
+            single_human_size="$size_human"
+            single_is_gz="$is_gz"
+
+            # Safety check: ensure size_bytes is a number before comparing
+            if [ "${size_bytes:-0}" -gt "$limit_bytes" ]; then
                 too_large=true
                 local label=$([ "$is_gz" = true ] && echo "uncompressed " || echo "")
                 file_report+="\e[31m-> $file ($size_human ${label})[OVER LIMIT]\e[0m\n"
@@ -74,26 +92,16 @@ nv() {
 
     # 4. Single-file Logic: Auto-switch to less/zless
     if [ "$#" -eq 1 ] && [ "$too_large" = true ]; then
-        local file="$1"
-        # Determine size again for the specific message
-        local size_bytes
-        if [[ "$file" == *.gz ]]; then
-            size_bytes=$(gzip -l "$file" | tail -n 1 | awk '{print $2}')
-        else
-            size_bytes=$(stat -c%s "$file")
-        fi
-        local size_human=$(numfmt --to=iec-i --suffix=B "$size_bytes")
+        echo -e "\e[31mFile is too large for Neovim ($single_human_size).\e[0m"
         
-        echo -e "\e[31mFile is too large for Neovim ($size_human).\e[0m"
-        
-        if [[ "$file" == *.gz ]]; then
+        if [ "$single_is_gz" = true ]; then
             echo "Opening with 'zless' in 2 seconds..."
             sleep 2
-            less "$file"
+            zless "$1"
         else
             echo "Opening with 'less' in 2 seconds..."
             sleep 2
-            less "$file"
+            less "$1"
         fi
         return
     fi
@@ -102,7 +110,8 @@ nv() {
     command nvim "$@"
 }
 
-# Safer fzf alias (use function)
+
+# better fzf alias
 fzf() {
     command fzf --height=40% --layout=reverse --border --margin=2% --bind "ctrl-j:down,ctrl-k:up" "$@"
 }
