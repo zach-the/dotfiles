@@ -1,0 +1,50 @@
+[colors]
+foreground = "#c0caf5"
+background = "#0d0d17"
+
+cursor_bg = "#ff007f"
+cursor_fg = "#0d0d17"
+cursor_border = "#ff007f"
+
+selection_fg = "#0d0d17"
+selection_bg = "#33ccff"
+
+# Matches your active_border_color
+split = "#ff007f" 
+
+ansi = [
+    "#0d0d17", # black
+    "#ff007f", # red
+    "#00ff99", # green
+    "#ffee00", # yellow
+    "#33ccff", # blue
+    "#9d00ff", # magenta
+    "#ff6600", # cyan (orange)
+    "#a9b1d6", # white
+]
+
+brights = [
+    "#414868", # bright black
+    "#ff33a1", # bright red
+    "#26ffaa", # bright green
+    "#fff700", # bright yellow
+    "#52d5ff", # bright blue
+    "#b042ff", # bright magenta
+    "#ff8533", # bright cyan (orange)
+    "#c0caf5", # bright white
+]
+
+[colors.tab_bar]
+background = "#0d0d17"
+
+[colors.tab_bar.active_tab]
+bg_color = "#ff007f"
+fg_color = "#0d0d17"
+
+[colors.tab_bar.inactive_tab]
+bg_color = "#161626"
+fg_color = "#787c99"
+
+[colors.tab_bar.new_tab]
+bg_color = "#161626"
+fg_color = "#787c99"

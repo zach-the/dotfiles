@@ -1,0 +1,125 @@
+local wezterm = require 'wezterm'
+local config = wezterm.config_builder()
+local act = wezterm.action
+
+-- Font Configuration
+config.font = wezterm.font 'JetBrainsMono Nerd Font Mono'
+config.font_size = 12.5
+
+-- Default Window Size
+-- Note: WezTerm uses columns/rows, not pixels. Adjust these to match your old 1100x600 size.
+config.initial_cols = 120
+config.initial_rows = 35
+
+config.color_scheme = 'CyberpunkNeon'
+
+-- Inactive border color dimming
+config.inactive_pane_hsb = {
+  brightness = 0.5,
+}
+
+-- Other Behavior
+config.selection_word_boundary = " \t\n{}[]()\"'`"
+config.default_cursor_style = 'BlinkingBlock'
+config.pane_focus_follows_mouse = true
+
+-- Tab Bar Customization
+config.use_fancy_tab_bar = false -- Gives a retro, un-styled look similar to basic Kitty
+
+-- OS Specific Settings
+config.window_decorations = "RESIZE" -- closest to 'titlebar-only'
+config.send_composed_key_when_left_alt_is_pressed = false -- macos_option_as_alt equivalent
+config.send_composed_key_when_right_alt_is_pressed = false
+
+-- Keybinds
+config.keys = {
+  -- ctrl+hjkl to send arrow keys
+  { key = 'k', mods = 'CTRL', action = act.SendString '\x1b[A' },
+  { key = 'j', mods = 'CTRL', action = act.SendString '\x1b[B' },
+  { key = 'h', mods = 'CTRL', action = act.SendString '\x1b[D' },
+  { key = 'l', mods = 'CTRL', action = act.SendString '\x1b[C' },
+
+  -- alt+shift+h/l move left/right by a word
+  { key = 'H', mods = 'ALT|SHIFT', action = act.SendKey { key = 'LeftArrow', mods = 'CTRL' } },
+  { key = 'L', mods = 'ALT|SHIFT', action = act.SendKey { key = 'RightArrow', mods = 'CTRL' } },
+
+  -- Split Panes
+  { key = '-', mods = 'ALT', action = act.SplitVertical { domain = 'CurrentPaneDomain' } }, -- top/bottom split
+  { key = '\\', mods = 'ALT', action = act.SplitHorizontal { domain = 'CurrentPaneDomain' } }, -- left/right split
+  
+  -- Pane Swapping / Rotation
+  { key = 'p', mods = 'ALT', action = act.PaneSelect { mode = 'SwapWithActive' } },
+  { key = 'n', mods = 'ALT', action = act.PaneSelect { mode = 'SwapWithActive' } },
+  { key = 'b', mods = 'ALT', action = act.PaneSelect { mode = 'SwapWithActive' } },
+  { key = 'm', mods = 'ALT', action = act.RotatePanes 'Clockwise' },
+
+  -- Kitty Tab Actions
+  { key = 'H', mods = 'CTRL|SHIFT', action = act.ActivateTabRelative(-1) },
+  { key = 'L', mods = 'CTRL|SHIFT', action = act.ActivateTabRelative(1) },
+  { key = 'w', mods = 'CMD', action = act.CloseCurrentPane { confirm = false } },
+  { key = 'w', mods = 'CTRL|SHIFT', action = act.CloseCurrentPane { confirm = false } },
+  
+  -- Vim Keybinds for Navigation
+  { key = 'h', mods = 'ALT', action = act.ActivatePaneDirection 'Left' },
+  { key = 'l', mods = 'ALT', action = act.ActivatePaneDirection 'Right' },
+  { key = 'k', mods = 'ALT', action = act.ActivatePaneDirection 'Up' },
+  { key = 'j', mods = 'ALT', action = act.ActivatePaneDirection 'Down' },
+}
+
+-- Mouse Bindings
+config.mouse_bindings = {
+  -- Right-click block selection
+  {
+    event = { Down = { streak = 1, button = 'Right' } },
+    mods = 'NONE',
+    action = act.SelectTextAtMouseCursor 'Block',
+  },
+}
+
+
+-- ==========================================
+-- Custom Gradient Tab Bar (Numbers Only)
+-- ==========================================
+wezterm.on(
+  'format-tab-title',
+  function(tab, tabs, panes, config, hover, max_width)
+    -- Define colors matching your Cyberpunk theme
+    local background = '#161626' -- inactive bg
+    local foreground = '#787c99' -- inactive fg
+    local edge_background = '#0d0d17' -- the base tab bar background
+
+    if tab.is_active then
+      background = '#ff007f' -- active bg (pink)
+      foreground = '#0d0d17' -- active fg (obsidian)
+    elseif hover then
+      background = '#33ccff' -- hover bg (blue)
+      foreground = '#0d0d17' -- hover fg
+    end
+
+    local fade_in = '░▒▓'
+    local fade_out = '▓▒░'
+
+    -- Construct the title with just the tab number and some padding
+    local title = ' ' .. (tab.tab_index + 1) .. ' '
+
+    return {
+      -- Left Fade
+      { Background = { Color = edge_background } },
+      { Foreground = { Color = background } },
+      { Text = fade_in },
+
+      -- Solid Tab Body
+      { Background = { Color = background } },
+      { Foreground = { Color = foreground } },
+      { Text = title },
+
+      -- Right Fade
+      { Background = { Color = edge_background } },
+      { Foreground = { Color = background } },
+      { Text = fade_out },
+    }
+  end
+)
+
+
+return config
