@@ -25,9 +25,11 @@ config.pane_focus_follows_mouse = true
 
 -- Tab Bar Customization
 config.use_fancy_tab_bar = false -- Gives a retro, un-styled look similar to basic Kitty
+config.enable_tab_bar = true
+config.hide_tab_bar_if_only_one_tab = true
 
 -- OS Specific Settings
-config.window_decorations = "RESIZE" -- closest to 'titlebar-only'
+config.window_decorations = "NONE"
 config.send_composed_key_when_left_alt_is_pressed = false -- macos_option_as_alt equivalent
 config.send_composed_key_when_right_alt_is_pressed = false
 
