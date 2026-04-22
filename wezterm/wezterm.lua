@@ -27,6 +27,7 @@ config.pane_focus_follows_mouse = true
 config.use_fancy_tab_bar = false -- Gives a retro, un-styled look similar to basic Kitty
 config.enable_tab_bar = true
 config.hide_tab_bar_if_only_one_tab = true
+config.tab_bar_at_bottom = true
 
 -- OS Specific Settings
 config.window_decorations = "NONE"
