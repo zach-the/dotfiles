@@ -356,28 +356,46 @@ end
 -- =====================================================================
 
 local function launchChrome()
-    local app = hs.application.get("Google Chrome")
-    
-    if not app then
-        -- If Chrome isn't running, just launch it (it will open a window naturally)
-        hs.application.launchOrFocus("Google Chrome")
-    else
-        -- If it is already running, tell it to make a new window
-        local script = [[
-            tell application "Google Chrome"
-                make new window
-                activate
-            end tell
-        ]]
-        hs.osascript.applescript(script)
+    -- Snapshot existing Chrome windows so we can identify the new one later
+    local existingIds = {}
+    local chromeApp = hs.application.get("Google Chrome")
+    if chromeApp then
+        for _, w in ipairs(chromeApp:allWindows()) do
+            existingIds[w:id()] = true
+        end
     end
 
-    -- Use the timer to ensure the window is ready before moving it
-    hs.timer.doAfter(0.2, function()
-        local win = hs.window.focusedWindow()
-        -- Ensure we are actually moving a Chrome window
-        if win and win:application():title() == "Google Chrome" then
-            moveSpecificWindow(win)
+    local targetScreen = hs.mouse.getCurrentScreen()
+    local f = targetScreen:frame()
+    -- AppleScript bounds are {left, top, right, bottom}
+    local left   = math.floor(f.x)
+    local top    = math.floor(f.y)
+    local right  = math.floor(f.x + f.w)
+    local bottom = math.floor(f.y + f.h)
+
+    if not chromeApp then
+        -- Chrome isn't running: open in background without stealing focus
+        hs.task.new("/usr/bin/open", nil, {"-g", "-a", "Google Chrome"}):start()
+    else
+        -- Create the window and immediately position it on the target screen so it
+        -- never visually appears on the wrong monitor before being moved.
+        hs.osascript.applescript(string.format([[
+            tell application "Google Chrome"
+                set newWin to make new window
+                set bounds of newWin to {%d, %d, %d, %d}
+            end tell
+        ]], left, top, right, bottom))
+    end
+
+    hs.timer.doAfter(0.4, function()
+        local app = hs.application.get("Google Chrome")
+        if not app then return end
+
+        for _, w in ipairs(app:allWindows()) do
+            if not existingIds[w:id()] then
+                moveSpecificWindow(w)
+                return
+            end
         end
     end)
 end
@@ -494,7 +512,7 @@ hs.hotkey.bind({"cmd", "alt"}, "J", function() smartFocus("South") end)
 
 -- Terminal and Browser
 hs.hotkey.bind(hyper, "T", launchWezterm)
--- hs.hotkey.bind(hyper, "N", launchChrome)
+hs.hotkey.bind(hyper, "N", launchChrome)
 
 -- 1. Create the hotkey but don't enable it yet
 local stopCmdH = hs.hotkey.new({"cmd"}, "h", function() end)
