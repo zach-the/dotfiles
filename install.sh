@@ -15,7 +15,7 @@ configs=(
   "Rofi"             "$DOTFILES/rofi-config.rasi"             "$HOME/.config/rofi/config.rasi"
   "Keyd"             "$DOTFILES/keyd-default.conf"            "/etc/keyd/default.conf"
   "WezTerm"          "$DOTFILES/wezterm"                      "$HOME/.config/wezterm"
-  "Hammerspoon"      "$DOTFILES/hammerspooon-init.lua"        "$HOME/.hammerspoon/init.lua"
+  "Hammerspoon"      "$DOTFILES/hammerspoon-init.lua"         "$HOME/.hammerspoon/init.lua"
   "Karabiner"        "$DOTFILES/karabiner"                    "$HOME/.config/karabiner"
   "Ghostty"          "$DOTFILES/ghostty-config"               "$HOME/.config/ghostty/config"
 )

@@ -315,15 +315,12 @@ end
 -- HELPER FUNCTION FOR GHOSTTY/CHROME LAUNCH FUNCTIONS
 -- =====================================================================
 local function moveSpecificWindow(win)
-    if not win then
-        hs.alert.show("Error: New Kitty window not found.")
-        return
-    end
+    if not win then return end
 
     local mouseScreen = hs.mouse.getCurrentScreen()
     if mouseScreen then
         win:moveToScreen(mouseScreen)
-        win:focus() -- Force focus on the current window/Space
+        win:focus()
     end
 end
 
@@ -385,6 +382,59 @@ local function launchChrome()
     end)
 end
 
+-- =====================================================================
+-- LAUNCH WEZTERM
+-- =====================================================================
+
+local function launchWezterm()
+    -- Snapshot existing WezTerm windows so we can identify the new one later
+    local existingIds = {}
+    local weztermApp = hs.application.get("WezTerm")
+    if weztermApp then
+        for _, w in ipairs(weztermApp:allWindows()) do
+            existingIds[w:id()] = true
+        end
+    end
+
+    -- Find the wezterm CLI binary (hs.task does not inherit shell PATH)
+    local bin
+    for _, p in ipairs({
+        "/opt/homebrew/bin/wezterm",
+        "/usr/local/bin/wezterm",
+        "/Applications/WezTerm.app/Contents/MacOS/wezterm",
+    }) do
+        if hs.fs.attributes(p) then
+            bin = p
+            break
+        end
+    end
+
+    if not bin then
+        hs.alert.show("wezterm CLI not found")
+        return
+    end
+
+    -- `wezterm start` talks to the running WezTerm process via Unix socket IPC.
+    -- A new OS window is created without stealing focus from whatever you're in.
+    hs.task.new(bin, nil, {"start"}):start()
+
+    -- After WezTerm opens the window, move it to the screen under the mouse
+    hs.timer.doAfter(0.4, function()
+        local targetScreen = hs.mouse.getCurrentScreen()
+        local app = hs.application.get("WezTerm")
+        if not app then return end
+
+        for _, w in ipairs(app:allWindows()) do
+            if not existingIds[w:id()] then
+                w:moveToScreen(targetScreen)
+                w:focus()
+                return
+            end
+        end
+    end)
+end
+
+
 --==========================================--
 --  _  __          _     _           _      --
 -- | |/ /___ _   _| |__ (_)_ __   __| |___  --
@@ -442,8 +492,8 @@ hs.hotkey.bind({"cmd", "alt"}, "L", function() smartFocus("East") end)
 hs.hotkey.bind({"cmd", "alt"}, "K", function() smartFocus("North") end)
 hs.hotkey.bind({"cmd", "alt"}, "J", function() smartFocus("South") end)
 
--- Ghostty and Chrome
--- hs.hotkey.bind(hyper, "T", launchGhostty)
+-- Terminal and Browser
+hs.hotkey.bind(hyper, "T", launchWezterm)
 -- hs.hotkey.bind(hyper, "N", launchChrome)
 
 -- 1. Create the hotkey but don't enable it yet
