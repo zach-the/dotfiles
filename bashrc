@@ -66,7 +66,7 @@ export TZ='America/Denver'
     
 [ -f ~/.fzf.bash ] && source ~/.fzf.bash
 
-[ -f /home/zb900042/toolbox/setup/toolboxrc ] && source /home/zb900042/toolbox/setup/toolboxrc
+[ -f /home/zb900042/.zachs_toolbox_sandbox_aliases ] && source /home/zb900042/.zachs_toolbox_sandbox_aliases
 
 [ -f ~/.local_aliases ] && source ~/.local_aliases
 

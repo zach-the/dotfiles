@@ -1,0 +1,220 @@
+#!/usr/bin/env python3
+import sys
+import subprocess
+import difflib
+import shutil
+import re
+import fnmatch
+
+RESET = '\033[0m'
+RED = '\033[31m'
+GREEN = '\033[32m'
+BLUE = '\033[34m'
+PURPLE = '\033[35m'
+DIM = '\033[2m'
+BOLD = '\033[1m'
+CYAN = '\033[36m'
+
+# Add your regex patterns here to ignore specific files/directories
+# e.g., r'\.git/.*', r'.*\.pyc'
+EXCLUDE_PATTERNS = [
+    r'.*\.git/.*',
+    r'.*\.pyc',
+    r'.*def',
+    r'.*log',
+    r'.*rpt',
+    # r'.*\.shadow.*',
+    r'.*csv',
+    r'.*eco.\.tcl',
+]
+
+compiled_excludes = []
+for p in EXCLUDE_PATTERNS:
+    try:
+        compiled_excludes.append(re.compile(p))
+    except re.error:
+        # If it's not a valid regex (like a shell glob), convert it
+        compiled_excludes.append(re.compile(fnmatch.translate(p)))
+
+def get_terminal_width():
+    return shutil.get_terminal_size((80, 24)).columns
+
+def build_ansi_string(char_color_list, width):
+    out = []
+    current_color = ''
+    visual_len = 0
+    for ch, color in char_color_list:
+        if visual_len >= width:
+            break
+        if color != current_color:
+            out.append(RESET if not color else color)
+            current_color = color
+        out.append(ch)
+        visual_len += 1
+        
+    if current_color != '':
+        out.append(RESET)
+        
+    if visual_len < width:
+        out.append(' ' * (width - visual_len))
+        
+    return "".join(out)
+
+def get_inline_diff(old_line, new_line):
+    if old_line is None and new_line is None:
+        return [], []
+    if old_line is None:
+        return [], [(ch, GREEN) for ch in new_line]
+    if new_line is None:
+        return [(ch, RED) for ch in old_line], []
+        
+    old_char_color = []
+    new_char_color = []
+    sm = difflib.SequenceMatcher(None, old_line, new_line)
+    for ctag, i1, i2, j1, j2 in sm.get_opcodes():
+        if ctag == 'equal':
+            old_char_color.extend((old_line[i], '') for i in range(i1, i2))
+            new_char_color.extend((new_line[j], '') for j in range(j1, j2))
+        elif ctag == 'delete':
+            old_char_color.extend((old_line[i], RED) for i in range(i1, i2))
+        elif ctag == 'insert':
+            new_char_color.extend((new_line[j], GREEN) for j in range(j1, j2))
+        elif ctag == 'replace':
+            old_char_color.extend((old_line[i], RED) for i in range(i1, i2))
+            new_char_color.extend((new_line[j], GREEN) for j in range(j1, j2))
+            
+    return old_char_color, new_char_color
+
+def process_diff(iterable):
+    term_width = get_terminal_width()
+    mid_sep = " | "
+    left_width = (term_width - len(mid_sep)) // 2
+    right_width = term_width - len(mid_sep) - left_width
+
+    old_block = []
+    new_block = []
+    skip_current_file = False
+
+    def flush_blocks():
+        if skip_current_file:
+            old_block.clear()
+            new_block.clear()
+            return
+            
+        if not old_block and not new_block:
+            return
+            
+        old_lines = [line[1:] for line in old_block]
+        new_lines = [line[1:] for line in new_block]
+
+        sm = difflib.SequenceMatcher(None, old_lines, new_lines)
+        aligned_old = []
+        aligned_new = []
+        for ctag, i1, i2, j1, j2 in sm.get_opcodes():
+            if ctag == 'equal':
+                for i, j in zip(range(i1, i2), range(j1, j2)):
+                    aligned_old.append(old_lines[i])
+                    aligned_new.append(new_lines[j])
+            elif ctag == 'replace':
+                chunk_old = old_lines[i1:i2]
+                chunk_new = new_lines[j1:j2]
+                max_len = max(len(chunk_old), len(chunk_new))
+                for k in range(max_len):
+                    o = chunk_old[k] if k < len(chunk_old) else None
+                    n = chunk_new[k] if k < len(chunk_new) else None
+                    aligned_old.append(o)
+                    aligned_new.append(n)
+            elif ctag == 'delete':
+                for i in range(i1, i2):
+                    aligned_old.append(old_lines[i])
+                    aligned_new.append(None)
+            elif ctag == 'insert':
+                for j in range(j1, j2):
+                    aligned_old.append(None)
+                    aligned_new.append(new_lines[j])
+
+        for o, n in zip(aligned_old, aligned_new):
+            o_colors, n_colors = get_inline_diff(o, n)
+            left_str = build_ansi_string(o_colors, left_width)
+            right_str = build_ansi_string(n_colors, right_width)
+            sys.stdout.write(f"{left_str}{DIM}{mid_sep}{RESET}{right_str}\n")
+            
+        old_block.clear()
+        new_block.clear()
+
+    for line in iterable:
+        line = line.rstrip('\r\n').expandtabs(4)
+        if line.startswith('---') or line.startswith('+++') or line.startswith('index '):
+            pass
+        elif line.startswith('diff '):
+            flush_blocks()
+            parts = line.split()
+            if len(parts) >= 3:
+                f1 = parts[-2]
+                f2 = parts[-1]
+                skip_current_file = any(p.search(f1) or p.search(f2) for p in compiled_excludes)
+                if skip_current_file:
+                    continue
+                sys.stdout.write(f"\n{BLUE}{BOLD}FILE: {f1} <-> {f2}{RESET}\n")
+            else:
+                skip_current_file = False
+                sys.stdout.write(f"\n{BLUE}{BOLD}{line}{RESET}\n")
+        elif skip_current_file:
+            continue
+        elif line.startswith('@@ '):
+            flush_blocks()
+            parts = line.split('@@')
+            if len(parts) >= 3:
+                nums = parts[1].strip().split()
+                if len(nums) == 2:
+                    old_nums = nums[0][1:]
+                    new_nums = nums[1][1:]
+                    old_start = old_nums.split(',')[0]
+                    new_start = new_nums.split(',')[0]
+                    sys.stdout.write(f"{PURPLE}{BOLD}Lines {old_start} (left) / {new_start} (right):{RESET}\n")
+                else:
+                    sys.stdout.write(f"{PURPLE}{line}{RESET}\n")
+            else:
+                sys.stdout.write(f"{PURPLE}{line}{RESET}\n")
+        elif line.startswith('-'):
+            old_block.append(line)
+        elif line.startswith('+'):
+            new_block.append(line)
+        elif line.startswith(' '):
+            flush_blocks()
+            content = line[1:]
+            c_colors = [(ch, '') for ch in content]
+            left_str = build_ansi_string(c_colors, left_width)
+            right_str = build_ansi_string(c_colors, right_width)
+            sys.stdout.write(f"{left_str}{DIM}{mid_sep}{RESET}{right_str}\n")
+        elif line.startswith('\\'):
+            flush_blocks()
+            sys.stdout.write(f"{DIM}{line}{RESET}\n")
+        else:
+            flush_blocks()
+            sys.stdout.write(f"{line}\n")
+            
+    flush_blocks()
+
+def main():
+    if len(sys.argv) == 2 and sys.argv[1] in ('-h', '--help'):
+        print("Usage: zd <file1> <file2>   OR   <diff generating command> | zd")
+        sys.exit(0)
+        
+    if len(sys.argv) == 1:
+        if sys.stdin.isatty():
+            print("Usage: zd <file1> <file2>   OR   <diff generating command> | zd")
+            sys.exit(1)
+        process_diff(sys.stdin)
+    elif len(sys.argv) == 3:
+        cmd = ['diff', '-u', sys.argv[1], sys.argv[2]]
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, universal_newlines=True)
+        process_diff(p.stdout)
+        p.wait()
+        sys.exit(p.returncode)
+    else:
+        print("Usage: zd <file1> <file2>   OR   <diff generating command> | zd")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()

@@ -24,6 +24,7 @@ alias nvs='nv -O'
 alias work='ssh -Y zb900042@lvnvda8240.lvn.broadcom.net'
 alias redhawk_results='/project/priest/master_scripts/user_scripts/parse_redhawk_sc_block_rpts.ftc.py'
 alias color_test='for i in {0..7}; do printf "\e[48;5;${i}m  "; done; printf "\e[0m\n"; for i in {8..15}; do printf "\e[48;5;${i}m  "; done; printf "\e[0m\n"'
+alias zd='~/dotfiles/zd'
 
 # safe nvim (any file over 50mb will automatically use less/zless)
 nv() {
@@ -141,43 +142,6 @@ md() {
         echo "no arguments supplied. doing nothing"
         return 1
     fi
-}
-
-# --- to easily diff two directories ---
-zd ()
-{ 
-    if [[ -z "$2" ]]; then
-        echo "you need 2 arguments";
-        return 0;
-    fi;
-
-    diff -r -y --suppress-common-lines -W $(tput cols) \
-        --exclude="*def" --exclude="eco?.tcl" --exclude="*csv" \
-        --exclude="*log" --exclude="*rpt" --exclude="*\.shadow*" --expand-tabs "$1" "$2" | \
-        # This sed captures the last two space-separated strings (the paths) 
-        # on lines starting with 'diff'
-        sed -E 's/^diff .* ([^ ]+) ([^ ]+)$/FILE: \1 <-> \2/' | \
-        rg -v "Common\ subdirectories" | \
-        # The -- tells rg that "FILE:" is a pattern, not a flag
-        rg --color=always -- "FILE:.*|Only in |$" 
-}
-# --- same as above, but this one allows you to diff with a .shadow/ directory ---
-zd_with_shadow ()
-{ 
-    if [[ -z "$2" ]]; then
-        echo "you need 2 arguments";
-        return 0;
-    fi;
-
-    diff -r -y --suppress-common-lines -W $(tput cols) \
-        --exclude="*def" --exclude="eco?.tcl" --exclude="*csv" \
-        --exclude="*log" --exclude="*rpt" --expand-tabs "$1" "$2" | \
-        # This sed captures the last two space-separated strings (the paths) 
-        # on lines starting with 'diff'
-        sed -E 's/^diff .* ([^ ]+) ([^ ]+)$/FILE: \1 <-> \2/' | \
-        rg -v "Common\ subdirectories" | \
-        # The -- tells rg that "FILE:" is a pattern, not a flag
-        rg --color=always -- "FILE:.*|Only in .*|$" 
 }
 
 qcursor_ssh_start () {
