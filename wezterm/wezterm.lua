@@ -62,6 +62,14 @@ config.keys = {
   { key = 'w', mods = 'CMD', action = act.CloseCurrentPane { confirm = false } },
   { key = 'w', mods = 'CTRL|SHIFT', action = act.CloseCurrentPane { confirm = false } },
   
+  -- Pop out and pop in tabs
+  -- "Pop out" current tab to a new window
+  { key = 'd', mods = 'CTRL|SHIFT', action = wezterm.action_callback(function(win, pane)
+    pane:move_to_new_window()
+  end) },
+  -- "Pop in" a tab from another window into the current one
+  { key = 'i', mods = 'CTRL|SHIFT', action = act.PaneSelect { mode = 'MoveToNewTab' } },
+  
   -- Vim Keybinds for Navigation
   { key = 'h', mods = 'ALT', action = act.ActivatePaneDirection 'Left' },
   { key = 'l', mods = 'ALT', action = act.ActivatePaneDirection 'Right' },
