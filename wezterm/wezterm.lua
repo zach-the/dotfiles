@@ -4,7 +4,7 @@ local act = wezterm.action
 
 -- Font Configuration
 config.font = wezterm.font 'JetBrainsMono Nerd Font Mono'
-config.font_size = 12.5
+config.font_size = 12
 
 -- Default Window Size
 -- Note: WezTerm uses columns/rows, not pixels. Adjust these to match your old 1100x600 size.
@@ -30,7 +30,7 @@ config.hide_tab_bar_if_only_one_tab = true
 -- config.tab_bar_at_bottom = true
 
 -- OS Specific Settings
-config.window_decorations = "RESIZE"
+config.window_decorations = "NONE"
 config.send_composed_key_when_left_alt_is_pressed = false -- macos_option_as_alt equivalent
 config.send_composed_key_when_right_alt_is_pressed = false
 
