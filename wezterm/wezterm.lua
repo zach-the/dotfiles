@@ -8,7 +8,7 @@ local is_linux = wezterm.target_triple:find("linux") ~= nil
 
 -- Font Configuration
 config.font = wezterm.font 'JetBrainsMono Nerd Font Mono'
-config.font_size = 12
+config.font_size = is_linux and 12 or 13
 
 -- Default Window Size
 -- Note: WezTerm uses columns/rows, not pixels. Adjust these to match your old 1100x600 size.
@@ -34,11 +34,7 @@ config.hide_tab_bar_if_only_one_tab = true
 -- config.tab_bar_at_bottom = true
 
 -- OS Specific Settings
-if is_linux then
-  config.window_decorations = "NONE"
-else
-  config.window_decorations = "RESIZE"
-end
+config.window_decorations = is_linux and "NONE" or "RESIZE" -- if linux, use NONE, else use RESIZE (needed for MACOS)
 config.send_composed_key_when_left_alt_is_pressed = false -- macos_option_as_alt equivalent
 config.send_composed_key_when_right_alt_is_pressed = false
 
