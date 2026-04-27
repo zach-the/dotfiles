@@ -1,7 +1,6 @@
 # --- Aliases ---
 alias ls='ls --color=auto'
 alias grep='grep --color=auto'
-alias lg='ls -lrt | rg'
 alias zg='rg -z'
 alias rgs='rg -S'
 alias zgs='rg -z -S'
@@ -25,6 +24,8 @@ alias work='ssh -Y zb900042@lvnvda8240.lvn.broadcom.net'
 alias redhawk_results='/project/priest/master_scripts/user_scripts/parse_redhawk_sc_block_rpts.ftc.py'
 alias color_test='for i in {0..7}; do printf "\e[48;5;${i}m  "; done; printf "\e[0m\n"; for i in {8..15}; do printf "\e[48;5;${i}m  "; done; printf "\e[0m\n"'
 alias zd='~/dotfiles/zd'
+alias pp='realpath'
+alias rs='rsync -aHAX --info=progress2'
 
 # safe nvim (any file over 50mb will automatically use less/zless)
 nv() {
@@ -142,11 +143,4 @@ md() {
         echo "no arguments supplied. doing nothing"
         return 1
     fi
-}
-
-qcursor_ssh_start () {
-    cd /project/priest_4/giant/giant-2025.7.2/user/zb900042/PN99.0.LIB1.fp17.23Oct2025.dft.251025/impl/broadcom_cloud_noncritical_zb900042/
-    so ~/.junklog /tools/ictools/bin/qcursor --ssh-container ./
-    echo "started qcursordb"
-    cd .qcursordata
 }
