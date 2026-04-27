@@ -2,6 +2,10 @@ local wezterm = require 'wezterm'
 local config = wezterm.config_builder()
 local act = wezterm.action
 
+-- Helper variables to identify the OS based on the target_triple
+local is_mac = wezterm.target_triple:find("darwin") ~= nil
+local is_linux = wezterm.target_triple:find("linux") ~= nil
+
 -- Font Configuration
 config.font = wezterm.font 'JetBrainsMono Nerd Font Mono'
 config.font_size = 12
@@ -30,7 +34,11 @@ config.hide_tab_bar_if_only_one_tab = true
 -- config.tab_bar_at_bottom = true
 
 -- OS Specific Settings
-config.window_decorations = "NONE"
+if is_linux then
+  config.window_decorations = "NONE"
+else
+  config.window_decorations = "RESIZE"
+end
 config.send_composed_key_when_left_alt_is_pressed = false -- macos_option_as_alt equivalent
 config.send_composed_key_when_right_alt_is_pressed = false
 
