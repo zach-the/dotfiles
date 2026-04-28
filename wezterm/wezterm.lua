@@ -8,7 +8,7 @@ local is_linux = wezterm.target_triple:find("linux") ~= nil
 
 -- Font Configuration
 config.font = wezterm.font 'JetBrainsMono Nerd Font Mono'
-config.font_size = is_linux and 12 or 13
+config.font_size = is_linux and 11 or 13
 
 -- Default Window Size
 -- Note: WezTerm uses columns/rows, not pixels. Adjust these to match your old 1100x600 size.
