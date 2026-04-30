@@ -21,6 +21,8 @@ using namespace Layout;
 static constexpr double ULTRAWIDE_RATIO = 2.1;
 static constexpr float  MIN_COL_FRAC    = 0.1f;
 
+static HANDLE g_handle = nullptr;
+
 // Binary tree node for dwindle layout — used for normal monitors and per-column in ultrawide.
 struct SDwindleNode {
     SP<ITarget>                   target;
@@ -161,6 +163,12 @@ class CUltrawideImprovedAlgorithm final : public ITiledAlgorithm {
         auto existing = getUltrawideTiledTargets();
         int  n        = (int)existing.size();
 
+        HyprlandAPI::addNotification(g_handle,
+            "[UW] newTarget n=" + std::to_string(n) +
+            " mouseX=" + std::to_string((int)g_pInputManager->getMouseCoordsInternal().x) +
+            " waX=" + std::to_string((int)workArea.x) + " waW=" + std::to_string((int)workArea.w),
+            CHyprColor{0.2f, 0.6f, 1.0f, 1.0f}, 6000.0f);
+
         if (n == 0) {
             m_numCols      = 1;
             m_colWidths[0] = 1.0f;
@@ -179,6 +187,11 @@ class CUltrawideImprovedAlgorithm final : public ITiledAlgorithm {
             // The existing window (currently in col 0) moves to the other column.
             int newCol      = pickColumnByCentroid(workArea, 2);
             int existingCol = 1 - newCol;
+
+            HyprlandAPI::addNotification(g_handle,
+                "[UW] n=1: newCol=" + std::to_string(newCol) +
+                " existingCol=" + std::to_string(existingCol),
+                CHyprColor{0.2f, 1.0f, 0.4f, 1.0f}, 6000.0f);
 
             if (existingCol != 0) {
                 // Move existing window from col 0 to col 1.
@@ -235,6 +248,9 @@ class CUltrawideImprovedAlgorithm final : public ITiledAlgorithm {
             if (w.lock() == target) { known = true; break; }
 
         if (!known) {
+            HyprlandAPI::addNotification(g_handle,
+                "[UW] movedTarget UNKNOWN → inserting into col (numCols=" + std::to_string(m_numCols) + ")",
+                CHyprColor{1.0f, 0.6f, 0.2f, 1.0f}, 6000.0f);
             int col = (m_numCols > 0) ? pickColumnByCentroidActual(workArea) : 0;
             if (m_numCols == 0) {
                 m_numCols      = 1;
@@ -700,6 +716,7 @@ APICALL EXPORT std::string pluginAPIVersion() {
 }
 
 APICALL EXPORT PLUGIN_DESCRIPTION_INFO pluginInit(HANDLE handle) {
+    g_handle = handle;
     HyprlandAPI::addTiledAlgo(
         handle,
         "ultrawide-dwindle-improved",
