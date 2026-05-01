@@ -92,6 +92,7 @@ config.keys = {
   { key = 'w', mods = 'CTRL|SHIFT', action = act.SendString '\x02W' },
   { key = 'h', mods = 'CTRL|SHIFT', action = act.SendString '\x02H' },
   { key = 'l', mods = 'CTRL|SHIFT', action = act.SendString '\x02L' },
+  { key = 'r', mods = 'CTRL|SHIFT', action = act.SendString '\x02R' },
 }
 
 -- Mouse Bindings
