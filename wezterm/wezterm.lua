@@ -84,6 +84,13 @@ config.keys = {
   { key = 'l', mods = 'ALT', action = act.ActivatePaneDirection 'Right' },
   { key = 'k', mods = 'ALT', action = act.ActivatePaneDirection 'Up' },
   { key = 'j', mods = 'ALT', action = act.ActivatePaneDirection 'Down' },
+
+
+  -- tmux support
+  { key = 't', mods = 'CTRL|SHIFT', action = act.SendString '\x02T' },
+  { key = 'w', mods = 'CTRL|SHIFT', action = act.SendString '\x02W' },
+  { key = 'h', mods = 'CTRL|SHIFT', action = act.SendString '\x02H' },
+  { key = 'l', mods = 'CTRL|SHIFT', action = act.SendString '\x02L' },
 }
 
 -- Mouse Bindings
