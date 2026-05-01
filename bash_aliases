@@ -26,6 +26,7 @@ alias color_test='for i in {0..7}; do printf "\e[48;5;${i}m  "; done; printf "\e
 alias zd='~/dotfiles/zd'
 alias pp='realpath'
 alias rs='rsync -aHAX --info=progress2'
+alias tm='tmux new-session -t 0 \; set-option destroy-unattached on'
 
 # safe nvim (any file over 50mb will automatically use less/zless)
 nv() {
