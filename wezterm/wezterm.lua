@@ -55,10 +55,10 @@ config.keys = {
   -- { key = 'H', mods = 'ALT|SHIFT', action = act.SendKey { key = 'LeftArrow', mods = 'CTRL' } },
   -- { key = 'L', mods = 'ALT|SHIFT', action = act.SendKey { key = 'RightArrow', mods = 'CTRL' } },
 
-  -- Split Panes
-  { key = '-', mods = 'ALT', action = act.SplitVertical { domain = 'CurrentPaneDomain' } }, -- top/bottom split
-  { key = '\\', mods = 'ALT', action = act.SplitHorizontal { domain = 'CurrentPaneDomain' } }, -- left/right split
-  
+  -- WezTerm splits (was ALT, now CMD+SHIFT)
+  { key = '-',  mods = 'CMD|SHIFT', action = act.SplitVertical { domain = 'CurrentPaneDomain' } },
+  { key = '\\', mods = 'CMD|SHIFT', action = act.SplitHorizontal { domain = 'CurrentPaneDomain' } },
+ 
   -- Pane Swapping / Rotation
   { key = 'p', mods = 'ALT', action = act.PaneSelect { mode = 'SwapWithActive' } },
   { key = 'n', mods = 'ALT', action = act.PaneSelect { mode = 'SwapWithActive' } },
@@ -85,6 +85,9 @@ config.keys = {
   { key = 'k', mods = 'ALT', action = act.ActivatePaneDirection 'Up' },
   { key = 'j', mods = 'ALT', action = act.ActivatePaneDirection 'Down' },
 
+  -- tmux split passthroughs
+  { key = '-',  mods = 'CTRL|SHIFT', action = act.SendString '\x02-' },
+  { key = '\\', mods = 'CTRL|SHIFT', action = act.SendString '\x02\\' },
 
   -- tmux support
   { key = 't', mods = 'CTRL|SHIFT', action = act.SendString '\x02T' },
