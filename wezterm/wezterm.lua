@@ -86,13 +86,12 @@ config.keys = {
   -- { key = 'j', mods = 'ALT', action = act.ActivatePaneDirection 'Down' },
 
   -- tmux support
-  { key = '_',  mods = 'CTRL|SHIFT', action = act.SendString '\x02_' },
-  { key = '|',  mods = 'CTRL|SHIFT', action = act.SendString '\x02|' },
-  { key = 't', mods = 'CTRL|SHIFT', action = act.SendString '\x02T' },
-  { key = 'w', mods = 'CTRL|SHIFT', action = act.SendString '\x02W' },
-  { key = 'h', mods = 'CTRL|SHIFT', action = act.SendString '\x02H' },
-  { key = 'l', mods = 'CTRL|SHIFT', action = act.SendString '\x02L' },
-  { key = 'r', mods = 'CTRL|SHIFT', action = act.SendString '\x02R' },
+  -- { key = '_',  mods = 'CTRL|SHIFT', action = act.SendString '\x02_' },
+  -- { key = '|',  mods = 'CTRL|SHIFT', action = act.SendString '\x02|' },
+  -- { key = 't', mods = 'CTRL|SHIFT', action = act.SendString '\x02T' },
+  -- { key = 'w', mods = 'CTRL|SHIFT', action = act.SendString '\x02W' },
+  -- { key = 'h', mods = 'CTRL|SHIFT', action = act.SendString '\x02H' },
+  -- { key = 'l', mods = 'CTRL|SHIFT', action = act.SendString '\x02L' },
 }
 
 -- Mouse Bindings
