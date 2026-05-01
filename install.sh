@@ -18,6 +18,7 @@ configs=(
   "Hammerspoon"      "$DOTFILES/hammerspoon-init.lua"         "$HOME/.hammerspoon/init.lua"
   "Karabiner"        "$DOTFILES/karabiner"                    "$HOME/.config/karabiner"
   "Ghostty"          "$DOTFILES/ghostty-config"               "$HOME/.config/ghostty/config"
+  "TMUX"             "$DOTFILES/tmux.conf"                    "$HOME/.tmux.conf"
 )
 
 # --- Helpers ---
