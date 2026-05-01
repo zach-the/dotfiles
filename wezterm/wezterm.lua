@@ -79,11 +79,11 @@ config.keys = {
   -- "Pop in" a tab from another window into the current one
   { key = 'i', mods = 'CTRL|SHIFT', action = act.PaneSelect { mode = 'MoveToNewTab' } },
   
-  -- Vim Keybinds for Navigation
-  { key = 'h', mods = 'ALT', action = act.ActivatePaneDirection 'Left' },
-  { key = 'l', mods = 'ALT', action = act.ActivatePaneDirection 'Right' },
-  { key = 'k', mods = 'ALT', action = act.ActivatePaneDirection 'Up' },
-  { key = 'j', mods = 'ALT', action = act.ActivatePaneDirection 'Down' },
+  -- Vim Keybinds for Navigation (replaced by tmux)
+  -- { key = 'h', mods = 'ALT', action = act.ActivatePaneDirection 'Left' },
+  -- { key = 'l', mods = 'ALT', action = act.ActivatePaneDirection 'Right' },
+  -- { key = 'k', mods = 'ALT', action = act.ActivatePaneDirection 'Up' },
+  -- { key = 'j', mods = 'ALT', action = act.ActivatePaneDirection 'Down' },
 
   -- tmux support
   { key = '_',  mods = 'CTRL|SHIFT', action = act.SendString '\x02_' },
