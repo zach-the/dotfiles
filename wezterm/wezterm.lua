@@ -47,8 +47,8 @@ config.keys = {
   { key = 'l', mods = 'CTRL', action = act.SendString '\x1b[C' },
 
   -- alt+shift+h/l move left/right by a word
-  { key = 'H', mods = 'ALT|SHIFT', action = act.SendKey { key = 'LeftArrow', mods = 'CTRL' } },
-  { key = 'L', mods = 'ALT|SHIFT', action = act.SendKey { key = 'RightArrow', mods = 'CTRL' } },
+  -- { key = 'H', mods = 'ALT|SHIFT', action = act.SendKey { key = 'LeftArrow', mods = 'CTRL' } },
+  -- { key = 'L', mods = 'ALT|SHIFT', action = act.SendKey { key = 'RightArrow', mods = 'CTRL' } },
 
   -- Split Panes
   { key = '-', mods = 'ALT', action = act.SplitVertical { domain = 'CurrentPaneDomain' } }, -- top/bottom split
@@ -61,8 +61,8 @@ config.keys = {
   { key = 'm', mods = 'ALT', action = act.RotatePanes 'Clockwise' },
 
   -- Kitty Tab Actions
-  { key = 'H', mods = 'CTRL|SHIFT', action = act.ActivateTabRelative(-1) },
-  { key = 'L', mods = 'CTRL|SHIFT', action = act.ActivateTabRelative(1) },
+  { key = 'H', mods = 'CMD', action = act.ActivateTabRelative(-1) },
+  { key = 'L', mods = 'CMD', action = act.ActivateTabRelative(1) },
   { key = 'w', mods = 'CMD', action = act.CloseCurrentPane { confirm = false } },
   { key = 'w', mods = 'CTRL|SHIFT', action = act.CloseCurrentPane { confirm = false } },
   
