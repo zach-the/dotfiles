@@ -55,9 +55,9 @@ config.keys = {
   -- { key = 'H', mods = 'ALT|SHIFT', action = act.SendKey { key = 'LeftArrow', mods = 'CTRL' } },
   -- { key = 'L', mods = 'ALT|SHIFT', action = act.SendKey { key = 'RightArrow', mods = 'CTRL' } },
 
-  -- WezTerm splits (was ALT, now CMD+SHIFT)
-  { key = '-',  mods = 'CMD|SHIFT', action = act.SplitVertical { domain = 'CurrentPaneDomain' } },
-  { key = '\\', mods = 'CMD|SHIFT', action = act.SplitHorizontal { domain = 'CurrentPaneDomain' } },
+  -- WezTerm splits (was ALT, now SUPER+SHIFT)
+  { key = '-',  mods = 'SUPER|SHIFT', action = act.SplitVertical { domain = 'CurrentPaneDomain' } },
+  { key = '\\', mods = 'SUPER|SHIFT', action = act.SplitHorizontal { domain = 'CurrentPaneDomain' } },
  
   -- Pane Swapping / Rotation
   { key = 'p', mods = 'ALT', action = act.PaneSelect { mode = 'SwapWithActive' } },
@@ -66,10 +66,10 @@ config.keys = {
   { key = 'm', mods = 'ALT', action = act.RotatePanes 'Clockwise' },
 
   -- Kitty Tab Actions
-  { key = 'H', mods = 'CMD', action = act.ActivateTabRelative(-1) },
-  { key = 'L', mods = 'CMD', action = act.ActivateTabRelative(1) },
-  { key = 'w', mods = 'CMD', action = act.CloseCurrentPane { confirm = false } },
-  { key = 't', mods = 'CMD', action = act.SpawnTab 'CurrentPaneDomain' }, 
+  { key = 'H', mods = 'SUPER', action = act.ActivateTabRelative(-1) },
+  { key = 'L', mods = 'SUPER', action = act.ActivateTabRelative(1) },
+  { key = 'w', mods = 'SUPER', action = act.CloseCurrentPane { confirm = false } },
+  { key = 't', mods = 'SUPER', action = act.SpawnTab 'CurrentPaneDomain' }, 
   
   -- Pop out and pop in tabs
   -- "Pop out" current tab to a new window
@@ -86,8 +86,8 @@ config.keys = {
   { key = 'j', mods = 'ALT', action = act.ActivatePaneDirection 'Down' },
 
   -- tmux support
-  { key = '_',  mods = 'CTRL', action = act.SendString '\x02-' },
-  { key = '|',  mods = 'CTRL', action = act.SendString '\x02\\' },
+  { key = '_',  mods = 'CTRL|SHIFT', action = act.SendString '\x02_' },
+  { key = '|',  mods = 'CTRL|SHIFT', action = act.SendString '\x02|' },
   { key = 't', mods = 'CTRL|SHIFT', action = act.SendString '\x02T' },
   { key = 'w', mods = 'CTRL|SHIFT', action = act.SendString '\x02W' },
   { key = 'h', mods = 'CTRL|SHIFT', action = act.SendString '\x02H' },
