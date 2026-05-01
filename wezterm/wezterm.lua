@@ -117,10 +117,10 @@ wezterm.on(
     local edge_background = '#0d0d17' -- the base tab bar background
 
     if tab.is_active then
-      background = '#ff007f' -- active bg (pink)
+      background = '#33ccff' -- hover bg (blue)
       foreground = '#0d0d17' -- active fg (obsidian)
     elseif hover then
-      background = '#33ccff' -- hover bg (blue)
+      background = '#ff007f' -- active bg (pink)
       foreground = '#0d0d17' -- hover fg
     end
 
