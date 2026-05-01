@@ -1,6 +1,7 @@
 local wezterm = require 'wezterm'
 local config = wezterm.config_builder()
 local act = wezterm.action
+config.disable_default_key_bindings = true
 
 -- Helper variables to identify the OS based on the target_triple
 local is_mac = wezterm.target_triple:find("darwin") ~= nil
@@ -40,6 +41,10 @@ config.send_composed_key_when_right_alt_is_pressed = false
 
 -- Keybinds
 config.keys = {
+  -- Copy/Paste
+  { key = 'c', mods = 'CTRL|SHIFT', action = act.CopyTo 'Clipboard' },
+  { key = 'v', mods = 'CTRL|SHIFT', action = act.PasteFrom 'Clipboard' },
+
   -- ctrl+hjkl to send arrow keys
   { key = 'k', mods = 'CTRL', action = act.SendString '\x1b[A' },
   { key = 'j', mods = 'CTRL', action = act.SendString '\x1b[B' },
@@ -64,7 +69,7 @@ config.keys = {
   { key = 'H', mods = 'CMD', action = act.ActivateTabRelative(-1) },
   { key = 'L', mods = 'CMD', action = act.ActivateTabRelative(1) },
   { key = 'w', mods = 'CMD', action = act.CloseCurrentPane { confirm = false } },
-  { key = 'w', mods = 'CTRL|SHIFT', action = act.CloseCurrentPane { confirm = false } },
+  { key = 't', mods = 'CMD', action = act.SpawnTab 'CurrentPaneDomain' }, 
   
   -- Pop out and pop in tabs
   -- "Pop out" current tab to a new window
