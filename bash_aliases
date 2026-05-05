@@ -39,11 +39,16 @@ tm() {
     fi
 
     # Format numeric session names as "session #N" for display
-    local display
-    display=$(echo "$sessions" | awk '{
-        if ($0 ~ /^[0-9]+$/) printf "session #%s\n", $0
-        else print $0
-    }')
+    local display=""
+    while IFS= read -r name; do
+        name="${name%$'\r'}"  # strip any carriage return
+        if [[ "$name" =~ ^[0-9]+$ ]]; then
+            display+="session #${name}"$'\n'
+        else
+            display+="${name}"$'\n'
+        fi
+    done <<< "$sessions"
+    display="${display%$'\n'}"
 
     choice=$(printf "%s\n%s" "$display" "$new_label" | fzf --prompt="tmux> ")
     [[ -z "$choice" ]] && return
