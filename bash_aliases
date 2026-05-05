@@ -38,13 +38,23 @@ tm() {
         return
     fi
 
-    choice=$(printf "%s\n%s" "$sessions" "$new_label" | fzf --prompt="tmux> ")
+    # Format numeric session names as "session #N" for display
+    local display
+    display=$(echo "$sessions" | awk '{
+        if ($0 ~ /^[0-9]+$/) printf "session #%s\n", $0
+        else print $0
+    }')
+
+    choice=$(printf "%s\n%s" "$display" "$new_label" | fzf --prompt="tmux> ")
     [[ -z "$choice" ]] && return
 
     if [[ "$choice" == "$new_label" ]]; then
         tmux new-session
     else
-        tmux attach-session -t "$choice"
+        # Reverse display label back to actual session name
+        local session_name="$choice"
+        [[ "$choice" =~ ^session\ #([0-9]+)$ ]] && session_name="${BASH_REMATCH[1]}"
+        tmux attach-session -t "$session_name"
     fi
 }
 
