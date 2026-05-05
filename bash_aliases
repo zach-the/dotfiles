@@ -29,7 +29,7 @@ alias rs='rsync -aHAX --info=progress2'
 tm() {
     local new_label="  [new session]"
     local sessions
-    sessions=$(tmux ls 2>/dev/null)
+    sessions=$(tmux list-sessions -F '#{session_name}' 2>/dev/null)
 
     local choice
     if [[ -z "$sessions" ]]; then
@@ -44,9 +44,7 @@ tm() {
     if [[ "$choice" == "$new_label" ]]; then
         tmux new-session
     else
-        # Extract session name (the part before the first colon)
-        local session_name="${choice%%:*}"
-        tmux attach-session -t "$session_name"
+        tmux attach-session -t "$choice"
     fi
 }
 
