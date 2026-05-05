@@ -2,24 +2,48 @@
 
 DOTFILES="$HOME/dotfiles"
 
-# --- Config list ---
+# --- OS detection ---
+OS="unknown"
+if [[ "$(uname)" == "Darwin" ]]; then
+  OS="mac"
+elif [[ "$(uname)" == "Linux" ]]; then
+  OS="linux"
+fi
+echo "Detected OS: $OS"
+
+# --- Config lists ---
 # Every 3 elements form one entry: "Name" "source" "destination"
-configs=(
+
+universal_configs=(
   "Neovim"           "$DOTFILES/nvim-init.lua"                "$HOME/.config/nvim/init.lua"
   "Bash RC"          "$DOTFILES/bashrc"                       "$HOME/.bashrc"
   "Bash Aliases"     "$DOTFILES/bash_aliases"                 "$HOME/.bash_aliases"
-  "Kitty"            "$DOTFILES/kitty"                        "$HOME/.config/kitty"
-  "Waybar"           "$DOTFILES/waybar"                       "$HOME/.config/waybar"
-  "MPV"              "$DOTFILES/mpv.conf"                     "$HOME/.config/mpv/mpv.conf"
+  # "Kitty"            "$DOTFILES/kitty"                        "$HOME/.config/kitty"
   "Powerline Shell"  "$DOTFILES/powerline-shell.config.json"  "$HOME/.config/powerline-shell/config.json"
-  "Rofi"             "$DOTFILES/rofi-config.rasi"             "$HOME/.config/rofi/config.rasi"
-  "Keyd"             "$DOTFILES/keyd-default.conf"            "/etc/keyd/default.conf"
   "WezTerm"          "$DOTFILES/wezterm"                      "$HOME/.config/wezterm"
-  "Hammerspoon"      "$DOTFILES/hammerspoon-init.lua"         "$HOME/.hammerspoon/init.lua"
-  "Karabiner"        "$DOTFILES/karabiner"                    "$HOME/.config/karabiner"
-  "Ghostty"          "$DOTFILES/ghostty-config"               "$HOME/.config/ghostty/config"
+  # "Ghostty"          "$DOTFILES/ghostty-config"               "$HOME/.config/ghostty/config"
   "TMUX"             "$DOTFILES/tmux.conf"                    "$HOME/.tmux.conf"
 )
+
+linux_only_configs=(
+  "Waybar"           "$DOTFILES/waybar"                       "$HOME/.config/waybar"
+  "Rofi"             "$DOTFILES/rofi-config.rasi"             "$HOME/.config/rofi/config.rasi"
+  "Keyd"             "$DOTFILES/keyd-default.conf"            "/etc/keyd/default.conf"
+  "MPV"              "$DOTFILES/mpv.conf"                     "$HOME/.config/mpv/mpv.conf"
+)
+
+mac_only_configs=(
+  "Hammerspoon"      "$DOTFILES/hammerspoon-init.lua"         "$HOME/.hammerspoon/init.lua"
+  "Karabiner"        "$DOTFILES/karabiner"                    "$HOME/.config/karabiner"
+)
+
+# Build the active config list based on OS
+configs=("${universal_configs[@]}")
+if [[ "$OS" == "linux" ]]; then
+  configs+=("${linux_only_configs[@]}")
+elif [[ "$OS" == "mac" ]]; then
+  configs+=("${mac_only_configs[@]}")
+fi
 
 # --- Helpers ---
 
