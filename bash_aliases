@@ -26,7 +26,29 @@ alias color_test='for i in {0..7}; do printf "\e[48;5;${i}m  "; done; printf "\e
 alias zd='~/dotfiles/zd'
 alias pp='realpath'
 alias rs='rsync -aHAX --info=progress2'
-alias tm='tmux new-session -t 0 \; set-option destroy-unattached on'
+tm() {
+    local new_label="  [new session]"
+    local sessions
+    sessions=$(tmux ls 2>/dev/null)
+
+    local choice
+    if [[ -z "$sessions" ]]; then
+        # No sessions exist — skip fzf and just create one
+        tmux new-session
+        return
+    fi
+
+    choice=$(printf "%s\n%s" "$sessions" "$new_label" | fzf --prompt="tmux> ")
+    [[ -z "$choice" ]] && return
+
+    if [[ "$choice" == "$new_label" ]]; then
+        tmux new-session
+    else
+        # Extract session name (the part before the first colon)
+        local session_name="${choice%%:*}"
+        tmux attach-session -t "$session_name"
+    fi
+}
 
 # safe nvim (any file over 50mb will automatically use less/zless)
 nv() {
