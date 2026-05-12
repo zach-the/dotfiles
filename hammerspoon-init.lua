@@ -458,9 +458,9 @@ end
 -- Ramps from 1x to 5x speed over 5 seconds on an exponential curve
 local scrollTimer = nil
 local scrollStartTime = nil
-local BASE_SPEED = 10
-local MAX_MULT = 5
-local RAMP_SECS = 5
+local BASE_SPEED = 20
+local MAX_MULT = 60
+local RAMP_SECS = 6
 
 local function startScroll(dy)
     if scrollTimer then scrollTimer:stop() end
@@ -468,7 +468,7 @@ local function startScroll(dy)
     scrollTimer = hs.timer.doEvery(0.016, function()
         local elapsed = math.min(hs.timer.secondsSinceEpoch() - scrollStartTime, RAMP_SECS)
         local mult = MAX_MULT ^ (elapsed / RAMP_SECS)  -- 1x at t=0, 5x at t=5
-        hs.eventtap.scrollWheel({0, dy * mult}, {}, "pixel")
+        hs.eventtap.scrollWheel({0, math.floor(dy * mult)}, {}, "pixel")
     end)
 end
 
