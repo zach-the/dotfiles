@@ -31,7 +31,7 @@ alias rs='rsync -aHAX --info=progress2'
 tm() {
     local new_label="  [new session]"
     local sessions
-    sessions=$(tmux list-sessions -F '#{session_name}' 2>/dev/null)
+    sessions=$(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -vE '^.+-[0-9]{10}$')
 
     local choice
     if [[ -z "$sessions" ]]; then
