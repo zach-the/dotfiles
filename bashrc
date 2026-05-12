@@ -72,3 +72,37 @@ export TZ='America/Denver'
 
 clear
 
+# Function to keep track of directory changes
+_track_dir_change() {
+    # Initialize if empty
+    if [[ -z "${_DIR_HISTORY[*]}" ]]; then
+        _DIR_HISTORY=("$PWD")
+        _DIR_HISTORY_INDEX=0
+    fi
+
+    local hist_dir="${_DIR_HISTORY[$_DIR_HISTORY_INDEX]}"
+
+    if [[ "$PWD" != "$hist_dir" ]]; then
+        # A new directory change occurred! Truncate forward history
+        _DIR_HISTORY=("${_DIR_HISTORY[@]:0:$((_DIR_HISTORY_INDEX + 1))}")
+        
+        # Add new directory
+        _DIR_HISTORY+=("$PWD")
+        ((_DIR_HISTORY_INDEX++))
+        
+        # Limit history size to 100 to prevent unbounded growth
+        if (( ${#_DIR_HISTORY[@]} > 100 )); then
+            _DIR_HISTORY=("${_DIR_HISTORY[@]:1}")
+            ((_DIR_HISTORY_INDEX--))
+        fi
+    fi
+}
+
+# Append our tracking function to PROMPT_COMMAND safely
+if [[ -z "$PROMPT_COMMAND" ]]; then
+    PROMPT_COMMAND="_track_dir_change"
+else
+    if [[ "$PROMPT_COMMAND" != *"_track_dir_change"* ]]; then
+        PROMPT_COMMAND="_track_dir_change; $PROMPT_COMMAND"
+    fi
+fi

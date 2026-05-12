@@ -179,3 +179,30 @@ md() {
         return 1
     fi
 }
+
+# --- Directory history navigation ---
+b() {
+    if (( _DIR_HISTORY_INDEX > 0 )); then
+        local target="${_DIR_HISTORY[$((_DIR_HISTORY_INDEX - 1))]}"
+        if cd "$target" 2>/dev/null; then
+            ((_DIR_HISTORY_INDEX--))
+        else
+            echo "Failed to go back."
+        fi
+    else
+        echo "No previous directory stored."
+    fi
+}
+
+f() {
+    if (( _DIR_HISTORY_INDEX < ${#_DIR_HISTORY[@]} - 1 )); then
+        local target="${_DIR_HISTORY[$((_DIR_HISTORY_INDEX + 1))]}"
+        if cd "$target" 2>/dev/null; then
+            ((_DIR_HISTORY_INDEX++))
+        else
+            echo "Failed to go forward."
+        fi
+    else
+        echo "No next directory stored."
+    fi
+}
