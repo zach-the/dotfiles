@@ -11,6 +11,12 @@
     },
     "git",
     "newline",
+    {
+      "type": "stdout",
+      "command": ["sh", "-c", "basename \"$PWD\""],
+      "fg_color": 0,
+      "bg_color": 2
+    },
     "root"
   ],
   "mode": "patched",
