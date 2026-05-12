@@ -26,6 +26,8 @@ alias color_test='for i in {0..7}; do printf "\e[48;5;${i}m  "; done; printf "\e
 alias zd='~/dotfiles/zd'
 alias pp='realpath'
 alias rs='rsync -aHAX --info=progress2'
+
+# tmux session manager/attaching
 tm() {
     local new_label="  [new session]"
     local sessions
@@ -51,7 +53,12 @@ tm() {
         # Reverse display label back to actual session name
         local session_name="$choice"
         [[ "$choice" =~ ^session\ #([0-9]+)$ ]] && session_name="${BASH_REMATCH[1]}"
-        tmux attach-session -t "$session_name"
+        
+        # Create a new grouped session with a unique name based on time
+        # This allows multiple terminals to view different windows independently.
+        # We also set destroy-unattached on the new session so it cleans up when detached.
+        local group_session="${session_name}-$(date +%s)"
+        tmux new-session -t "$session_name" -s "$group_session" \; set-option -t "$group_session" destroy-unattached on
     fi
 }
 
