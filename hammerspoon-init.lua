@@ -462,16 +462,25 @@ local scrollStartTime = nil
 local scrollGen = 0  -- incremented on each new scroll; stops stale doAfter callbacks
 local BASE_SPEED = 20
 local REPEAT_TAP_SPEED = 100
-local MAX_MULT = 10
-local RAMP_SECS = 6
-local TAP_WINDOW = 0.2
+local MAX_MULT = 60
+local RAMP_SECS = 3
+local TAP_WINDOW = 0.15
+local TERMINAL_DIVISOR = 1.5
 local lastTapTime = 0
 local lastTapDir = 0
+
+local TERMINAL_APPS = { WezTerm = true, iTerm2 = true, Terminal = true, Ghostty = true, Alacritty = true, kitty = true }
+
+local function isTerminalFocused()
+    local app = hs.application.frontmostApplication()
+    return app and TERMINAL_APPS[app:name()] or false
+end
 
 local function startScroll(dy)
     local now = hs.timer.secondsSinceEpoch()
     local isRepeat = dy * lastTapDir > 0 and (now - lastTapTime) < TAP_WINDOW
     local speed = isRepeat and REPEAT_TAP_SPEED or BASE_SPEED
+    local terminalDivisor = isTerminalFocused() and TERMINAL_DIVISOR or 1
     lastTapTime = now
     lastTapDir = dy
 
@@ -481,7 +490,7 @@ local function startScroll(dy)
     scrollTimer = hs.timer.doEvery(0.016, function()
         local elapsed = math.min(hs.timer.secondsSinceEpoch() - scrollStartTime, RAMP_SECS)
         local mult = MAX_MULT ^ (elapsed / RAMP_SECS)
-        hs.eventtap.scrollWheel({0, math.floor(dy * mult * (speed / BASE_SPEED))}, {}, "pixel")
+        hs.eventtap.scrollWheel({0, math.floor(dy * mult * (speed / BASE_SPEED) / terminalDivisor)}, {}, "pixel")
     end)
 end
 
