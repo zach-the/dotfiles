@@ -72,7 +72,6 @@ vim.o.ignorecase = true
 vim.o.hlsearch = true
 vim.o.clipboard = "unnamedplus"
 vim.o.scrolloff = 5
-vim.o.mouse = "a"
 vim.o.expandtab = true
 vim.o.shiftwidth = 4
 vim.o.tabstop = 4
@@ -311,10 +310,6 @@ require("lazy").setup({
         local get_step = function() return math.floor(vim.api.nvim_win_get_height(0) * 4 / 9) end
         local get_small_step = function() return math.floor(vim.api.nvim_win_get_height(0) * 1 / 8) end
         local get_full_page = function() return vim.api.nvim_win_get_height(0) end
-
-        -- Mouse scroll wheel (route through neoscroll for smooth animation)
-        vim.keymap.set({"n", "v", "i"}, "<ScrollWheelUp>",   function() neoscroll.scroll(-get_small_step(), scroll_opts(small_step_duration)) end)
-        vim.keymap.set({"n", "v", "i"}, "<ScrollWheelDown>", function() neoscroll.scroll(get_small_step(),  scroll_opts(small_step_duration)) end)
 
         -- Standard Keybindings (Updated with hooks)
         vim.keymap.set("n", "<C-y>", function() neoscroll.scroll(-get_small_step(), scroll_opts(small_step_duration)) end)

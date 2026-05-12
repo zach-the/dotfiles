@@ -455,29 +455,55 @@ end
 -- =====================================================================
 -- SCROLL
 -- =====================================================================
--- Ramps from 1x to 5x speed over 5 seconds on an exponential curve
+-- Hold: ramps from 1x to MAX_MULT over RAMP_SECS on an exponential curve
+-- Repeated tap within TAP_WINDOW: uses REPEAT_TAP_SPEED instead of BASE_SPEED
 local scrollTimer = nil
 local scrollStartTime = nil
+local scrollGen = 0  -- incremented on each new scroll; stops stale doAfter callbacks
 local BASE_SPEED = 20
-local MAX_MULT = 60
+local REPEAT_TAP_SPEED = 100
+local MAX_MULT = 10
 local RAMP_SECS = 6
+local TAP_WINDOW = 0.2
+local lastTapTime = 0
+local lastTapDir = 0
 
 local function startScroll(dy)
+    local now = hs.timer.secondsSinceEpoch()
+    local isRepeat = dy * lastTapDir > 0 and (now - lastTapTime) < TAP_WINDOW
+    local speed = isRepeat and REPEAT_TAP_SPEED or BASE_SPEED
+    lastTapTime = now
+    lastTapDir = dy
+
+    scrollGen = scrollGen + 1  -- invalidate any pending stopScroll doAfter
     if scrollTimer then scrollTimer:stop() end
-    scrollStartTime = hs.timer.secondsSinceEpoch()
+    scrollStartTime = now
     scrollTimer = hs.timer.doEvery(0.016, function()
         local elapsed = math.min(hs.timer.secondsSinceEpoch() - scrollStartTime, RAMP_SECS)
-        local mult = MAX_MULT ^ (elapsed / RAMP_SECS)  -- 1x at t=0, 5x at t=5
-        hs.eventtap.scrollWheel({0, math.floor(dy * mult)}, {}, "pixel")
+        local mult = MAX_MULT ^ (elapsed / RAMP_SECS)
+        hs.eventtap.scrollWheel({0, math.floor(dy * mult * (speed / BASE_SPEED))}, {}, "pixel")
     end)
 end
 
+local MIN_SCROLL_DURATION = 0.15  -- taps animate for at least this long
+
 local function stopScroll()
-    if scrollTimer then
+    if not scrollTimer then return end
+    local elapsed = hs.timer.secondsSinceEpoch() - (scrollStartTime or 0)
+    local remaining = MIN_SCROLL_DURATION - elapsed
+    local gen = scrollGen
+    if remaining > 0 then
+        hs.timer.doAfter(remaining, function()
+            if scrollGen ~= gen then return end  -- a new scroll started; don't interfere
+            if scrollTimer then scrollTimer:stop() end
+            scrollTimer = nil
+            scrollStartTime = nil
+        end)
+    else
         scrollTimer:stop()
         scrollTimer = nil
+        scrollStartTime = nil
     end
-    scrollStartTime = nil
 end
 
 -- =====================================================================
