@@ -52,7 +52,7 @@ local function smartFocus(direction)
     local winFrame = win:frame()
     local winCenter = {x = winFrame.x + winFrame.w/2, y = winFrame.y + winFrame.h/2}
 
-    -- FIX: Use visibleWindows() instead of filters. 
+    -- FIX: Use visibleWindows() instead of filters.
     -- Filters cache state and can "lose" Ghostty after a tab close.
     -- This queries the OS directly for the current truth.
     local allWindows = hs.window.visibleWindows()
@@ -63,13 +63,13 @@ local function smartFocus(direction)
         if w:id() ~= win:id() and w:isVisible() and w:isStandard() then
             local f = w:frame()
             local c = {x = f.x + f.w/2, y = f.y + f.h/2}
-            
+
             -- Calculate deltas
             local deltaX = c.x - winCenter.x
             local deltaY = c.y - winCenter.y
-            
+
             local isCandidate = false
-            
+
             -- Geometric "Cone" Check
             -- We ensure the window is mostly in the target direction (avoids diagonals)
             if direction == "West" then
@@ -94,7 +94,7 @@ local function smartFocus(direction)
         table.sort(candidates, function(a, b)
             return a.dist < b.dist
         end)
-        
+
         candidates[1].window:focus()
         moveMouseToWindow(candidates[1].window)
     end
@@ -126,9 +126,9 @@ local function move(x, y, w, h)
     return function()
         local win = hs.window.focusedWindow()
         if not win then return end
-        
+
         snapshot(win)
-        
+
         local f = win:frame()
         local screen = win:screen()
         local max = screen:frame()
@@ -142,13 +142,13 @@ local function move(x, y, w, h)
         -- GAP LOGIC ---------------------------------------------------
         -- Outer Gap = gap
         -- Inner Gap = gap / 2 (We subtract gap/2 from each window to achieve this)
-        
+
         local outerGap = gap
-        local innerWindowPadding = gap / 2 
+        local innerWindowPadding = gap / 2
 
         -- 1. Horizontal Gaps
         -- Left Edge
-        if x == 0 then 
+        if x == 0 then
             f.x = f.x + outerGap
             f.w = f.w - outerGap
         else
@@ -157,9 +157,9 @@ local function move(x, y, w, h)
         end
 
         -- Right Edge (check if x + w is approximately 1)
-        if (x + w) >= 0.99 then 
+        if (x + w) >= 0.99 then
             f.w = f.w - outerGap
-        else 
+        else
             f.w = f.w - innerWindowPadding
         end
 
@@ -179,7 +179,7 @@ local function move(x, y, w, h)
             -- Not touching top (so it's below something)
             f.y = f.y + innerWindowPadding
             f.h = f.h - innerWindowPadding
-            
+
             -- Bottom adjustment
             if (y + h) >= 0.99 then
                 f.h = f.h - outerGap -- Touching bottom
@@ -200,13 +200,13 @@ local function moveDisplay(direction)
         local win = hs.window.focusedWindow()
         if not win then return end
         snapshot(win)
-        
+
         if direction == "next" then
             win:moveOneScreenEast()
         else
             win:moveOneScreenWest()
         end
-        
+
         -- Optional: Center mouse after moving display as well
         hs.timer.doAfter(0.1, function() moveMouseToWindow(win) end)
     end
@@ -220,14 +220,14 @@ end
 local function unMinimizeAll()
     local windows = hs.window.allWindows()
     local count = 0
-    
+
     for _, win in ipairs(windows) do
         if win:isMinimized() then
             win:unminimize()
             count = count + 1
         end
     end
-    
+
     if count > 0 then
     else
         hs.alert.show("No minimized windows found")
@@ -247,7 +247,7 @@ local function maximize()
     local win = hs.window.focusedWindow()
     if win then
         snapshot(win)
-        move(0,0,1,1)() 
+        move(0,0,1,1)()
         -- Note: move() now handles the mouse centering
     end
 end
@@ -255,9 +255,9 @@ end
 -- Center Focused Window
 local function center()
     local win = hs.window.focusedWindow()
-    if win then 
+    if win then
         snapshot(win)
-        win:centerOnScreen() 
+        win:centerOnScreen()
         moveMouseToWindow(win) -- UPDATE: Move mouse to center
     end
 end
@@ -268,10 +268,10 @@ local function resize(action)
         local win = hs.window.focusedWindow()
         if not win then return end
         snapshot(win)
-        
+
         local f = win:frame()
-        local step = 40 
-        
+        local step = 40
+
         if action == "larger" then
             f.x = f.x - step / 2
             f.y = f.y - step / 2
@@ -299,10 +299,10 @@ end
 local function isolateActiveWindow()
     local activeWindow = hs.window.focusedWindow()
     if not activeWindow then return end
-    
+
     -- Get all visible windows across all screens
     local allWindows = hs.window.visibleWindows()
-    
+
     for _, win in ipairs(allWindows) do
         -- Check if the window is NOT the active one and is NOT already minimized
         if win:id() ~= activeWindow:id() then
@@ -331,7 +331,7 @@ end
 
 local function launchGhostty()
     local app = hs.application.get("Ghostty")
-    
+
     if not app then
         -- If Ghostty isn't running at all, just launch it
         hs.application.launchOrFocus("Ghostty")
@@ -452,6 +452,153 @@ local function launchWezterm()
     end)
 end
 
+-- =====================================================================
+-- SCROLL
+-- =====================================================================
+-- Ramps from 1x to 5x speed over 5 seconds on an exponential curve
+local scrollTimer = nil
+local scrollStartTime = nil
+local BASE_SPEED = 10
+local MAX_MULT = 5
+local RAMP_SECS = 5
+
+local function startScroll(dy)
+    if scrollTimer then scrollTimer:stop() end
+    scrollStartTime = hs.timer.secondsSinceEpoch()
+    scrollTimer = hs.timer.doEvery(0.016, function()
+        local elapsed = math.min(hs.timer.secondsSinceEpoch() - scrollStartTime, RAMP_SECS)
+        local mult = MAX_MULT ^ (elapsed / RAMP_SECS)  -- 1x at t=0, 5x at t=5
+        hs.eventtap.scrollWheel({0, dy * mult}, {}, "pixel")
+    end)
+end
+
+local function stopScroll()
+    if scrollTimer then
+        scrollTimer:stop()
+        scrollTimer = nil
+    end
+    scrollStartTime = nil
+end
+
+-- =====================================================================
+-- FAST MULTI-MONITOR SPACE SWITCHING (Primary -> Externals -> Built-in)
+-- =====================================================================
+
+local function getMacOSScreenOrder()
+    local screens = hs.screen.allScreens()
+    local primary = hs.screen.primaryScreen()
+
+    local orderedScreens = { primary }
+    local externals = {}
+    local builtIns = {}
+
+    -- Separate the secondary screens into Externals and Built-ins
+    for _, screen in ipairs(screens) do
+        if screen:id() ~= primary:id() then
+            -- We identify the laptop screen by its standard macOS naming convention
+            if string.match(screen:name(), "Built%-in") then
+                table.insert(builtIns, screen)
+            else
+                table.insert(externals, screen)
+            end
+        end
+    end
+
+    -- Sort multiple externals geometrically (just in case you add a 3rd external monitor later)
+    table.sort(externals, function(a, b) return a:frame().x < b:frame().x end)
+
+    -- Construct the final list: Primary -> Externals -> Built-ins
+    for _, screen in ipairs(externals) do table.insert(orderedScreens, screen) end
+    for _, screen in ipairs(builtIns) do table.insert(orderedScreens, screen) end
+
+    return orderedScreens
+end
+
+-- =====================================================================
+-- THE SWITCHING LOGIC (Hard Boundaries, No Wrap-Around)
+-- =====================================================================
+
+local function switchSpace(direction)
+    local focusedScreen = hs.mouse.getCurrentScreen()
+    local orderedScreens = getMacOSScreenOrder()
+    local activeSpace = hs.spaces.activeSpaceOnScreen(focusedScreen)
+    local localSpaces = hs.spaces.spacesForScreen(focusedScreen)
+
+    local globalSpaces = {}
+    for _, screen in ipairs(orderedScreens) do
+        local screenSpaces = hs.spaces.spacesForScreen(screen)
+        if screenSpaces then
+            for _, spaceID in ipairs(screenSpaces) do
+                table.insert(globalSpaces, spaceID)
+            end
+        end
+    end
+
+    local localIndex = nil
+    for i, spaceID in ipairs(localSpaces) do
+        if spaceID == activeSpace then
+            localIndex = i
+            break
+        end
+    end
+    if not localIndex then return end
+
+    local targetLocalIndex = localIndex + (direction == "next" and 1 or -1)
+
+    -- Hard Wall
+    if targetLocalIndex < 1 or targetLocalIndex > #localSpaces then return end
+
+    local targetSpaceID = localSpaces[targetLocalIndex]
+    local targetGlobalIndex = nil
+    for i, spaceID in ipairs(globalSpaces) do
+        if spaceID == targetSpaceID then
+            targetGlobalIndex = i
+            break
+        end
+    end
+
+    if targetGlobalIndex and targetGlobalIndex <= 9 then
+        hs.eventtap.keyStroke({"ctrl"}, tostring(targetGlobalIndex))
+    end
+end
+
+-- =====================================================================
+-- SPACES X-RAY DEBUGGER
+-- =====================================================================
+
+local function debugSpaces()
+    local orderedScreens = getMacOSScreenOrder()
+    local focusedScreen = hs.mouse.getCurrentScreen()
+
+    local msg = "=== SPACES X-RAY ===\n\n"
+    local globalCounter = 1
+
+    for screenIndex, screen in ipairs(orderedScreens) do
+        local isPrimary = (screen:id() == hs.screen.primaryScreen():id()) and " [PRIMARY]" or ""
+        local isFocused = (screen:id() == focusedScreen:id()) and " [FOCUSED]" or ""
+
+        msg = msg .. "Screen " .. screenIndex .. isPrimary .. isFocused .. "\n"
+        msg = msg .. "Name: " .. screen:name() .. "\n"
+
+        local screenSpaces = hs.spaces.spacesForScreen(screen)
+        local activeSpace = hs.spaces.activeSpaceOnScreen(screen)
+
+        if screenSpaces then
+            for _, spaceID in ipairs(screenSpaces) do
+                local activeMark = (spaceID == activeSpace) and "  <-- ACTIVE" or ""
+                msg = msg .. "  -> Space ID: " .. spaceID .. "  |  Maps to: ^" .. globalCounter .. activeMark .. "\n"
+                globalCounter = globalCounter + 1
+            end
+        else
+            msg = msg .. "  -> No spaces found.\n"
+        end
+        msg = msg .. "\n"
+    end
+
+    print(msg)
+    hs.alert.show(msg, 8)
+end
+
 
 --==========================================--
 --  _  __          _     _           _      --
@@ -462,7 +609,7 @@ end
 --           |___/                          --
 --==========================================--
 
--- Bind to Hyper + H (Left) and Hyper + L (Right)
+-- Space Switching
 hs.hotkey.bind(hyper, "H", function() switchSpace("prev") end)
 hs.hotkey.bind(hyper, "L", function() switchSpace("next") end)
 
@@ -501,29 +648,34 @@ hs.hotkey.bind(hyper, "-", resize("smaller"))       -- Make Smaller
 hs.hotkey.bind(hyper, "=", resize("larger"))        -- Make Larger
 
 -- Displays
-hs.hotkey.bind(hyper, "O", moveDisplay("next")) -- Next Display
-hs.hotkey.bind(hyper, "Y", moveDisplay("prev"))  -- Previous Display
+hs.hotkey.bind(hyper, "O", moveDisplay("next"))     -- Next Display
+hs.hotkey.bind(hyper, "Y", moveDisplay("prev"))     -- Previous Display
 
--- Keybinds for Focus Shifting
+-- Focus Shifting
 hs.hotkey.bind({"cmd", "alt"}, "H", function() smartFocus("West") end)
 hs.hotkey.bind({"cmd", "alt"}, "L", function() smartFocus("East") end)
 hs.hotkey.bind({"cmd", "alt"}, "K", function() smartFocus("North") end)
 hs.hotkey.bind({"cmd", "alt"}, "J", function() smartFocus("South") end)
 
+-- Scroll
+hs.hotkey.bind({"ctrl", "shift"}, "J", function() startScroll(-BASE_SPEED) end, stopScroll)
+hs.hotkey.bind({"ctrl", "shift"}, "K", function() startScroll(BASE_SPEED) end, stopScroll)
+
 -- Terminal and Browser
 hs.hotkey.bind(hyper, "T", launchWezterm)
 hs.hotkey.bind(hyper, "N", launchChrome)
 
--- 1. Create the hotkey but don't enable it yet
-local stopCmdH = hs.hotkey.new({"cmd"}, "h", function() end)
+-- Debug
+hs.hotkey.bind(hyper, "P", debugSpaces)
 
--- 2. Toggle it based on whether TigerVNC is focused
+-- Block cmd+h everywhere except TigerVNC
+local stopCmdH = hs.hotkey.new({"cmd"}, "h", function() end)
 hs.window.filter.default:subscribe(hs.window.filter.windowFocused, function(win)
     local appName = win:application():title()
     if appName:find("TigerVNC") then
-        stopCmdH:disable() -- Let TigerVNC "see" the key
+        stopCmdH:disable()
     else
-        stopCmdH:enable()  -- Block it for everyone else
+        stopCmdH:enable()
     end
 end)
 
@@ -534,131 +686,4 @@ hs.hotkey.bind(hyper, "Z", function()               -- Reload Config
   hs.reload()
 end)
 
-
-
-
 hs.alert.show("Hammerspoon Config Loaded")
-
-
--- =====================================================================
--- FAST MULTI-MONITOR SPACE SWITCHING (Primary -> Externals -> Built-in)
--- =====================================================================
-
-local function getMacOSScreenOrder()
-    local screens = hs.screen.allScreens()
-    local primary = hs.screen.primaryScreen()
-    
-    local orderedScreens = { primary }
-    local externals = {}
-    local builtIns = {}
-    
-    -- Separate the secondary screens into Externals and Built-ins
-    for _, screen in ipairs(screens) do
-        if screen:id() ~= primary:id() then
-            -- We identify the laptop screen by its standard macOS naming convention
-            if string.match(screen:name(), "Built%-in") then
-                table.insert(builtIns, screen)
-            else
-                table.insert(externals, screen)
-            end
-        end
-    end
-    
-    -- Sort multiple externals geometrically (just in case you add a 3rd external monitor later)
-    table.sort(externals, function(a, b) return a:frame().x < b:frame().x end)
-    
-    -- Construct the final list: Primary -> Externals -> Built-ins
-    for _, screen in ipairs(externals) do table.insert(orderedScreens, screen) end
-    for _, screen in ipairs(builtIns) do table.insert(orderedScreens, screen) end
-    
-    -- =====================================================
-    -- DEBUG OUTPUT START (Bound to Hyper + P)
-    -- =====================================================
-    -- Feel free to delete this block once everything works perfectly
-    -- =====================================================
-    return orderedScreens
-end
-
--- Full X-RAY Debugger (Press Hyper + P to verify)
-hs.hotkey.bind(hyper, "P", function()
-    local orderedScreens = getMacOSScreenOrder()
-    local focusedScreen = hs.mouse.getCurrentScreen()
-    
-    local msg = "=== SPACES X-RAY ===\n\n"
-    local globalCounter = 1
-    
-    for screenIndex, screen in ipairs(orderedScreens) do
-        local isPrimary = (screen:id() == hs.screen.primaryScreen():id()) and " [PRIMARY]" or ""
-        local isFocused = (screen:id() == focusedScreen:id()) and " [FOCUSED]" or ""
-        
-        msg = msg .. "Screen " .. screenIndex .. isPrimary .. isFocused .. "\n"
-        msg = msg .. "Name: " .. screen:name() .. "\n"
-        
-        local screenSpaces = hs.spaces.spacesForScreen(screen)
-        local activeSpace = hs.spaces.activeSpaceOnScreen(screen)
-        
-        if screenSpaces then
-            for _, spaceID in ipairs(screenSpaces) do
-                local activeMark = (spaceID == activeSpace) and "  <-- ACTIVE" or ""
-                msg = msg .. "  -> Space ID: " .. spaceID .. "  |  Maps to: ^" .. globalCounter .. activeMark .. "\n"
-                globalCounter = globalCounter + 1
-            end
-        else
-            msg = msg .. "  -> No spaces found.\n"
-        end
-        msg = msg .. "\n"
-    end
-    
-    print(msg)
-    hs.alert.show(msg, 8)
-end)
-
--- =====================================================================
--- THE SWITCHING LOGIC (Hard Boundaries, No Wrap-Around)
--- =====================================================================
-local function switchSpace(direction)
-    local focusedScreen = hs.mouse.getCurrentScreen()
-    local orderedScreens = getMacOSScreenOrder()
-    local activeSpace = hs.spaces.activeSpaceOnScreen(focusedScreen)
-    local localSpaces = hs.spaces.spacesForScreen(focusedScreen)
-    
-    local globalSpaces = {}
-    for _, screen in ipairs(orderedScreens) do
-        local screenSpaces = hs.spaces.spacesForScreen(screen)
-        if screenSpaces then
-            for _, spaceID in ipairs(screenSpaces) do
-                table.insert(globalSpaces, spaceID)
-            end
-        end
-    end
-    
-    local localIndex = nil
-    for i, spaceID in ipairs(localSpaces) do
-        if spaceID == activeSpace then
-            localIndex = i
-            break
-        end
-    end
-    if not localIndex then return end
-    
-    local targetLocalIndex = localIndex + (direction == "next" and 1 or -1)
-    
-    -- Hard Wall
-    if targetLocalIndex < 1 or targetLocalIndex > #localSpaces then return end
-    
-    local targetSpaceID = localSpaces[targetLocalIndex]
-    local targetGlobalIndex = nil
-    for i, spaceID in ipairs(globalSpaces) do
-        if spaceID == targetSpaceID then
-            targetGlobalIndex = i
-            break
-        end
-    end
-    
-    if targetGlobalIndex and targetGlobalIndex <= 9 then
-        hs.eventtap.keyStroke({"ctrl"}, tostring(targetGlobalIndex))
-    end
-end
-
-hs.hotkey.bind(hyper, "H", function() switchSpace("prev") end)
-hs.hotkey.bind(hyper, "L", function() switchSpace("next") end)
