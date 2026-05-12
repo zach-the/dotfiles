@@ -36,7 +36,13 @@ tm() {
     local choice
     if [[ -z "$sessions" ]]; then
         # No sessions exist — skip fzf and just create one
-        tmux new-session
+        clear
+        read -p "session name: " new_session_name
+        if [[ -n "$new_session_name" ]]; then
+            tmux new-session -s "$new_session_name"
+        else
+            tmux new-session
+        fi
         return
     fi
 
@@ -48,7 +54,13 @@ tm() {
     [[ -z "$choice" ]] && return
 
     if [[ "$choice" == "$new_label" ]]; then
-        tmux new-session
+        clear
+        read -p "session name: " new_session_name
+        if [[ -n "$new_session_name" ]]; then
+            tmux new-session -s "$new_session_name"
+        else
+            tmux new-session
+        fi
     else
         # Reverse display label back to actual session name
         local session_name="$choice"
@@ -204,5 +216,43 @@ f() {
         fi
     else
         echo "No next directory stored."
+    fi
+}
+
+# Interactive qpt wrapper (runs pt_shell in current terminal via LSF)
+iqpt() {
+    # 1. Run qpt in debug mode (-d) and force xterm (-T xterm) to avoid dbus backgrounding hacks
+    local debug_out
+    debug_out=$(qpt -d -T xterm "$@" 2>&1)
+
+    # 2. Reconstruct the bsub command from the multi-line debug output
+    local cmd
+    cmd=$(echo "$debug_out" | grep -v "RUNNING THE FOLLOWING COMMAND" | tr '\n' ' ' | sed 's/  */ /g')
+
+    # 3. If it's not a bsub command (e.g. local run), fallback to normal qpt
+    if [[ "$cmd" != *bsub* ]]; then
+        qpt "$@"
+        return
+    fi
+
+    # 4. Convert to interactive LSF submission
+    cmd=${cmd/bsub /bsub -Is }
+    
+    # 5. Remove the -eo and -oo log file arguments so output goes to the terminal
+    cmd=$(echo "$cmd" | sed -E 's/-[eo]o [^ ]+ //g')
+
+    # 6. Extract the generated qsubScript path (it's the last argument)
+    local qsubScript
+    qsubScript=$(echo "$cmd" | awk '{print $NF}')
+
+    if [[ -f "$qsubScript" ]]; then
+        # 7. Modify the script to run the payload directly instead of spawning xterm
+        sed -i -E 's|^.*xterm.*-e (.*termScript.*)|\1|' "$qsubScript"
+        
+        echo -e "\e[32mLaunching interactive pt_shell on LSF...\e[0m"
+        eval "$cmd"
+    else
+        echo "Error: Could not parse qpt debug output."
+        return 1
     fi
 }

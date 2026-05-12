@@ -30,6 +30,7 @@ linux_only_configs=(
   "Rofi"             "$DOTFILES/rofi-config.rasi"             "$HOME/.config/rofi/config.rasi"
   "Keyd"             "$DOTFILES/keyd-default.conf"            "/etc/keyd/default.conf"
   "MPV"              "$DOTFILES/mpv.conf"                     "$HOME/.config/mpv/mpv.conf"
+  "Synopsys PT"      "$DOTFILES/synopsys_pt.setup"            "$HOME/.synopsys_pt.setup"
 )
 
 mac_only_configs=(
