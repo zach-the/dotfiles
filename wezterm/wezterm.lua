@@ -45,11 +45,8 @@ config.keys = {
   { key = 'c', mods = 'CTRL|SHIFT', action = act.CopyTo 'Clipboard' },
   { key = 'v', mods = 'CTRL|SHIFT', action = act.PasteFrom 'Clipboard' },
 
-  -- ctrl+hjkl to send arrow keys
-  { key = 'k', mods = 'CTRL', action = act.SendString '\x1b[A' },
-  { key = 'j', mods = 'CTRL', action = act.SendString '\x1b[B' },
-  { key = 'h', mods = 'CTRL', action = act.SendString '\x1b[D' },
-  { key = 'l', mods = 'CTRL', action = act.SendString '\x1b[C' },
+
+  -- ctrl+hjkl to send arrow keys (linux only; on mac, handled by Karabiner)
 
   -- alt+shift+h/l move left/right by a word
   -- { key = 'H', mods = 'ALT|SHIFT', action = act.SendKey { key = 'LeftArrow', mods = 'CTRL' } },
@@ -107,6 +104,18 @@ config.keys = {
   -- { key = 'h', mods = 'CTRL|SHIFT', action = act.SendString '\x02H' },
   -- { key = 'l', mods = 'CTRL|SHIFT', action = act.SendString '\x02L' },
 }
+
+if is_linux then
+  local hjkl = {
+    { key = 'k', mods = 'CTRL', action = act.SendString '\x1b[A' },
+    { key = 'j', mods = 'CTRL', action = act.SendString '\x1b[B' },
+    { key = 'h', mods = 'CTRL', action = act.SendString '\x1b[D' },
+    { key = 'l', mods = 'CTRL', action = act.SendString '\x1b[C' },
+  }
+  for _, bind in ipairs(hjkl) do
+    table.insert(config.keys, bind)
+  end
+end
 
 -- Mouse Bindings
 config.mouse_bindings = {
