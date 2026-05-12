@@ -1,9 +1,10 @@
 # --- Aliases ---
 alias ls='ls --color=auto'
 alias grep='grep --color=auto'
-alias zg='rg -z'
-alias rgs='rg -S'
-alias zgs='rg -z -S'
+# alias zg='rg -z'
+# alias rgs='rg -S'
+# alias zgs='rg -z -S'
+alias rg='rg -zS'
 alias fzv='tmp=$(fzf) && echo $tmp && nvim $tmp'
 alias fzd='tmp=$(fd --type d -d 4 | fzf) && echo $tmp && d $tmp'
 alias e='clear && exit'

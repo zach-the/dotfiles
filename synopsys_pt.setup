@@ -1,33 +1,7 @@
-proc update_pt_prompt {} {
+set tcl_prompt1 {
     set host [info hostname]
     set dir [pwd]
     
-    # ANSI color codes
-    set green "\033\[1;32m"
-    set blue "\033\[1;34m"
-    set reset "\033\[0m"
-    
-    # Format: user@hostname:cwd\n% 
-    set ::sh_command_prompt "${green}$::env(USER)@${host}${reset}:${blue}${dir}${reset}\n% "
+    puts "\[$::env(USER)@${host}\] ${dir}"
+    puts -nonewline "% "
 }
-
-# Rename the built-in cd command so we can wrap it
-rename cd builtin_cd
-
-# Create a new cd command that updates the prompt after changing dirs
-proc cd {args} {
-    # Execute the original cd command
-    set code [catch {uplevel 1 builtin_cd $args} result]
-    
-    # Update the prompt
-    update_pt_prompt
-    
-    # Return the result of the original cd command
-    if {$code == 1} {
-        return -code error $result
-    }
-    return $result
-}
-
-# Set the initial prompt
-update_pt_prompt
