@@ -239,11 +239,11 @@ Prefix: `Ctrl + B`
 
 | Keybind | Action |
 |---|---|
-| `Ctrl + T` | New window |
-| `Ctrl + W` | Close pane/window |
-| `Ctrl + H` | Previous window |
-| `Ctrl + L` | Next window |
-| `Ctrl + R` | Rename window |
+| `Ctrl + Shift + T` | New window |
+| `Ctrl + Shift + W` | Close pane/window |
+| `Ctrl + Shift + H` | Previous window |
+| `Ctrl + Shfit + L` | Next window |
+| `Ctrl + Shfit + R` | Rename window |
 
 **Panes (no prefix)**
 
@@ -251,10 +251,10 @@ Prefix: `Ctrl + B`
 |---|---|
 | `Alt + -` | Split horizontal (new pane below) |
 | `Alt + \` | Split vertical (new pane right) |
-| `Alt + H` | Focus pane left |
-| `Alt + J` | Focus pane down |
-| `Alt + K` | Focus pane up |
-| `Alt + L` | Focus pane right |
+| `Alt + h` | Focus pane left |
+| `Alt + j` | Focus pane down |
+| `Alt + k` | Focus pane up |
+| `Alt + l` | Focus pane right |
 
 **Panes (with prefix)**
 
@@ -282,10 +282,6 @@ Prefix: `Ctrl + B`
 
 | Keybind | Sends |
 |---|---|
-| `Ctrl + H` | `←` |
-| `Ctrl + J` | `↓` |
-| `Ctrl + K` | `↑` |
-| `Ctrl + L` | `→` |
 | `Alt + Shift + H` | `Ctrl + ←` (word left) |
 | `Alt + Shift + L` | `Ctrl + →` (word right) |
 
