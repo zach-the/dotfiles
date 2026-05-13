@@ -50,13 +50,44 @@ local function smartFocus(direction)
     if not win then return end
 
     local winFrame = win:frame()
-    local winCenter = {x = winFrame.x + winFrame.w/2, y = winFrame.y + winFrame.h/2}
+    local winScreen = win:screen()
+
+    -- Use mouse position as origin if it's on a different screen than the focused window.
+    -- This makes "empty screen" hops work: after landing on an empty screen,
+    -- the next keypress navigates from the mouse location, not the still-focused window.
+    local mousePos = hs.mouse.absolutePosition()
+    local mouseScreen = nil
+    for _, s in ipairs(hs.screen.allScreens()) do
+        local sf = s:frame()
+        if mousePos.x >= sf.x and mousePos.x < sf.x + sf.w and
+           mousePos.y >= sf.y and mousePos.y < sf.y + sf.h then
+            mouseScreen = s
+            break
+        end
+    end
+    local origin
+    if mouseScreen and mouseScreen:id() ~= winScreen:id() then
+        origin = mousePos
+        winScreen = mouseScreen
+    else
+        origin = {x = winFrame.x + winFrame.w/2, y = winFrame.y + winFrame.h/2}
+    end
+    local winCenter = origin
 
     -- FIX: Use visibleWindows() instead of filters.
     -- Filters cache state and can "lose" Ghostty after a tab close.
     -- This queries the OS directly for the current truth.
     local allWindows = hs.window.visibleWindows()
     local candidates = {}
+
+    -- Track which screens have at least one visible standard window on them
+    local screensWithWindows = {}
+    for _, w in ipairs(allWindows) do
+        if w:isVisible() and w:isStandard() then
+            local s = w:screen()
+            if s then screensWithWindows[s:id()] = true end
+        end
+    end
 
     for _, w in ipairs(allWindows) do
         -- Check: Not current window + Visible + Standard (avoids tooltips/popups)
@@ -89,14 +120,47 @@ local function smartFocus(direction)
         end
     end
 
+    -- Also add empty screens as virtual candidates
+    for _, screen in ipairs(hs.screen.allScreens()) do
+        if screen:id() ~= winScreen:id() and not screensWithWindows[screen:id()] then
+            local sf = screen:frame()
+            local sc = {x = sf.x + sf.w/2, y = sf.y + sf.h/2}
+            local deltaX = sc.x - winCenter.x
+            local deltaY = sc.y - winCenter.y
+
+            local isCandidate = false
+            if direction == "West" then
+                if deltaX < 0 and math.abs(deltaX) > math.abs(deltaY) then isCandidate = true end
+            elseif direction == "East" then
+                if deltaX > 0 and math.abs(deltaX) > math.abs(deltaY) then isCandidate = true end
+            elseif direction == "North" then
+                if deltaY < 0 and math.abs(deltaY) > math.abs(deltaX) then isCandidate = true end
+            elseif direction == "South" then
+                if deltaY > 0 and math.abs(deltaY) > math.abs(deltaX) then isCandidate = true end
+            end
+
+            if isCandidate then
+                local distance = deltaX^2 + deltaY^2
+                -- virtual candidate: no window field, just a point to move the mouse to
+                table.insert(candidates, {point = sc, dist = distance})
+            end
+        end
+    end
+
     -- Sort by distance (closest first)
     if #candidates > 0 then
         table.sort(candidates, function(a, b)
             return a.dist < b.dist
         end)
 
-        candidates[1].window:focus()
-        moveMouseToWindow(candidates[1].window)
+        local best = candidates[1]
+        if best.window then
+            best.window:focus()
+            moveMouseToWindow(best.window)
+        else
+            -- Empty screen: just move the mouse, don't change focus
+            hs.mouse.absolutePosition(best.point)
+        end
     end
 end
 
