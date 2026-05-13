@@ -434,7 +434,9 @@ local function launchWezterm()
 
     -- `wezterm start` talks to the running WezTerm process via Unix socket IPC.
     -- A new OS window is created without stealing focus from whatever you're in.
-    hs.task.new(bin, nil, {"start"}):start()
+    -- Run via a detached shell so wezterm is not a child of Hammerspoon and
+    -- survives config reloads (which terminate Hammerspoon's child processes).
+    hs.execute("nohup " .. bin .. " start </dev/null >/dev/null 2>&1 &")
 
     -- After WezTerm opens the window, move it to the screen under the mouse
     hs.timer.doAfter(0.4, function()
