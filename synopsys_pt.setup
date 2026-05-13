@@ -5,3 +5,294 @@ set tcl_prompt1 {
     puts "\[$::env(USER)@${host}\] ${dir}"
     puts -nonewline "% "
 }
+
+set sh_enable_page_mode false
+#set svr_keep_unconnected_nets true
+set report_default_significant_digits 3
+#set sh_enable_line_editing true
+
+# For some reason, we believe when using Redhat 4 (or later?), the following
+# sequence must be followed to set vi mode:
+#set sh_line_editing_mode emacs
+#set sh_line_editing_mode vi
+#set sh_line_editing_mode emacs
+#set sh_line_editing_mode vi
+
+
+#############
+# Shortcuts #
+#############
+
+# Procedure to remove an element from a list
+proc lremove {listVariable value} {
+    upvar 1 $listVariable var
+    set idx [lsearch -exact $var $value]
+    set var [lreplace $var $idx $idx]
+}
+
+# report_timing
+proc rt {args} {
+  if {[llength $args] == 2} {
+    ### See if it is a potential -to -from combination.
+    if {[lsearch $args "-*"] == -1} {
+      set args "-from [lindex $args 0] -to [lindex $args 1]"
+    }
+  }
+  eval report_timing -crosstalk_delta -path full_clock_expanded -input_pins -nets -cap -trans -include_hierarchical_pin -nosplit $args
+}
+
+
+# report_timing -delay min
+proc rtm {args} {
+  if {[llength $args] == 2} {
+    ### See if it is a potential -from/-to combination.
+    if {[lsearch $args "-*"] == -1} {
+      set args "-from [lindex $args 0] -to [lindex $args 1]"
+    }
+  }
+  eval report_timing -delay min -crosstalk_delta -path full_clock_expanded -input_pins -nets -cap -trans -include_hierarchical_pin -nosplit $args
+}
+
+
+# report_cell
+proc rc {cell}  {
+  return [report_cell -con -ver $cell]
+}
+
+
+# report_net
+proc rn {net}  {
+  return [report_net -con -ver $net]
+}
+
+# report_net on the net connected to $pin
+proc rnp {pin}  {
+  return [report_net -con -ver [get_net -of_object [get_pins $pin]]]
+}
+
+
+# sizeof_collection
+proc sc {col} {
+  return [sizeof_collection $col]
+}
+
+# report_delay_calc, max values
+proc rdc {from_pin to_pin} {
+  return [report_delay_calculation -max -from $from_pin -to $to_pin]
+}
+
+# report_delay_calc, min values
+proc rdcm {from_pin to_pin} {
+  return [report_delay_calculation -min -from $from_pin -to $to_pin]
+}
+
+# report_delay_calc, max values with crosstalk
+proc rdcc {from_pin to_pin} {
+  return [report_delay_calculation -max -crosstalk -from $from_pin -to $to_pin]
+}
+
+# report_delay_calc, min values with crosstalk
+proc rdcmc {from_pin to_pin} {
+  return [report_delay_calculation -min -crosstalk -from $from_pin -to $to_pin]
+}
+
+
+# Get cells based on their ref name.  Supports string matching.
+proc gcr {ref_name}  {
+  return [get_cell -hier -filter "ref_name =~ $ref_name" *]
+}
+
+# OLD GCR CODE:
+# Get cells based on their ref name.  Supports string matching.
+# e.g.  [gcr ~ *nand*]  returns collection containing all cells
+#       with "nand" embedded in their ref name
+# e.g.  [gcr = asdsrsokt2p64x64cm4sw1] returns collection of all
+#       cells with a ref name of asdsrsokt2p64x64cm4sw1
+#proc gcr {op ref_name}  {
+#  return [get_cell -hier -filter "ref_name =${op} $ref_name" *]
+#}
+
+
+
+# Return the case_value attribute of an object
+proc gacv {object}  {
+  return [get_attribute $object case_value]
+}
+
+
+# Return the ref_name attribute of an object
+proc garn {object}  {
+  return [get_attribute $object ref_name]
+}
+
+
+
+####################
+# Handy Procedures #
+####################
+
+
+# Allow display of unconstrained timing paths within report_timing
+proc vup {value}  {
+  global timing_report_unconstrained_paths
+  global timing_report_unconstrained_paths_from_nontimed_startpoints
+  set timing_report_unconstrained_paths $value
+  set timing_report_unconstrained_paths_from_nontimed_startpoints $value
+}
+
+
+# Proc to print the full_name attribute of every object in a
+# collection, one name per line.
+
+proc pc {collection}  {
+  foreach_in_collection object $collection {
+    echo [get_object_name $object]
+  }
+}
+
+
+# Proc to report the number of unique cell reference names in a
+# collection of cells.
+
+proc ref_count {cells}  {
+  set num_cells 0
+
+  # Populate cell_count array
+  foreach_in_collection cell $cells {
+    if {[get_attribute $cell object_class]=="cell"}  {
+      incr num_cells 1
+      set cell_ref_name [get_attribute $cell ref_name]
+      if {![info exists cell_count($cell_ref_name)]}  {
+        set cell_count($cell_ref_name) 1
+      } else {
+        incr cell_count($cell_ref_name) 1
+      }
+    } else {
+      echo "ERROR: [get_object_name $cell] is not of class cell, it is a [get_attribute $cell object_class]"
+    }
+  }
+
+  # Print cell_count array
+  echo "Total number of cells in the collection: $num_cells"
+  foreach ref_name [lsort [array names cell_count]]  {
+    echo "$ref_name: $cell_count($ref_name)"
+  }
+}
+
+
+
+# Procedure that takes a collection of clocks and returns the clock
+# object with the smallest period
+
+proc get_fastest_clock {clocks}  {
+
+  set fastest_clock ""
+  set min_period 2000000
+
+  # Find the fastest clock
+  foreach_in_collection clock $clocks {
+    set period [get_attribute $clock period]
+    if {$period < $min_period}  {
+      set min_period $period
+      set fastest_clock $clock
+    }
+  }
+
+  return $fastest_clock
+}
+
+
+
+# Procedure that returns a collection containing all nets whose fanout
+# is greater than or equal to $fanout
+
+# The definition of fanout is the number of "input" pins that are
+# connected to a given net
+
+proc get_fanout_nets {fanout}  {
+
+  if {$fanout < 0}  {
+    echo "Error: fanout is less than 0 (fanout=$fanout)"
+    echo "Usage:  get_fanout_nets <fanout>"
+    return
+  }
+
+  set fanout_nets ""
+  foreach_in_collection net [get_nets -hier -top *]  {
+    set receiver_pins [get_pins -quiet -of $net -filter "direction==in"]
+    set num_pins [sizeof_collection $receiver_pins]
+    if {$num_pins >= $fanout}  {
+      set fanout_nets [add_to_collection $net $fanout_nets]
+    }
+  }
+
+  return $fanout_nets
+}
+
+
+# Procedure that prints all the nets in the design with more than one
+# non-input pin attached to it.  Also prints each driver pin.
+
+proc print_multi_driven_nets {}  {
+  set nets [get_nets -hier *]
+  foreach_in_collection net $nets {
+    set drivers [get_pins -leaf -quiet -of $net -filter "direction!=in"]
+    if {[sizeof_collection $drivers] > 1}  {
+      echo "NET: [get_object_name $net]"
+      foreach_in_collection driver $drivers {
+        echo "  PIN: [get_object_name $driver]"
+      }
+    }
+  }
+}
+
+
+# Procedure that returns a collection of pins with a direction==in
+# attribute that is connected to the same net as driver_pin.  It is
+# assumed that driver_pin has a direction==out attribute but this is
+# not enforced.  If driver_pin has a direction==in attribute, it will
+# be in the collection returned.
+
+proc get_receivers_of_driver {driver_pin}  {
+  return [get_pins -leaf -of [get_nets -of [get_pins $driver_pin]] -filter "direction==in"]
+}
+
+
+
+# Procedure from the get_lib_timing_arcs Synopsys man page to print
+# timing arcs from/to a pin.  Sample usage
+#   show_lib_arc -of [get_timing_arcs -to [get_pins pads__elb_pcie_pads_0__serdes_pcie_port_3__serdes_PCIE_0__serdes_pcie/i_core_interrupt]]
+#   show_lib_arc -of [get_timing_arcs -from [get_pins pads__elb_pcie_pads_0__serdes_pcie_port_3__serdes_PCIE_0__serdes_pcie/i_core_interrupt]]
+
+proc show_lib_arcs {args} {
+  set lib_arcs [eval [concat get_lib_timing_arcs $args]]
+  echo [format "%15s    %-15s  %18s" "from_lib_pin" "to_lib_pin" \
+            "sense"]
+  echo [format "%15s    %-15s  %18s" "------------" "----------" \
+            "-----"]
+
+  foreach_in_collection lib_arc $lib_arcs {
+    set fpin [get_attribute $lib_arc from_lib_pin]
+    set tpin [get_attribute $lib_arc to_lib_pin]
+    set sense [get_attribute $lib_arc sense]
+    set from_lib_pin_name [get_attribute $fpin base_name]
+    set to_lib_pin_name [get_attribute $tpin base_name]
+    echo [format "%15s -> %-15s  %18s" \
+        $from_lib_pin_name $to_lib_pin_name \
+        $sense]
+  }
+}
+
+
+# Show all the library arcs to a pin
+proc slatp {pin}  {
+  show_lib_arc -of [get_timing_arcs -to [get_pins $pin]]
+}
+
+# Show all the library arcs from a pin
+proc slafp {pin}  {
+  show_lib_arc -of [get_timing_arcs -from [get_pins $pin]]
+}
+
+
+echo {Finished reading in ~/.synopsys_pt.setup}
