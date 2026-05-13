@@ -29,7 +29,7 @@ linux_only_configs=(
   "Waybar"           "$DOTFILES/waybar"                       "$HOME/.config/waybar"
   "Rofi"             "$DOTFILES/rofi-config.rasi"             "$HOME/.config/rofi/config.rasi"
   "Keyd"             "$DOTFILES/keyd-default.conf"            "/etc/keyd/default.conf"
-  "MPV"              "$DOTFILES/mpv.conf"                     "$HOME/.config/mpv/mpv.conf"
+  "MPV"              "$DOTFILES/mpv"                          "$HOME/.config/mpv"
   "Synopsys PT"      "$DOTFILES/synopsys_pt.setup"            "$HOME/.synopsys_pt.setup"
 )
 
