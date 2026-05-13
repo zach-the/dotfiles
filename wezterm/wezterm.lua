@@ -24,7 +24,7 @@ config.inactive_pane_hsb = {
 }
 
 -- Other Behavior
-config.selection_word_boundary = " \t\n{}[]()\"'`"
+config.selection_word_boundary = " \t\n{}[]()\"'`|│"
 config.default_cursor_style = 'BlinkingBlock'
 config.pane_focus_follows_mouse = true
 
@@ -44,6 +44,11 @@ config.keys = {
   -- Copy/Paste
   { key = 'c', mods = 'CTRL|SHIFT', action = act.CopyTo 'Clipboard' },
   { key = 'v', mods = 'CTRL|SHIFT', action = act.PasteFrom 'Clipboard' },
+
+  -- Font size
+  { key = '+', mods = 'CTRL|SHIFT', action = act.IncreaseFontSize },
+  { key = '-', mods = 'CTRL|SHIFT', action = act.DecreaseFontSize },
+  { key = '0', mods = 'CTRL|SHIFT', action = act.ResetFontSize },
 
 
   -- ctrl+hjkl to send arrow keys (linux only; on mac, handled by Karabiner)
