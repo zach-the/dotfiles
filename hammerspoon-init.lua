@@ -465,7 +465,7 @@ local REPEAT_TAP_SPEED = 100
 local MAX_MULT = 60
 local RAMP_SECS = 3
 local TAP_WINDOW = 0.15
-local TERMINAL_DIVISOR = 1.5
+local TERMINAL_DIVISOR = 2
 local lastTapTime = 0
 local lastTapDir = 0
 
