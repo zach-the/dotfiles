@@ -33,16 +33,24 @@ tm() {
     local sessions
     sessions=$(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -vE '^.+-[0-9]{10}$')
 
+    _tm_create() {
+        local name="$1"
+        if [[ -n "$TMUX" ]]; then
+            tmux new-session -d -s "$name" 2>/dev/null || true
+            tmux switch-client -t "$name"
+        elif [[ -n "$name" ]]; then
+            tmux new-session -s "$name"
+        else
+            tmux new-session
+        fi
+    }
+
     local choice
     if [[ -z "$sessions" ]]; then
         # No sessions exist — skip fzf and just create one
         clear
         read -p "session name: " new_session_name
-        if [[ -n "$new_session_name" ]]; then
-            tmux new-session -s "$new_session_name"
-        else
-            tmux new-session
-        fi
+        _tm_create "$new_session_name"
         return
     fi
 
@@ -56,11 +64,7 @@ tm() {
     if [[ "$choice" == "$new_label" ]]; then
         clear
         read -p "session name: " new_session_name
-        if [[ -n "$new_session_name" ]]; then
-            tmux new-session -s "$new_session_name"
-        else
-            tmux new-session
-        fi
+        _tm_create "$new_session_name"
     else
         # Reverse display label back to actual session name
         local session_name="$choice"
