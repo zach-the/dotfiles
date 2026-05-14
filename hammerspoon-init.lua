@@ -781,6 +781,190 @@ hs.window.filter.default:subscribe(hs.window.filter.windowFocused, function(win)
 end)
 
 -- =====================================================================
+-- MONITOR MODE SWITCHER
+-- =====================================================================
+-- Two modes: "plugged" (external monitor connected) and "unplugged" (laptop only).
+-- On a screen change event, saves all windows for the current mode, minimizes
+-- everything, then restores all windows saved for the incoming mode.
+-- State persists across reloads in ~/.hammerspoon/monitor_mode_state.json
+
+local monitorModeState    = { plugged = {}, unplugged = {} }
+local currentMonitorMode  = nil
+local modeDebounceTimer   = nil
+local MODE_STATE_FILE     = os.getenv("HOME") .. "/.hammerspoon/monitor_mode_state.json"
+
+local function loadModeState()
+  local f = io.open(MODE_STATE_FILE, "r")
+  if not f then return end
+  local raw = f:read("*a"); f:close()
+  local ok, data = pcall(hs.json.decode, raw)
+  if ok and data then monitorModeState = data end
+end
+
+local function saveModeState()
+  local ok, encoded = pcall(hs.json.encode, monitorModeState)
+  if not ok then return end
+  local f = io.open(MODE_STATE_FILE, "w")
+  if not f then return end
+  f:write(encoded); f:close()
+end
+
+local function detectMode()
+  return #hs.screen.allScreens() > 1 and "plugged" or "unplugged"
+end
+
+local function captureAllWindows()
+  local snapshot = {}
+  for _, win in ipairs(hs.window.allWindows()) do
+    if win:isStandard() then
+      local app = win:application()
+      if app then
+        local f = win:frame()
+        local s = win:screen()
+        table.insert(snapshot, {
+          appName     = app:name(),
+          bundleID    = app:bundleID() or "",
+          title       = win:title(),
+          frame       = { x = f.x, y = f.y, w = f.w, h = f.h },
+          screenName  = s and s:name() or "",
+          isMinimized = win:isMinimized(),
+        })
+      end
+    end
+  end
+  return snapshot
+end
+
+local function hideAllCurrentWindows()
+  for _, win in ipairs(hs.window.allWindows()) do
+    if win:isStandard() and not win:isMinimized() then
+      -- Exit fullscreen first, then minimize after the animation
+      if win:isFullscreen() then
+        win:setFullscreen(false)
+        local w = win
+        hs.timer.doAfter(0.6, function() if w:isStandard() then w:minimize() end end)
+      else
+        win:minimize()
+      end
+    end
+  end
+end
+
+local function restoreWindowsForMode(mode)
+  local saved = monitorModeState[mode]
+  if not saved or #saved == 0 then
+    hs.alert.show("Monitor: no saved layout for '" .. mode .. "'", 2)
+    return
+  end
+
+  -- Screen name → object map; fall back to primary for missing screens
+  local screenMap = {}
+  for _, s in ipairs(hs.screen.allScreens()) do screenMap[s:name()] = s end
+  local primary = hs.screen.primaryScreen()
+
+  -- Index all current windows by "bundleID|title" and by "bundleID" alone,
+  -- tracking which window IDs we have already claimed so we don't double-assign.
+  local byExact = {}
+  local byApp   = {}
+  local claimed = {}
+
+  for _, win in ipairs(hs.window.allWindows()) do
+    if win:isStandard() then
+      local app = win:application()
+      if app then
+        local bid  = app:bundleID() or app:name()
+        local exact = bid .. "|" .. win:title()
+        byExact[exact] = byExact[exact] or {}
+        table.insert(byExact[exact], win)
+        byApp[bid] = byApp[bid] or {}
+        table.insert(byApp[bid], win)
+      end
+    end
+  end
+
+  local function claimWindow(entry)
+    local bid   = entry.bundleID ~= "" and entry.bundleID or entry.appName
+    local exact = bid .. "|" .. entry.title
+    -- Prefer exact match, fall back to any window from same app
+    for _, pool in ipairs({ byExact[exact], byApp[bid] }) do
+      if pool then
+        for i, win in ipairs(pool) do
+          if not claimed[win:id()] then
+            claimed[win:id()] = true
+            return win
+          end
+        end
+      end
+    end
+    return nil
+  end
+
+  for _, entry in ipairs(saved) do
+    if not entry.isMinimized then
+      local win = claimWindow(entry)
+      if win then
+        local targetScreen = screenMap[entry.screenName] or primary
+        local f = entry.frame
+
+        -- Remap frame to primary if the saved screen is gone
+        if not screenMap[entry.screenName] then
+          local pf = primary:frame()
+          -- Clamp position inside primary bounds
+          f = {
+            x = math.max(pf.x, math.min(f.x, pf.x + pf.w - f.w)),
+            y = math.max(pf.y, math.min(f.y, pf.y + pf.h - f.h)),
+            w = f.w, h = f.h,
+          }
+        end
+
+        if win:isMinimized() then win:unminimize() end
+        -- setFrame after a tick so unminimize animation doesn't fight it
+        local capturedWin = win
+        local capturedF   = f
+        hs.timer.doAfter(0.35, function()
+          capturedWin:setFrame(hs.geometry(capturedF.x, capturedF.y, capturedF.w, capturedF.h))
+        end)
+      end
+    end
+  end
+end
+
+local function doMonitorModeSwitch()
+  local newMode = detectMode()
+  if newMode == currentMonitorMode then return end
+
+  -- Save and hide current mode
+  monitorModeState[currentMonitorMode] = captureAllWindows()
+  saveModeState()
+  hideAllCurrentWindows()
+
+  -- Switch, then restore after minimize animations settle
+  local previousMode = currentMonitorMode
+  currentMonitorMode = newMode
+  hs.alert.show("Monitor: " .. previousMode .. "  →  " .. newMode, 2)
+  hs.timer.doAfter(1.2, function() restoreWindowsForMode(currentMonitorMode) end)
+end
+
+local function onScreenChange()
+  if modeDebounceTimer then modeDebounceTimer:stop() end
+  modeDebounceTimer = hs.timer.doAfter(2.0, doMonitorModeSwitch)
+end
+
+-- Manually save the current window layout for the current mode
+-- (useful after rearranging windows without a plug/unplug event)
+hs.hotkey.bind(hyper, "V", function()
+  monitorModeState[currentMonitorMode] = captureAllWindows()
+  saveModeState()
+  hs.alert.show("Monitor: saved layout for '" .. currentMonitorMode .. "'", 2)
+end)
+
+-- Bootstrap
+loadModeState()
+currentMonitorMode = detectMode()
+local monitorWatcher = hs.screen.watcher.new(onScreenChange)
+monitorWatcher:start()
+
+-- =====================================================================
 -- CONFIG LOADED MESSAGE
 -- =====================================================================
 hs.hotkey.bind(hyper, "Z", function()               -- Reload Config
