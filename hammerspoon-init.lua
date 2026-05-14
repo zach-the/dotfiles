@@ -788,10 +788,13 @@ end)
 -- everything, then restores all windows saved for the incoming mode.
 -- State persists across reloads in ~/.hammerspoon/monitor_mode_state.json
 
-local monitorModeState    = { plugged = {}, unplugged = {} }
-local currentMonitorMode  = nil
-local modeDebounceTimer   = nil
-local MODE_STATE_FILE     = os.getenv("HOME") .. "/.hammerspoon/monitor_mode_state.json"
+local monitorModeState   = { plugged = {}, unplugged = {} }
+local currentMonitorMode = nil
+local modeDebounceTimer  = nil
+local MODE_STATE_FILE    = os.getenv("HOME") .. "/.hammerspoon/monitor_mode_state.json"
+local mmLog              = hs.logger.new("monitorMode", "info")
+
+local NEVER_HIDE = { Finder = true, SystemUIServer = true, Dock = true, Spotlight = true, loginwindow = true }
 
 local function loadModeState()
   local f = io.open(MODE_STATE_FILE, "r")
@@ -813,32 +816,72 @@ local function detectMode()
   return #hs.screen.allScreens() > 1 and "plugged" or "unplugged"
 end
 
-local function captureAllWindows()
-  local snapshot = {}
-  for _, win in ipairs(hs.window.allWindows()) do
-    if win:isStandard() then
+-- Collect every standard window across every space on every screen.
+-- Two-pass approach because app:allWindows() misses inactive-space windows
+-- on newer macOS: the hs.spaces pass catches what the app pass misses.
+local function collectAllWindows()
+  local result = {}
+  local seen   = {}
+
+  local function add(win)
+    if win and not seen[win:id()] and win:isStandard() then
       local app = win:application()
-      if app then
-        local f = win:frame()
-        local s = win:screen()
-        table.insert(snapshot, {
-          appName     = app:name(),
-          bundleID    = app:bundleID() or "",
-          title       = win:title(),
-          frame       = { x = f.x, y = f.y, w = f.w, h = f.h },
-          screenName  = s and s:name() or "",
-          isMinimized = win:isMinimized(),
-        })
+      if app and not NEVER_HIDE[app:name()] then
+        seen[win:id()] = true
+        result[#result + 1] = win
       end
     end
+  end
+
+  -- Pass 1: per-app enumeration
+  for _, app in ipairs(hs.application.runningApplications()) do
+    if not NEVER_HIDE[app:name()] then
+      for _, win in ipairs(app:allWindows()) do add(win) end
+    end
+  end
+
+  -- Pass 2: per-space enumeration via hs.spaces (catches inactive-space windows)
+  for _, screen in ipairs(hs.screen.allScreens()) do
+    for _, sid in ipairs(hs.spaces.spacesForScreen(screen) or {}) do
+      local ok, ids = pcall(hs.spaces.allWindowsForSpace, sid)
+      if ok and ids then
+        for _, wid in ipairs(ids) do
+          add(hs.window(wid))
+        end
+      end
+    end
+  end
+
+  mmLog.i("collectAllWindows found " .. #result .. " windows")
+  return result
+end
+
+local function captureAllWindows()
+  local snapshot = {}
+  for _, win in ipairs(collectAllWindows()) do
+    local app = win:application()
+    local f   = win:frame()
+    local s   = win:screen()
+    local entry = {
+      appName    = app:name(),
+      bundleID   = app:bundleID() or "",
+      title      = win:title(),
+      frame      = { x = f.x, y = f.y, w = f.w, h = f.h },
+      screenName = s and s:name() or "",
+      screenId   = s and s:id() or 0,
+      wasHidden  = win:isMinimized(),  -- app:isHidden() would silently drop whole apps
+    }
+    mmLog.i("  capture: [" .. (entry.wasHidden and "minimized" or "visible") .. "] " .. entry.appName .. " — " .. entry.title)
+    snapshot[#snapshot + 1] = entry
   end
   return snapshot
 end
 
-local function hideAllCurrentWindows()
-  for _, win in ipairs(hs.window.allWindows()) do
-    if win:isStandard() and not win:isMinimized() then
-      -- Exit fullscreen first, then minimize after the animation
+local function minimizeAllWindows()
+  local wins = collectAllWindows()
+  mmLog.i("minimizeAllWindows: targeting " .. #wins .. " windows")
+  for _, win in ipairs(wins) do
+    if not win:isMinimized() then
       if win:isFullscreen() then
         win:setFullscreen(false)
         local w = win
@@ -857,92 +900,103 @@ local function restoreWindowsForMode(mode)
     return
   end
 
-  -- Screen name → object map; fall back to primary for missing screens
-  local screenMap = {}
-  for _, s in ipairs(hs.screen.allScreens()) do screenMap[s:name()] = s end
+  -- Index screens by both ID and name so either can match
+  local screenById   = {}
+  local screenByName = {}
+  for _, s in ipairs(hs.screen.allScreens()) do
+    screenById[s:id()]     = s
+    screenByName[s:name()] = s
+  end
   local primary = hs.screen.primaryScreen()
 
-  -- Index all current windows by "bundleID|title" and by "bundleID" alone,
-  -- tracking which window IDs we have already claimed so we don't double-assign.
   local byExact = {}
   local byApp   = {}
   local claimed = {}
 
-  for _, win in ipairs(hs.window.allWindows()) do
-    if win:isStandard() then
-      local app = win:application()
-      if app then
-        local bid  = app:bundleID() or app:name()
-        local exact = bid .. "|" .. win:title()
-        byExact[exact] = byExact[exact] or {}
-        table.insert(byExact[exact], win)
-        byApp[bid] = byApp[bid] or {}
-        table.insert(byApp[bid], win)
-      end
-    end
+  for _, win in ipairs(collectAllWindows()) do
+    local app = win:application()
+    local bid = app:bundleID() or app:name()
+    local exact = bid .. "|" .. win:title()
+    byExact[exact] = byExact[exact] or {}
+    byExact[exact][#byExact[exact] + 1] = win
+    byApp[bid] = byApp[bid] or {}
+    byApp[bid][#byApp[bid] + 1] = win
   end
 
-  local function claimWindow(entry)
+  local function claimWin(entry)
     local bid   = entry.bundleID ~= "" and entry.bundleID or entry.appName
     local exact = bid .. "|" .. entry.title
-    -- Prefer exact match, fall back to any window from same app
     for _, pool in ipairs({ byExact[exact], byApp[bid] }) do
       if pool then
-        for i, win in ipairs(pool) do
-          if not claimed[win:id()] then
-            claimed[win:id()] = true
-            return win
+        for _, w in ipairs(pool) do
+          if not claimed[w:id()] then
+            claimed[w:id()] = true
+            return w
           end
         end
       end
     end
-    return nil
   end
 
+  -- Build the full restore list before touching any windows
+  local restoreList = {}
+  mmLog.i("restoreWindowsForMode: " .. mode .. " has " .. #saved .. " saved entries")
   for _, entry in ipairs(saved) do
-    if not entry.isMinimized then
-      local win = claimWindow(entry)
+    if not entry.wasHidden then
+      local win = claimWin(entry)
       if win then
-        local targetScreen = screenMap[entry.screenName] or primary
+        -- Resolve target screen: prefer ID match, fall back to name, then clamp to primary
+        local targetScreen = screenById[entry.screenId or 0] or screenByName[entry.screenName]
         local f = entry.frame
-
-        -- Remap frame to primary if the saved screen is gone
-        if not screenMap[entry.screenName] then
+        if not targetScreen then
           local pf = primary:frame()
-          -- Clamp position inside primary bounds
           f = {
             x = math.max(pf.x, math.min(f.x, pf.x + pf.w - f.w)),
             y = math.max(pf.y, math.min(f.y, pf.y + pf.h - f.h)),
             w = f.w, h = f.h,
           }
         end
-
-        if win:isMinimized() then win:unminimize() end
-        -- setFrame after a tick so unminimize animation doesn't fight it
-        local capturedWin = win
-        local capturedF   = f
-        hs.timer.doAfter(0.35, function()
-          capturedWin:setFrame(hs.geometry(capturedF.x, capturedF.y, capturedF.w, capturedF.h))
-        end)
+        mmLog.i("  restore: " .. entry.appName .. " — " .. entry.title)
+        restoreList[#restoreList + 1] = { win = win, frame = f }
+      else
+        mmLog.i("  restore: NO MATCH for " .. entry.appName .. " — " .. entry.title)
       end
     end
   end
+
+  -- Phase 1: unminimize all at once
+  for _, item in ipairs(restoreList) do
+    item.win:unminimize()
+  end
+
+  -- Phase 2: set all frames after animations finish.
+  -- duration=0 makes setFrame instant so it can't be overridden by the unminimize animation.
+  local function applyFrames()
+    for _, item in ipairs(restoreList) do
+      if item.win:isStandard() then
+        item.win:setFrame(hs.geometry(item.frame.x, item.frame.y, item.frame.w, item.frame.h), 0)
+      end
+    end
+  end
+
+  hs.timer.doAfter(0.6, applyFrames)
+  hs.timer.doAfter(1.5, applyFrames)  -- second pass catches stragglers
 end
 
 local function doMonitorModeSwitch()
   local newMode = detectMode()
   if newMode == currentMonitorMode then return end
 
-  -- Save and hide current mode
+  mmLog.i("switching " .. currentMonitorMode .. " → " .. newMode)
   monitorModeState[currentMonitorMode] = captureAllWindows()
   saveModeState()
-  hideAllCurrentWindows()
+  minimizeAllWindows()
 
-  -- Switch, then restore after minimize animations settle
   local previousMode = currentMonitorMode
   currentMonitorMode = newMode
   hs.alert.show("Monitor: " .. previousMode .. "  →  " .. newMode, 2)
-  hs.timer.doAfter(1.2, function() restoreWindowsForMode(currentMonitorMode) end)
+  -- 2.5s gives fullscreen windows time to exit (0.6s) + minimize animation + buffer
+  hs.timer.doAfter(2.5, function() restoreWindowsForMode(currentMonitorMode) end)
 end
 
 local function onScreenChange()
@@ -950,19 +1004,42 @@ local function onScreenChange()
   modeDebounceTimer = hs.timer.doAfter(2.0, doMonitorModeSwitch)
 end
 
--- Manually save the current window layout for the current mode
--- (useful after rearranging windows without a plug/unplug event)
 hs.hotkey.bind(hyper, "V", function()
   monitorModeState[currentMonitorMode] = captureAllWindows()
   saveModeState()
   hs.alert.show("Monitor: saved layout for '" .. currentMonitorMode .. "'", 2)
 end)
 
--- Bootstrap
-loadModeState()
-currentMonitorMode = detectMode()
-local monitorWatcher = hs.screen.watcher.new(onScreenChange)
-monitorWatcher:start()
+-- Bootstrap (disabled — re-enable by uncommenting below)
+-- loadModeState()
+-- currentMonitorMode = detectMode()
+
+-- monitorWatcher = hs.screen.watcher.new(onScreenChange)
+-- monitorWatcher:start()
+
+local function currentScreenIds()
+  local ids = {}
+  for _, s in ipairs(hs.screen.allScreens()) do ids[s:id()] = true end
+  return ids
+end
+
+-- local lastScreenIds = currentScreenIds()
+-- screenPollTimer = hs.timer.doEvery(2, function()
+--   local nowIds  = currentScreenIds()
+--   local changed = false
+--   for id in pairs(lastScreenIds) do
+--     if not nowIds[id] then changed = true; break end
+--   end
+--   if not changed then
+--     for id in pairs(nowIds) do
+--       if not lastScreenIds[id] then changed = true; break end
+--     end
+--   end
+--   if changed then
+--     lastScreenIds = nowIds
+--     onScreenChange()
+--   end
+-- end)
 
 -- =====================================================================
 -- CONFIG LOADED MESSAGE
