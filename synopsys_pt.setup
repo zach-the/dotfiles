@@ -1,10 +1,13 @@
 set tcl_prompt1 {
     set host [info hostname]
-    set dir [pwd]
+    set dir [file tail [pwd]]
     
-    puts "\[$::env(USER)@${host}\] ${dir}"
-    puts -nonewline "% "
+    # Fallback for the root directory (file tail of "/" is empty)
+    if {$dir eq ""} {set dir "/"}
+    
+    puts -nonewline "\[$::env(USER)@${host}\] ${dir} % "
 }
+
 
 set sh_enable_page_mode false
 #set svr_keep_unconnected_nets true

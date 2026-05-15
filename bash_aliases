@@ -200,7 +200,7 @@ md() {
 b() {
     if (( _DIR_HISTORY_INDEX > 0 )); then
         local target="${_DIR_HISTORY[$((_DIR_HISTORY_INDEX - 1))]}"
-        if cd "$target" 2>/dev/null; then
+        if cd "$target" 2>/dev/null && ls -lrt; then
             ((_DIR_HISTORY_INDEX--))
         else
             echo "Failed to go back."
@@ -213,7 +213,7 @@ b() {
 f() {
     if (( _DIR_HISTORY_INDEX < ${#_DIR_HISTORY[@]} - 1 )); then
         local target="${_DIR_HISTORY[$((_DIR_HISTORY_INDEX + 1))]}"
-        if cd "$target" 2>/dev/null; then
+        if cd "$target" 2>/dev/null && ls -lrt; then
             ((_DIR_HISTORY_INDEX++))
         else
             echo "Failed to go forward."
