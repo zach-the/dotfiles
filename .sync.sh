@@ -15,5 +15,6 @@ echo_purple "adding all"
 git add --all
 echo_purple "committing with message \"$1\""
 git commit -m '$1'
+git pull --rebase
 echo_purple "pushing"
 git push
