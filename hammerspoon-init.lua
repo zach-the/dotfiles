@@ -359,6 +359,33 @@ local function fullscreen()
     end
 end
 
+local function third(n)
+    return function()
+        local win = hs.window.focusedWindow()
+        if not win then return end
+        local sf = win:screen():frame()
+        if sf.h > sf.w then
+            move(0, (n-1)/3, 1, 1/3)()
+        else
+            move((n-1)/3, 0, 1/3, 1)()
+        end
+    end
+end
+
+local function twoThirds(n)
+    return function()
+        local win = hs.window.focusedWindow()
+        if not win then return end
+        local sf = win:screen():frame()
+        local offset = (n == 1) and 0 or 1/3
+        if sf.h > sf.w then
+            move(0, offset, 1, 2/3)()
+        else
+            move(offset, 0, 2/3, 1)()
+        end
+    end
+end
+
 -- Function to minimize all windows except the focused one
 local function isolateActiveWindow()
     local activeWindow = hs.window.focusedWindow()
@@ -530,7 +557,7 @@ local BASE_SPEED = 20
 local REPEAT_TAP_SPEED = 100
 local MAX_MULT = 60
 local RAMP_SECS = 3
-local TAP_WINDOW = 0.15
+local TAP_WINDOW = 0.2
 local TERMINAL_DIVISOR = 2
 local lastTapTime = 0
 local lastTapDir = 0
@@ -728,14 +755,14 @@ hs.hotkey.bind(hyper, "I", move(0.5, 0, 0.5, 0.5))  -- Top Right
 hs.hotkey.bind(hyper, "J", move(0, 0.5, 0.5, 0.5))  -- Bottom Left
 hs.hotkey.bind(hyper, "K", move(0.5, 0.5, 0.5, 0.5))-- Bottom Right
 
--- Thirds
-hs.hotkey.bind(hyper, "1", move(0, 0, 1/3, 1))      -- First Third
-hs.hotkey.bind(hyper, "2", move(1/3, 0, 1/3, 1))    -- Center Third
-hs.hotkey.bind(hyper, "3", move(2/3, 0, 1/3, 1))    -- Last Third
+-- Thirds (portrait monitor: horizontal thirds; landscape: vertical thirds)
+hs.hotkey.bind(hyper, "1", third(1))
+hs.hotkey.bind(hyper, "2", third(2))
+hs.hotkey.bind(hyper, "3", third(3))
 
--- Two Thirds
-hs.hotkey.bind(hyper, "W", move(0, 0, 2/3, 1))      -- First Two Thirds
-hs.hotkey.bind(hyper, "E", move(1/3, 0, 2/3, 1))    -- Last Two Thirds
+-- Two Thirds (portrait monitor: horizontal; landscape: vertical)
+hs.hotkey.bind(hyper, "W", twoThirds(1))             -- First Two Thirds
+hs.hotkey.bind(hyper, "E", twoThirds(2))             -- Last Two Thirds
 
 -- Sizing & Restoration
 hs.hotkey.bind(hyper, "F", maximize)                -- Maximize
