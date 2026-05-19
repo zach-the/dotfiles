@@ -1,0 +1,213 @@
+#!/usr/bin/env python3
+import sys
+import os
+import subprocess
+import selectors
+import signal
+
+def get_terminal_size():
+    try:
+        import fcntl
+        import termios
+        import struct
+        h, w, hp, wp = struct.unpack('HHHH',
+            fcntl.ioctl(sys.stdout.fileno(), termios.TIOCGWINSZ,
+            struct.pack('HHHH', 0, 0, 0, 0)))
+        if w > 0 and h > 0:
+            return w, h
+    except:
+        pass
+        
+    try:
+        import shutil
+        size = shutil.get_terminal_size((80, 24))
+        if size.columns > 0 and size.lines > 0:
+            return size.columns, size.lines
+    except:
+        pass
+        
+    return 80, 24
+
+def draw_screen(files, buffers, width, height, drawn_lines, n_lines):
+    if width < len(files) * 5:
+        msg = f"Terminal too small: {width}x{height}"
+        if drawn_lines > 0:
+            sys.stdout.write(f'\033[{drawn_lines - 1}A\r')
+        sys.stdout.write(msg + '\033[K')
+        sys.stdout.flush()
+        return 1
+
+    col_width = width // len(files)
+
+    wrapped_buffers = []
+    for i, buf in enumerate(buffers):
+        w_buf = []
+        max_len = col_width - 2 if i < len(files) - 1 else col_width - 1
+        if max_len < 1: max_len = 1
+        for line in buf:
+            line = line.replace('\t', '    ')
+            if not line:
+                w_buf.append("")
+                continue
+            for j in range(0, len(line), max_len):
+                w_buf.append(line[j:j+max_len])
+        wrapped_buffers.append(w_buf)
+
+    max_content = max((len(b) for b in wrapped_buffers), default=0)
+    
+    # We need 1 line for header, plus max_content
+    # But we can't exceed terminal height or (n_lines + 1)
+    total_lines = min(max_content + 1, height, n_lines + 1)
+    content_lines = total_lines - 1
+    
+    if drawn_lines > 0:
+        sys.stdout.write(f'\033[{drawn_lines - 1}A\r')
+        
+    frame = []
+    
+    # Draw headers
+    header_line = ""
+    for i, f in enumerate(files):
+        title = f" {f} "
+        if len(title) > col_width - 1:
+            title = title[:col_width - 4] + "... "
+        
+        title_padded = title.center(col_width - (1 if i < len(files) - 1 else 0))
+        header_line += f'\033[7m{title_padded}\033[0m'
+        
+        if i < len(files) - 1:
+            header_line += '│'
+            
+    frame.append(header_line + '\033[K')
+    
+    # Draw content
+    for y in range(content_lines):
+        line_str = ""
+        for i in range(len(files)):
+            buf = wrapped_buffers[i]
+            idx = len(buf) - content_lines + y
+            
+            display_line = ""
+            if idx >= 0 and idx < len(buf):
+                display_line = buf[idx]
+                
+            if i < len(files) - 1:
+                display_line = display_line.ljust(col_width - 1) + '│'
+            else:
+                display_line = display_line.ljust(col_width)
+                
+            line_str += display_line
+            
+        frame.append(line_str + '\033[K')
+        
+    for i, line in enumerate(frame):
+        sys.stdout.write(line)
+        if i < len(frame) - 1:
+            sys.stdout.write('\n')
+            
+    sys.stdout.flush()
+    return total_lines
+
+def main():
+    args = sys.argv[1:]
+    n_lines = 70
+    files = []
+    
+    i = 0
+    while i < len(args):
+        if args[i] == '-n':
+            if i + 1 < len(args):
+                try:
+                    n_lines = int(args[i+1])
+                except ValueError:
+                    pass
+                i += 2
+            else:
+                i += 1
+        elif args[i].startswith('-n'):
+            try:
+                n_lines = int(args[i][2:])
+            except ValueError:
+                pass
+            i += 1
+        elif args[i].startswith('-') and args[i][1:].isdigit():
+            n_lines = int(args[i][1:])
+            i += 1
+        else:
+            files.append(args[i])
+            i += 1
+
+    if not files:
+        sys.exit(0)
+
+    # Hide cursor
+    sys.stdout.write('\033[?25l')
+    sys.stdout.flush()
+
+    running = True
+    def signal_handler(sig, frame):
+        nonlocal running
+        running = False
+
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
+    width, height = get_terminal_size()
+    
+    needs_redraw = True
+    def resize_handler(sig, frame):
+        nonlocal width, height, needs_redraw
+        width, height = get_terminal_size()
+        needs_redraw = True
+
+    signal.signal(signal.SIGWINCH, resize_handler)
+
+    procs = []
+    sel = selectors.DefaultSelector()
+    drawn_lines = 0
+    
+    try:
+        for i, f in enumerate(files):
+            p = subprocess.Popen(['tail', '-Fn', str(n_lines), f], 
+                               stdout=subprocess.PIPE, 
+                               stderr=subprocess.STDOUT, 
+                               universal_newlines=True, 
+                               bufsize=1)
+            os.set_blocking(p.stdout.fileno(), False)
+            sel.register(p.stdout, selectors.EVENT_READ, data=i)
+            procs.append(p)
+
+        buffers = [[] for _ in files]
+
+        while running:
+            if needs_redraw:
+                drawn_lines = draw_screen(files, buffers, width, height, drawn_lines, n_lines)
+                needs_redraw = False
+
+            events = sel.select(timeout=0.1)
+            for key, _ in events:
+                i = key.data
+                p = procs[i]
+                try:
+                    while True:
+                        line = p.stdout.readline()
+                        if not line:
+                            break
+                        buffers[i].append(line.rstrip('\n'))
+                        # Keep buffer size manageable
+                        if len(buffers[i]) > n_lines * 2:
+                            buffers[i] = buffers[i][-n_lines:]
+                        needs_redraw = True
+                except (IOError, OSError):
+                    pass
+
+    finally:
+        # Show cursor and print final newline
+        sys.stdout.write('\033[?25h\n')
+        sys.stdout.flush()
+        for p in procs:
+            p.terminate()
+            p.wait()
+
+if __name__ == '__main__':
+    main()

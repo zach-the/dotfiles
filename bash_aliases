@@ -17,13 +17,22 @@ alias fgrep='fgrep --color=auto'
 alias egrep='egrep --color=auto'
 alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo error)" "$(history | tail -n1 | sed -e "s/^\s*[0-9]\+\s*//;s/[;&|]\s*alert$//")"'
 alias py='python3'
-alias tl='tail -Fn 70'
+unalias tl 2>/dev/null
+function tl() {
+    if [ $# -le 1 ]; then
+        tail -Fn 70 "$@"
+        return
+    fi
+    
+    # Use our custom python script for side-by-side tailing
+    python3 ~/dotfiles/bin/tl "$@"
+}
 alias cp='cp -a'
 alias lg='ls -lrga | rg -i'
 alias nvs='nv -O'
 alias work='autossh -M 0 -Y zb900042@lvnvda8240.lvn.broadcom.net'
 alias color_test='for i in {0..7}; do printf "\e[48;5;${i}m  "; done; printf "\e[0m\n"; for i in {8..15}; do printf "\e[48;5;${i}m  "; done; printf "\e[0m\n"'
-alias zd='~/dotfiles/zd'
+alias zd='~/dotfiles/bin/zd'
 alias pp='realpath'
 alias rs='rsync -aHAX --info=progress2'
 
