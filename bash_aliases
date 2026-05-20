@@ -20,7 +20,8 @@ alias py='python3'
 unalias tl 2>/dev/null
 function tl() {
     if [ $# -le 1 ]; then
-        tail -Fn 70 "$@"
+        local lines=$(tput lines 2>/dev/null || echo 70)
+        tail -Fn "$lines" "$@"
         return
     fi
     

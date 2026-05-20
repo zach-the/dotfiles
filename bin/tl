@@ -53,16 +53,11 @@ def draw_screen(files, buffers, width, height, drawn_lines, n_lines):
                 w_buf.append(line[j:j+max_len])
         wrapped_buffers.append(w_buf)
 
-    max_content = max((len(b) for b in wrapped_buffers), default=0)
+    content_lines = height - 1
     
-    # We need 1 line for header, plus max_content
-    # But we can't exceed terminal height or (n_lines + 1)
-    total_lines = min(max_content + 1, height, n_lines + 1)
-    content_lines = total_lines - 1
+    # Move to top-left instead of moving cursor up
+    sys.stdout.write('\033[H')
     
-    if drawn_lines > 0:
-        sys.stdout.write(f'\033[{drawn_lines - 1}A\r')
-        
     frame = []
     
     # Draw headers
@@ -85,10 +80,11 @@ def draw_screen(files, buffers, width, height, drawn_lines, n_lines):
         line_str = ""
         for i in range(len(files)):
             buf = wrapped_buffers[i]
-            idx = len(buf) - content_lines + y
+            offset = max(0, len(buf) - content_lines)
+            idx = offset + y
             
             display_line = ""
-            if idx >= 0 and idx < len(buf):
+            if idx < len(buf):
                 display_line = buf[idx]
                 
             if i < len(files) - 1:
@@ -106,11 +102,13 @@ def draw_screen(files, buffers, width, height, drawn_lines, n_lines):
             sys.stdout.write('\n')
             
     sys.stdout.flush()
-    return total_lines
+    return height
 
 def main():
+    width, height = get_terminal_size()
     args = sys.argv[1:]
-    n_lines = 70
+    n_lines = height
+    n_lines_given = False
     files = []
     
     i = 0
@@ -119,6 +117,7 @@ def main():
             if i + 1 < len(args):
                 try:
                     n_lines = int(args[i+1])
+                    n_lines_given = True
                 except ValueError:
                     pass
                 i += 2
@@ -127,11 +126,13 @@ def main():
         elif args[i].startswith('-n'):
             try:
                 n_lines = int(args[i][2:])
+                n_lines_given = True
             except ValueError:
                 pass
             i += 1
         elif args[i].startswith('-') and args[i][1:].isdigit():
             n_lines = int(args[i][1:])
+            n_lines_given = True
             i += 1
         else:
             files.append(args[i])
@@ -140,9 +141,17 @@ def main():
     if not files:
         sys.exit(0)
 
-    # Hide cursor
-    sys.stdout.write('\033[?25l')
+    # Enter alternate screen and hide cursor
+    sys.stdout.write('\033[?1049h\033[2J\033[H\033[?25l')
     sys.stdout.flush()
+
+    # Set stdin to raw mode to handle keys and prevent echoing
+    old_termios = None
+    if sys.stdin.isatty():
+        import termios
+        import tty
+        old_termios = termios.tcgetattr(sys.stdin.fileno())
+        tty.setcbreak(sys.stdin.fileno())
 
     running = True
     def signal_handler(sig, frame):
@@ -152,12 +161,12 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    width, height = get_terminal_size()
-    
     needs_redraw = True
     def resize_handler(sig, frame):
-        nonlocal width, height, needs_redraw
+        nonlocal width, height, needs_redraw, n_lines
         width, height = get_terminal_size()
+        if not n_lines_given:
+            n_lines = height
         needs_redraw = True
 
     signal.signal(signal.SIGWINCH, resize_handler)
@@ -167,6 +176,9 @@ def main():
     drawn_lines = 0
     
     try:
+        if sys.stdin.isatty():
+            sel.register(sys.stdin, selectors.EVENT_READ, data='stdin')
+
         for i, f in enumerate(files):
             p = subprocess.Popen(['tail', '-Fn', str(n_lines), f], 
                                stdout=subprocess.PIPE, 
@@ -186,6 +198,17 @@ def main():
 
             events = sel.select(timeout=0.1)
             for key, _ in events:
+                if key.data == 'stdin':
+                    try:
+                        c = os.read(sys.stdin.fileno(), 1).decode('utf-8', 'ignore')
+                        if c and c.lower() == 'q':
+                            running = False
+                        else:
+                            needs_redraw = True
+                    except (IOError, OSError):
+                        pass
+                    continue
+
                 i = key.data
                 p = procs[i]
                 try:
@@ -202,8 +225,11 @@ def main():
                     pass
 
     finally:
-        # Show cursor and print final newline
-        sys.stdout.write('\033[?25h\n')
+        if old_termios:
+            import termios
+            termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, old_termios)
+        # Show cursor and exit alternate screen
+        sys.stdout.write('\033[?1049l\033[?25h')
         sys.stdout.flush()
         for p in procs:
             p.terminate()
