@@ -90,8 +90,7 @@ local function smartFocus(direction)
     end
 
     for _, w in ipairs(allWindows) do
-        -- Check: Not current window + Visible + Standard (avoids tooltips/popups)
-        if w:id() ~= win:id() and w:isVisible() and w:isStandard() then
+        if w:isVisible() and w:isStandard() then
             local f = w:frame()
             local c = {x = f.x + f.w/2, y = f.y + f.h/2}
 
