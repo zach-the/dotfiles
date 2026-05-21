@@ -37,10 +37,9 @@ if (( sub < 1 || sub > 5 )); then
 fi
 
 if [ "$action" == "next" ]; then
-    sub=$(( (sub % 5) + 1 ))
+    if (( sub < 5 )); then sub=$(( sub + 1 )); fi
 elif [ "$action" == "prev" ]; then
-    sub=$(( sub - 1 ))
-    if (( sub < 1 )); then sub=5; fi
+    if (( sub > 1 )); then sub=$(( sub - 1 )); fi
 elif [[ "$action" =~ ^[1-5]$ ]]; then
     sub=$action
 fi
