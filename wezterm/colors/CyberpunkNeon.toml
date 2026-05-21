@@ -36,16 +36,17 @@ brights = [
 ]
 
 [colors.tab_bar]
-background = "#0d0d17"
+background = "#161932"
 
 [colors.tab_bar.active_tab]
 bg_color = "#ff007f"
 fg_color = "#0d0d17"
 
 [colors.tab_bar.inactive_tab]
-bg_color = "#161626"
-fg_color = "#787c99"
+bg_color = "#161932"
+# fg_color = "#787c99"
+fg_color = "#161932"
 
 [colors.tab_bar.new_tab]
-bg_color = "#161626"
+bg_color = "#161932"
 fg_color = "#787c99"
