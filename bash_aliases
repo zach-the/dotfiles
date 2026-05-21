@@ -31,7 +31,7 @@ function tl() {
 alias cp='cp -a'
 alias lg='ls -lrga | rg -i'
 alias nvs='nv -O'
-alias work='autossh -M 0 -Y zb900042@lvnvda8240.lvn.broadcom.net'
+alias work='autossh -M 0 -t -Y zb900042@lvnvda8240.lvn.broadcom.net "LAUNCH_NEW_TMUX=true exec bash -l"'
 alias color_test='for i in {0..7}; do printf "\e[48;5;${i}m  "; done; printf "\e[0m\n"; for i in {8..15}; do printf "\e[48;5;${i}m  "; done; printf "\e[0m\n"'
 alias zd='~/dotfiles/bin/zd'
 alias pp='realpath'
