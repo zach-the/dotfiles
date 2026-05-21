@@ -1,3 +1,6 @@
+##########
+# PROMPT #
+##########
 set tcl_prompt1 {
     set host [info hostname]
     set dir [file tail [pwd]]
@@ -8,18 +11,14 @@ set tcl_prompt1 {
     puts -nonewline "\[$::env(USER)@${host}\] ${dir} % "
 }
 
-
+################
+# LINE EDITING #
+################
 set sh_enable_page_mode false
 #set svr_keep_unconnected_nets true
 set report_default_significant_digits 3
-#set sh_enable_line_editing true
-
-# For some reason, we believe when using Redhat 4 (or later?), the following
-# sequence must be followed to set vi mode:
-#set sh_line_editing_mode emacs
-#set sh_line_editing_mode vi
-#set sh_line_editing_mode emacs
-#set sh_line_editing_mode vi
+set sh_enable_line_editing true
+set sh_line_editing_mode vi
 
 
 #############

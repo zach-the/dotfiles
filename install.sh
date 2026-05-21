@@ -17,6 +17,7 @@ echo "Detected OS: $OS"
 universal_configs=(
   "Neovim"           "$DOTFILES/nvim-init.lua"                "$HOME/.config/nvim/init.lua"
   "Bash RC"          "$DOTFILES/bashrc"                       "$HOME/.bashrc"
+  "Input RC"         "$DOTFILES/inputrc"                      "$HOME/.inputrc"
   "Bash Aliases"     "$DOTFILES/bash_aliases"                 "$HOME/.bash_aliases"
   # "Kitty"            "$DOTFILES/kitty"                        "$HOME/.config/kitty"
   "Powerline Shell"  "$DOTFILES/powerline-shell.config.json"  "$HOME/.config/powerline-shell/config.json"
