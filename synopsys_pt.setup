@@ -22,7 +22,7 @@ set sh_line_editing_mode vi
 
 
 #############
-# Shortcuts #
+# SHORTCUTS #
 #############
 
 # Procedure to remove an element from a list
@@ -130,7 +130,7 @@ proc garn {object}  {
 
 
 ####################
-# Handy Procedures #
+# HANDY PROCEDURES #
 ####################
 
 
