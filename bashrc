@@ -125,3 +125,4 @@ else
         PROMPT_COMMAND="_track_dir_change; $PROMPT_COMMAND"
     fi
 fi
+export PATH=$HOME/.npm-global/bin:$PATH
