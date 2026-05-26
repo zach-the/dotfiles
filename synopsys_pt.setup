@@ -1,15 +1,15 @@
 ##########
 # PROMPT #
 ##########
-set tcl_prompt1 {
-    set host [info hostname]
-    set dir [file tail [pwd]]
-    
-    # Fallback for the root directory (file tail of "/" is empty)
-    if {$dir eq ""} {set dir "/"}
-    
-    puts -nonewline "\[$::env(USER)@${host}\] ${dir} % "
-}
+# set tcl_prompt1 {
+#     set host [info hostname]
+#     set dir [file tail [pwd]]
+#     
+#     # Fallback for the root directory (file tail of "/" is empty)
+#     if {$dir eq ""} {set dir "/"}
+#     
+#     puts -nonewline "\[$::env(USER)@${host}\] ${dir} % "
+# }
 
 ################
 # LINE EDITING #
