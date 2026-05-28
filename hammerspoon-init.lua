@@ -783,6 +783,11 @@ hs.hotkey.bind({"cmd", "alt"}, "L", function() smartFocus("East") end)
 hs.hotkey.bind({"cmd", "alt"}, "K", function() smartFocus("North") end)
 hs.hotkey.bind({"cmd", "alt"}, "J", function() smartFocus("South") end)
 
+hs.hotkey.bind({"cmd", "ctrl"}, "H", function() smartFocus("West") end)
+hs.hotkey.bind({"cmd", "ctrl"}, "L", function() smartFocus("East") end)
+hs.hotkey.bind({"cmd", "ctrl"}, "K", function() smartFocus("North") end)
+hs.hotkey.bind({"cmd", "ctrl"}, "J", function() smartFocus("South") end)
+
 -- Scroll
 hs.hotkey.bind({"ctrl", "shift"}, "J", function() startScroll(-BASE_SPEED) end, stopScroll)
 hs.hotkey.bind({"ctrl", "shift"}, "K", function() startScroll(BASE_SPEED) end, stopScroll)
