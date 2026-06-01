@@ -4,6 +4,10 @@ set show-mode-in-prompt on
 set keymap vi-insert
 "\C-w": unix-word-rubout
 
+set keymap vi-command
+"\177": backward-delete-char
+"\C-h": backward-delete-char
+
 
 $if Bash
 # Bash: Fancy Powerline-style indicators
