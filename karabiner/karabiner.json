@@ -124,6 +124,19 @@
                         ]
                     },
                     {
+                        "description": "Right Command to Delete",
+                        "manipulators": [
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "right_command",
+                                    "modifiers": { "optional": ["any"] }
+                                },
+                                "to": [{ "key_code": "delete_or_backspace" }]
+                            }
+                        ]
+                    },
+                    {
                         "enabled": false,
                         "manipulators": [
                             {

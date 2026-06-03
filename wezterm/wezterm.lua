@@ -62,10 +62,10 @@ config.keys = {
   { key = '\\', mods = 'SUPER|SHIFT', action = act.SplitHorizontal { domain = 'CurrentPaneDomain' } },
  
   -- Pane Swapping / Rotation
-  { key = 'p', mods = 'ALT', action = act.PaneSelect { mode = 'SwapWithActive' } },
-  { key = 'n', mods = 'ALT', action = act.PaneSelect { mode = 'SwapWithActive' } },
-  { key = 'b', mods = 'ALT', action = act.PaneSelect { mode = 'SwapWithActive' } },
-  { key = 'm', mods = 'ALT', action = act.RotatePanes 'Clockwise' },
+  -- { key = 'p', mods = 'ALT', action = act.PaneSelect { mode = 'SwapWithActive' } },
+  -- { key = 'n', mods = 'ALT', action = act.PaneSelect { mode = 'SwapWithActive' } },
+  -- { key = 'b', mods = 'ALT', action = act.PaneSelect { mode = 'SwapWithActive' } },
+  -- { key = 'm', mods = 'ALT', action = act.RotatePanes 'Clockwise' },
 
   -- Swallow hyper+Z (Hammerspoon config reload) so it doesn't reach the terminal
   { key = 'z', mods = 'CTRL|ALT|SUPER|SHIFT', action = act.DisableDefaultAssignment },
