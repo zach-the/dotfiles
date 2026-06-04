@@ -1,22 +1,25 @@
 # Cyberpunk Neon — Light variant
-# Mid-tone lavender-grey backgrounds, not blinding white. Same accent hues as
-# dark.toml, darkened to stay legible on the lighter surface.
+# Backgrounds inspired by Solarized Light: warm cream base (very low saturation,
+# barely-warm tint) rather than cold grey or pure white. The slight warmth reads
+# as paper, not paint. Accents are the same hues as dark.toml, darkened for legibility.
 # Edit here, then run: python3 generate_colors.py light
 
 [palette]
-# --- Backgrounds (medium lavender-grey — not white, not dark) ---
+# --- Backgrounds (warm cream, Solarized-inspired) ---
+# Solarized base3 = #fdf6e3 (warm cream). We use the same warmth but shift the
+# tint a hair cooler (neutral→cream rather than yellow) to sit near the cyberpunk hue family.
 # Note: bg also doubles as the ANSI "black" terminal slot (color0).
-bg          = "#d0cee8"   # medium lavender (base — tab edges)
-bg_dim      = "#c4c2dc"   # slightly dimmer (tmux inactive pane)
-bg_inactive = "#b8b6d0"   # inactive tab background
-bg_normal   = "#cac8e2"   # normal terminal/window background
+bg          = "#f4f0e4"   # warm cream base (tab edges, obsidian equivalent)
+bg_dim      = "#ece8da"   # slightly dimmer cream (tmux inactive pane)
+bg_inactive = "#dfdbd0"   # muted warm grey (inactive tab background)
+bg_normal   = "#f0ecde"   # normal terminal/window background
 
 # --- Text ---
-fg    = "#1a1a2e"   # deep navy (primary text)
-grey  = "#4c4e6a"   # muted purple-grey (inactive / secondary text)
+fg    = "#1a1a2e"   # deep navy (cool against warm bg — Solarized contrast trick)
+grey  = "#4c5060"   # muted slate (secondary / inactive text)
 white = "#2e3050"   # dark indigo (terminal white slot)
 
-# --- Accents (same hues as dark.toml, darkened for mid-tone background) ---
+# --- Accents (same hues as dark.toml, darkened for a light surface) ---
 pink   = "#cc0066"   # darkened neon pink
 blue   = "#0099cc"   # darkened neon blue
 green  = "#007744"   # darkened neon green
@@ -36,11 +39,11 @@ white_bright  = "#9698b0"
 
 # --- Misc ---
 battery_warning = "#cc6600"
-shadow          = "#9090a8"   # visible but soft on mid-tone bg
-border_inactive = "#a8a8c0"   # medium grey-purple border
+shadow          = "#c4bfb0"   # warm grey shadow (Solarized base2-ish)
+border_inactive = "#cdc9bc"   # warm tan border
 
-# --- Rofi ---
-rofi_bg     = "#d8d6f0"
-rofi_bg_alt = "#c8c6e4"
-rofi_fg_dim = "#7a7a92"
-rofi_fg_sec = "#5a5c78"
+# --- Rofi (warm cream, same family as terminal bg) ---
+rofi_bg     = "#f5f1e5"
+rofi_bg_alt = "#e8e4d6"
+rofi_fg_dim = "#7a7060"
+rofi_fg_sec = "#5a5448"
