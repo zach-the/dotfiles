@@ -77,7 +77,7 @@ vim.o.shiftwidth = 4
 vim.o.tabstop = 4
 vim.o.softtabstop = 4
 -- vim.o.termguicolors = true
-vim.opt.termguicolors = false
+vim.opt.termguicolors = true
 vim.o.cursorline = true
 vim.o.cursorcolumn = true
 vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>')
@@ -159,13 +159,13 @@ vim.keymap.set('n', '<S-k>', ':m .-2<CR>==', { silent = true })
 vim.keymap.set('v', '<S-j>', ":m '>+1<CR>gv=gv", { silent = true })
 vim.keymap.set('v', '<S-k>', ":m '<-2<CR>gv=gv", { silent = true })
 
--- Make matches blue --------------------------------------------------------
-vim.api.nvim_create_autocmd("ColorScheme", {
-  pattern = "*",
-  callback = function()
-    vim.api.nvim_set_hl(0, "CurSearch", { bg = "#61afef", fg = "#dcdfe4" })
-  end,
-})
+-- Make matches blue -------------------------------------------------------- (now in colorscheme)
+-- vim.api.nvim_create_autocmd("ColorScheme", {
+--   pattern = "*",
+--   callback = function()
+--     vim.api.nvim_set_hl(0, "CurSearch", { bg = "#61afef", fg = "#dcdfe4" })
+--   end,
+-- })
 
 -- ----------------------------------------------------------- --
 -- ╔═════════════════════════════════════════════════════════╗ --
@@ -208,29 +208,29 @@ require("lazy").setup({
     --   end,
     -- },
 
-    {
-        'navarasu/onedark.nvim',
-        priority = 1000, -- Load this before all other plugins
-        config = function()
-            require('onedark').setup({
-                style = 'cool', -- Options: dark, darker, cool, deep, warm, warmer, light
-                transparent = false, -- Show/hide background
-                term_colors = true, -- Terminal colors
-                ending_tildes = false, -- Show ~ at the end of buffer
-                cmp_itemkind_reverse = false,
-                
-                -- Toggle italic text for keywords, functions, etc.
-                code_style = {
-                    comments = 'none',
-                    keywords = 'none',
-                    functions = 'none',
-                    strings = 'none',
-                    variables = 'none',
-                },
-            })
-            require('onedark').load()
-        end,
-    },
+    -- {
+    --     'navarasu/onedark.nvim',
+    --     priority = 1000, -- Load this before all other plugins
+    --     config = function()
+    --         require('onedark').setup({
+    --             style = 'cool', -- Options: dark, darker, cool, deep, warm, warmer, light
+    --             transparent = false, -- Show/hide background
+    --             term_colors = true, -- Terminal colors
+    --             ending_tildes = false, -- Show ~ at the end of buffer
+    --             cmp_itemkind_reverse = false,
+    --
+    --             -- Toggle italic text for keywords, functions, etc.
+    --             code_style = {
+    --                 comments = 'none',
+    --                 keywords = 'none',
+    --                 functions = 'none',
+    --                 strings = 'none',
+    --                 variables = 'none',
+    --             },
+    --         })
+    --         require('onedark').load()
+    --     end,
+    -- },
     -- {
       -- "sonph/onehalf",
       -- priority = 1000,
@@ -461,15 +461,15 @@ require("lazy").setup({
 --                                         --                                       
 -- --------------------------------------- --
 
-    {
-      'tribela/transparent.nvim',
-      event = 'VimEnter',
-      config = function()
-        require('transparent').setup({
-          exclude_groups = { "CursorLine" },
-        })
-      end,
-    },
+    -- {
+    --   'tribela/transparent.nvim',
+    --   event = 'VimEnter',
+    --   config = function()
+    --     require('transparent').setup({
+    --       exclude_groups = { "CursorLine" },
+    --     })
+    --   end,
+    -- },
 
     {
       "numToStr/Comment.nvim",
@@ -637,3 +637,9 @@ require("lazy").setup({
   change_detection = { enabled = true, notify = false },
   ui = { wrap = true },
 })
+
+-- Load generated colorscheme (run: python3 ~/dotfiles/generate_colors.py)
+local ok, err = pcall(vim.cmd.colorscheme, "custom_autogen_nvim_colorscheme")
+if not ok then
+  vim.notify("colorscheme not found — run: python3 ~/dotfiles/generate_colors.py", vim.log.levels.WARN)
+end
