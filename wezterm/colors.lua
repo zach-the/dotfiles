@@ -1,7 +1,7 @@
 -- GENERATED from palettes/dark.toml — run generate_colors.py to update
 return {
   bg          = '#0d0d17',
-  bg_dim      = '#090910',
+  bg_dim      = '#10101c',
   bg_inactive = '#161626',
   bg_normal   = '#161932',
 

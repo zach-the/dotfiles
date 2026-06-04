@@ -1,22 +1,18 @@
 # Cyberpunk Neon — Light variant
-# Backgrounds inspired by Solarized Light: warm cream base (very low saturation,
-# barely-warm tint) rather than cold grey or pure white. The slight warmth reads
-# as paper, not paint. Accents are the same hues as dark.toml, darkened for legibility.
+# Near-white lavender backgrounds. Same accent hues as dark.toml, darkened for legibility.
 # Edit here, then run: python3 generate_colors.py light
 
 [palette]
-# --- Backgrounds (warm cream, Solarized-inspired) ---
-# Solarized base3 = #fdf6e3 (warm cream). We use the same warmth but shift the
-# tint a hair cooler (neutral→cream rather than yellow) to sit near the cyberpunk hue family.
+# --- Backgrounds ---
 # Note: bg also doubles as the ANSI "black" terminal slot (color0).
-bg          = "#f4f0e4"   # warm cream base (tab edges, obsidian equivalent)
-bg_dim      = "#ece8da"   # slightly dimmer cream (tmux inactive pane)
-bg_inactive = "#dfdbd0"   # muted warm grey (inactive tab background)
-bg_normal   = "#f0ecde"   # normal terminal/window background
+bg          = "#f5f4fc"   # near-white lavender (base — tab edges)
+bg_dim      = "#e8e7f5"   # slightly dimmer (tmux inactive pane)
+bg_inactive = "#dddcee"   # inactive tab background
+bg_normal   = "#eeedf8"   # normal terminal/window background
 
 # --- Text ---
-fg    = "#1a1a2e"   # deep navy (cool against warm bg — Solarized contrast trick)
-grey  = "#4c5060"   # muted slate (secondary / inactive text)
+fg    = "#1a1a2e"   # deep navy (primary text)
+grey  = "#5a5c7a"   # muted purple-grey (inactive / secondary text)
 white = "#2e3050"   # dark indigo (terminal white slot)
 
 # --- Accents (same hues as dark.toml, darkened for a light surface) ---
@@ -39,11 +35,11 @@ white_bright  = "#9698b0"
 
 # --- Misc ---
 battery_warning = "#cc6600"
-shadow          = "#c4bfb0"   # warm grey shadow (Solarized base2-ish)
-border_inactive = "#cdc9bc"   # warm tan border
+shadow          = "#c0c0d0"   # soft light shadow
+border_inactive = "#c8c8dc"   # light purple-grey border
 
-# --- Rofi (warm cream, same family as terminal bg) ---
-rofi_bg     = "#f5f1e5"
-rofi_bg_alt = "#e8e4d6"
-rofi_fg_dim = "#7a7060"
-rofi_fg_sec = "#5a5448"
+# --- Rofi ---
+rofi_bg     = "#f5f5f7"
+rofi_bg_alt = "#e5e5ea"
+rofi_fg_dim = "#8e8e93"
+rofi_fg_sec = "#6c6c70"

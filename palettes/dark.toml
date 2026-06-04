@@ -3,8 +3,13 @@
 
 [palette]
 # --- Backgrounds ---
-bg          = "#0d0d17"   # deep obsidian (kitty bg, wezterm tab edge, tmux dim)
-bg_dim      = "#090910"   # dimmer obsidian (tmux inactive pane)
+# Full gradient from darkest to normal — comment/uncomment to remap bg_dim etc.
+# bg_super_duper_darkest = "#090910"
+# bg_super_darkest       = "#10101c"
+# bg_darkest             = "#141525"
+# bg_darker              = "#12142a"
+bg          = "#0d0d17"   # deep obsidian (kitty bg, wezterm tab edge)
+bg_dim      = "#10101c"   # tmux inactive pane
 bg_inactive = "#161626"   # inactive tab background
 bg_normal   = "#161932"   # normal terminal background (wezterm, tmux active)
 
