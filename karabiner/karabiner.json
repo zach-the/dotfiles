@@ -5,21 +5,21 @@
             "complex_modifications": {
                 "rules": [
                     {
-                        "description": "Tab (hold) = hjkl arrow layer; Tab (tap) = Tab",
+                        "description": "Space (hold) = hjkl arrow layer; Space (tap) = Space",
                         "manipulators": [
                             {
                                 "type": "basic",
                                 "from": {
-                                    "key_code": "tab",
+                                    "key_code": "spacebar",
                                     "modifiers": { "optional": ["shift", "option", "control"] }
                                 },
                                 "to": [
-                                    { "set_variable": { "name": "tab_held", "value": 1 } }
+                                    { "set_variable": { "name": "space_held", "value": 1 } }
                                 ],
                                 "to_after_key_up": [
-                                    { "set_variable": { "name": "tab_held", "value": 0 } }
+                                    { "set_variable": { "name": "space_held", "value": 0 } }
                                 ],
-                                "to_if_alone": [{ "key_code": "tab" }]
+                                "to_if_alone": [{ "key_code": "spacebar" }]
                             },
                             {
                                 "type": "basic",
@@ -29,7 +29,7 @@
                                 },
                                 "to": [{ "key_code": "left_arrow" }],
                                 "conditions": [
-                                    { "type": "variable_if", "name": "tab_held", "value": 1 }
+                                    { "type": "variable_if", "name": "space_held", "value": 1 }
                                 ]
                             },
                             {
@@ -40,7 +40,7 @@
                                 },
                                 "to": [{ "key_code": "down_arrow" }],
                                 "conditions": [
-                                    { "type": "variable_if", "name": "tab_held", "value": 1 }
+                                    { "type": "variable_if", "name": "space_held", "value": 1 }
                                 ]
                             },
                             {
@@ -51,7 +51,7 @@
                                 },
                                 "to": [{ "key_code": "up_arrow" }],
                                 "conditions": [
-                                    { "type": "variable_if", "name": "tab_held", "value": 1 }
+                                    { "type": "variable_if", "name": "space_held", "value": 1 }
                                 ]
                             },
                             {
@@ -62,7 +62,7 @@
                                 },
                                 "to": [{ "key_code": "right_arrow" }],
                                 "conditions": [
-                                    { "type": "variable_if", "name": "tab_held", "value": 1 }
+                                    { "type": "variable_if", "name": "space_held", "value": 1 }
                                 ]
                             }
                         ]
@@ -82,43 +82,6 @@
                                     }
                                 ],
                                 "to_if_alone": [{ "key_code": "escape" }],
-                                "type": "basic"
-                            }
-                        ]
-                    },
-                    {
-                        "description": "Ctrl+J/K to Down/Up",
-                        "manipulators": [
-                            {
-                                "from": {
-                                    "key_code": "j",
-                                    "modifiers": { "mandatory": ["left_control"] }
-                                },
-                                "to": [{ "key_code": "down_arrow" }],
-                                "type": "basic"
-                            },
-                            {
-                                "from": {
-                                    "key_code": "k",
-                                    "modifiers": { "mandatory": ["left_control"] }
-                                },
-                                "to": [{ "key_code": "up_arrow" }],
-                                "type": "basic"
-                            },
-                            {
-                                "from": {
-                                    "key_code": "h",
-                                    "modifiers": { "mandatory": ["left_control"] }
-                                },
-                                "to": [{ "key_code": "left_arrow" }],
-                                "type": "basic"
-                            },
-                            {
-                                "from": {
-                                    "key_code": "l",
-                                    "modifiers": { "mandatory": ["left_control"] }
-                                },
-                                "to": [{ "key_code": "right_arrow" }],
                                 "type": "basic"
                             }
                         ]
