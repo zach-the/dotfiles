@@ -1,6 +1,7 @@
 local wezterm = require 'wezterm'
 local config = wezterm.config_builder()
 local act = wezterm.action
+local c = require 'colors'
 config.disable_default_key_bindings = true
 
 -- Helper variables to identify the OS based on the target_triple
@@ -16,7 +17,30 @@ config.font_size = is_linux and 11 or 13
 config.initial_cols = 120
 config.initial_rows = 35
 
-config.color_scheme = 'CyberpunkNeon'
+config.colors = {
+  foreground    = c.fg,
+  background    = c.bg_normal,
+  cursor_bg     = c.pink,
+  cursor_fg     = c.bg,
+  cursor_border = c.pink,
+  selection_fg  = c.bg,
+  selection_bg  = c.blue,
+  split         = c.pink,
+  ansi = {
+    c.bg, c.pink, c.green, c.yellow,
+    c.blue, c.purple, c.orange, c.white,
+  },
+  brights = {
+    c.black_bright, c.pink_bright, c.green_bright, c.yellow_bright,
+    c.blue_bright, c.purple_bright, c.orange_bright, c.white_bright,
+  },
+  tab_bar = {
+    background   = c.bg_normal,
+    active_tab   = { bg_color = c.pink,      fg_color = c.bg },
+    inactive_tab = { bg_color = c.bg_normal,  fg_color = c.bg_normal },
+    new_tab      = { bg_color = c.bg_normal,  fg_color = c.grey },
+  },
+}
 
 -- Inactive border color dimming
 config.inactive_pane_hsb = {
@@ -139,17 +163,16 @@ config.mouse_bindings = {
 wezterm.on(
   'format-tab-title',
   function(tab, tabs, panes, config, hover, max_width)
-    -- Define colors matching your Cyberpunk theme
-    local background = '#161626' -- inactive bg
-    local foreground = '#787c99' -- inactive fg
-    local edge_background = '#0d0d17' -- the base tab bar background
+    local background = c.bg_inactive
+    local foreground = c.grey
+    local edge_background = c.bg
 
     if tab.is_active then
-      background = '#33ccff' -- hover bg (blue)
-      foreground = '#0d0d17' -- active fg (obsidian)
+      background = c.blue
+      foreground = c.bg
     elseif hover then
-      background = '#ff007f' -- active bg (pink)
-      foreground = '#0d0d17' -- hover fg
+      background = c.pink
+      foreground = c.bg
     end
 
     local fade_in = '░▒▓'

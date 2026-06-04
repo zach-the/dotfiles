@@ -1,0 +1,43 @@
+# Cyberpunk Neon palette — single source of truth
+# Edit here, then run: python3 generate_colors.py
+
+[palette]
+# --- Backgrounds ---
+bg          = "#0d0d17"   # deep obsidian (kitty bg, wezterm tab edge, tmux dim)
+bg_dim      = "#090910"   # dimmer obsidian (tmux inactive pane)
+bg_inactive = "#161626"   # inactive tab background
+bg_normal   = "#161932"   # normal terminal background (wezterm, tmux active)
+
+# --- Text ---
+fg    = "#c0caf5"   # primary text
+grey  = "#787c99"   # muted / inactive text
+white = "#a9b1d6"   # terminal white slot
+
+# --- Accents ---
+pink   = "#ff007f"   # primary: cursor, active tabs, borders
+blue   = "#33ccff"   # secondary: selection, hover, clock, network
+green  = "#00ff99"   # tertiary: url, battery, backlight
+yellow = "#ffee00"   # terminal yellow
+purple = "#9d00ff"   # terminal magenta slot
+orange = "#ff6600"   # terminal cyan slot (actually orange)
+
+# --- Brights (ANSI 8–15) ---
+black_bright  = "#414868"
+pink_bright   = "#ff33a1"
+green_bright  = "#26ffaa"
+yellow_bright = "#fff700"
+blue_bright   = "#52d5ff"
+purple_bright = "#b042ff"
+orange_bright = "#ff8533"
+white_bright  = "#c0caf5"
+
+# --- Misc ---
+battery_warning = "#ff9e64"   # warm orange, waybar battery warning only
+shadow          = "#1a1a1a"   # hyprland window shadow
+border_inactive = "#595959"   # hyprland inactive border grey
+
+# --- Rofi (macOS Spotlight aesthetic, intentionally different from terminal bg) ---
+rofi_bg     = "#1c1c1e"
+rofi_bg_alt = "#2c2c2e"
+rofi_fg_dim = "#8e8e93"
+rofi_fg_sec = "#ebebf5"

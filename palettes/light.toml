@@ -1,0 +1,48 @@
+# Cyberpunk Neon — Light variant
+# Same hues as palette.toml; backgrounds flipped to light lavender whites,
+# accents darkened so they remain legible on light backgrounds.
+# Edit here, then run: python3 generate_colors.py --palette palette_light.toml
+
+[palette]
+# --- Backgrounds ---
+# Note: bg is also used as the ANSI "black" terminal slot (color0).
+# In the dark theme bg=obsidian=black. In a light theme these roles diverge;
+# the generator would need a separate ansi_black key to fully support this.
+bg          = "#f5f4fc"   # light lavender base (lightest — tab edges, obsidian equivalent)
+bg_dim      = "#e8e7f5"   # slightly dimmer (tmux inactive pane)
+bg_inactive = "#dddcee"   # inactive tab background
+bg_normal   = "#eeedf8"   # normal terminal/window background
+
+# --- Text ---
+fg    = "#1a1a2e"   # deep navy (primary text)
+grey  = "#5a5c7a"   # muted purple-grey (inactive / secondary text)
+white = "#2e3050"   # dark indigo (terminal white slot — dark so it shows on light bg)
+
+# --- Accents (same hues as dark, lightness pulled down to stay legible on light) ---
+pink   = "#cc0066"   # darkened neon pink   (dark: #ff007f, 330° 100% 50% → 40%)
+blue   = "#0099cc"   # darkened neon blue   (dark: #33ccff, 198° 100% 60% → 40%)
+green  = "#007744"   # darkened neon green  (dark: #00ff99, 156° 100% 50% → 23%)
+yellow = "#997700"   # darkened amber       (dark: #ffee00, 56°  100% 50% → 30%)
+purple = "#6600bb"   # darkened violet      (dark: #9d00ff, 277° 100% 50% → 37%)
+orange = "#cc4400"   # darkened orange      (dark: #ff6600, 24°  100% 50% → 40%)
+
+# --- Brights (ANSI 8–15 — slightly lighter than base accents, still legible) ---
+black_bright  = "#6b6e8f"   # medium purple-grey
+pink_bright   = "#dd0077"
+green_bright  = "#008855"
+yellow_bright = "#aa8800"
+blue_bright   = "#00aadd"
+purple_bright = "#7700cc"
+orange_bright = "#dd5500"
+white_bright  = "#9698b0"   # light purple-grey
+
+# --- Misc ---
+battery_warning = "#cc6600"   # dark warm orange
+shadow          = "#c0c0d0"   # soft light shadow
+border_inactive = "#c8c8dc"   # light purple-grey border
+
+# --- Rofi (macOS Spotlight — light mode) ---
+rofi_bg     = "#f5f5f7"
+rofi_bg_alt = "#e5e5ea"
+rofi_fg_dim = "#8e8e93"
+rofi_fg_sec = "#6c6c70"

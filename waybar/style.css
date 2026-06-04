@@ -1,3 +1,5 @@
+@import 'colors.css';
+
 * {
     font-family: "JetBrains Mono", "Font Awesome 6 Free";
     font-size: 12px;
@@ -9,7 +11,7 @@
 window#waybar {
     /* Using a very subtle dark tint to make the neon colors pop */
     background: rgba(15, 17, 23, 0); 
-    color: #c0caf5;
+    color: var(--fg);
     border-radius: 10px;
     margin: 5px 5px 0 5px; /* Added slight margin for a floating look */
     padding: 0px;
@@ -17,17 +19,17 @@ window#waybar {
 
 #workspaces button {
     padding: 0 8px;
-    color: #414868; /* Dimmed inactive state */
+    color: var(--fg-dim); /* Dimmed inactive state */
     background: transparent;
     transition: all 0.2s ease-in-out;
 }
 
 #workspaces button.active {
-    color: #ff007f; /* Cyberpunk Neon Pink */
+    color: var(--pink); /* Cyberpunk Neon Pink */
 }
 
 #workspaces button:hover {
-    color: #33ccff; /* Blue hover effect */
+    color: var(--blue); /* Blue hover effect */
     /*background: rgba(51, 204, 255, 0.1);*/
 }
 
@@ -38,36 +40,36 @@ window#waybar {
 #pulseaudio,
 #tray {
     padding: 0 12px;
-    color: #c0caf5;
+    color: var(--fg);
 }
 
 #clock {
-    color: #33ccff; /* Neon Blue */
+    color: var(--blue); /* Neon Blue */
     font-weight: bold;
 }
 
 #backlight {
-    color: #00ff99; /* Neon Green */
+    color: var(--green); /* Neon Green */
 }
 
 #battery {
-    color: #00ff99; /* Green for healthy battery */
+    color: var(--green); /* Green for healthy battery */
 }
 
 #battery.warning {
-    color: #ff9e64; /* Keep a warm orange for warning */
+    color: var(--battery-warn); /* Warm orange for warning */
 }
 
 #battery.critical {
-    color: #ff007f; /* Neon Pink for critical alerts */
+    color: var(--pink); /* Neon Pink for critical alerts */
 }
 
 #network {
-    color: #33ccff; /* Neon Blue */
+    color: var(--blue); /* Neon Blue */
 }
 
 #pulseaudio {
-    color: #00ff99; /* Neon Green */
+    color: var(--green); /* Neon Green */
 }
 
 #tray {

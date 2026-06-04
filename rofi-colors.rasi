@@ -1,0 +1,12 @@
+/* GENERATED from palettes/light.toml — run generate_colors.py to update */
+* {
+    bg:            #f5f5f7ee;
+    bg-solid:      #f5f5f7ff;
+    bg-alt:        #e5e5eacc;
+    bg-selected:   #00774455;
+    fg:            #ffffffff;
+    fg-dim:        #8e8e93ff;
+    fg-secondary:  #6c6c7099;
+    border-accent: #0099cc88;
+    separator-bg:  #ffffff18;
+}

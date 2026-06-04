@@ -1,16 +1,9 @@
 @theme "/dev/null"
+@import "rofi-colors.rasi"
 
 /* Approximating macOS Spotlight with a hyprland twist */
 /* Real blur requires a compositor like picom with blur enabled */
 * {
-    bg:           #1c1c1eee;
-    bg-solid:     #1c1c1eff;
-    bg-alt:       #2c2c2ecc;
-    bg-selected:  #00ff9955;
-    fg:           #ffffffff;
-    fg-dim:       #8e8e93ff;
-    fg-secondary: #ebebf599;
-
     background-color: transparent;
     text-color:       @fg;
 }
@@ -33,7 +26,7 @@ window {
     fixed-height:     false;
     background-color: @bg;
     border:           1px;
-    border-color:     #33ccff88;
+    border-color:     @border-accent;
     border-radius:    16px;
     padding:          0;
 }
@@ -67,7 +60,7 @@ entry {
 }
 
 separator {
-    background-color: #ffffff18;
+    background-color: @separator-bg;
     height:           1px;
     margin:           0 16px;
 }
