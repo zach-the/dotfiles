@@ -12,6 +12,7 @@ bg          = "#0d0d17"   # deep obsidian (kitty bg, wezterm tab edge)
 bg_dim      = "#10101c"   # tmux inactive pane
 bg_inactive = "#161626"   # inactive tab background
 bg_normal   = "#161932"   # normal terminal background (wezterm, tmux active)
+bg_cursorline = "#10101c" # cursorline + statusline (darker neutral grey)
 
 # --- Text ---
 fg    = "#c0caf5"   # primary text
