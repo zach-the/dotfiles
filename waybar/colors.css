@@ -1,10 +1,10 @@
-/* GENERATED from palettes/light.toml — run generate_colors.py to update */
+/* GENERATED from palettes/dark.toml — run generate_colors.py to update */
 :root {
-  --fg:           #1a1a2e;
-  --fg-muted:     #5a5c7a;
-  --fg-dim:       #6b6e8f;
-  --pink:         #cc0066;
-  --blue:         #0099cc;
-  --green:        #007744;
-  --battery-warn: #cc6600;
+  --fg:           #c0caf5;
+  --fg-muted:     #787c99;
+  --fg-dim:       #414868;
+  --pink:         #ff007f;
+  --blue:         #33ccff;
+  --green:        #00ff99;
+  --battery-warn: #ff9e64;
 }
