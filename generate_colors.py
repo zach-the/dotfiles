@@ -236,7 +236,7 @@ def gen_rofi_colors(p: dict, name: str) -> str:
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-OUTPUTS: dict[str, callable] = {
+OUTPUTS = {
     "kitty/theme.conf":   gen_kitty_theme,
     "wezterm/colors.lua": gen_wezterm_colors,
     "tmux-colors.conf":   gen_tmux_colors,
