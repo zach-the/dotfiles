@@ -15,7 +15,7 @@ bg_normal   = "#161932"   # normal terminal background (wezterm, tmux active)
 
 # --- NVIM STUFF ---
 bg_cursorline = "#10101c" # cursorline + statusline (darker neutral grey)
-bg_cursorline = "#00ff99" # cursorline + statusline (darker neutral grey)
+bg_cursorline = "#0d0d17" # cursorline + statusline (darker neutral grey)
 bg_highlight  = "#ff6600" # visual selection background
 fg_highlight  = "#0d0d17" # visual selection text color
 
