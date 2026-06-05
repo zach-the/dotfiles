@@ -643,3 +643,19 @@ local ok, err = pcall(vim.cmd.colorscheme, "custom_autogen_nvim_colorscheme")
 if not ok then
   vim.notify("colorscheme not found — run: python3 ~/dotfiles/generate_colors.py", vim.log.levels.WARN)
 end
+
+-- Transparency: clear bg on Normal and related groups; CursorLine/CursorColumn keep their bg
+local function apply_transparency()
+  local transparent = { "Normal", "NormalNC", "NormalFloat", "SignColumn",
+                        "StatusLine", "StatusLineNC", "VertSplit", "WinSeparator",
+                        "EndOfBuffer", "LineNr", "FoldColumn", "Folded" }
+  for _, group in ipairs(transparent) do
+    local hl = vim.api.nvim_get_hl(0, { name = group, link = false })
+    hl.bg = nil
+    hl.ctermbg = nil
+    vim.api.nvim_set_hl(0, group, hl)
+  end
+end
+
+apply_transparency()
+vim.api.nvim_create_autocmd("ColorScheme", { callback = apply_transparency })
