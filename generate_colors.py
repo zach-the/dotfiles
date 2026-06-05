@@ -299,7 +299,7 @@ def gen_nvim_colorscheme(p: dict, name: str) -> str:
         hl('LineNr',          fg='black_bright'),
         hl('CursorLineNr',    fg='pink',        bold=True),
         hl('CursorLine',      fg='fg_cursorline', bg='bg_cursorline'),
-        hl('CursorColumn',    bg='bg_cursorline'),
+        hl('CursorColumn',    fg='fg_cursorline', bg='bg_cursorline'),
         hl('ColorColumn',     bg='bg_dim'),
         hl('VertSplit',       fg='black_bright'),
         hl('WinSeparator',    fg='black_bright'),
