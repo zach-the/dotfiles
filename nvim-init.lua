@@ -138,8 +138,6 @@ end
 vim.api.nvim_create_autocmd("RecordingEnter", {
   group = macro_group,
   callback = function()
-    local text_color = get_hl_color("Normal", "fg") or "#1d2021"
-    vim.api.nvim_set_hl(0, "MacroLine", { bg = "#c678dd", fg = text_color, bold = true })
     vim.opt_local.winhighlight = "CursorLine:MacroLine"
   end,
 })

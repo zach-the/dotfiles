@@ -9,9 +9,7 @@ bg          = "#f5f4fc"   # near-white lavender (base — tab edges)
 bg_dim      = "#e8e7f5"   # slightly dimmer (tmux inactive pane)
 bg_inactive = "#dddcee"   # inactive tab background
 bg_normal   = "#eeedf8"   # normal terminal/window background
-bg_cursorline = "#d0cfdf" # cursorline + statusline (darker neutral grey)
-bg_highlight  = "#d0cfdf" # visual selection background
-fg_highlight  = "#1a1a2e" # visual selection text color
+bg_cursorline = "#d0cfdf" # cursorline + statusline
 
 # --- Text ---
 fg    = "#1a1a2e"   # deep navy (primary text)
