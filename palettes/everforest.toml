@@ -1,0 +1,45 @@
+# Everforest palette — medium dark variant
+# Source: https://github.com/sainnhe/everforest
+# Edit here, then run: python3 generate_colors.py
+
+[palette]
+# --- Backgrounds ---
+bg          = "#2d353b"   # bg0 — main background
+bg_dim      = "#232a2e"   # bg_dim — tmux inactive pane
+bg_inactive = "#343f44"   # bg1 — inactive tab background
+bg_normal   = "#3d484d"   # bg2 — normal surface
+bg_cursorline = "#343f44" # bg1 — cursorline + statusline
+
+# --- Text ---
+fg    = "#d3c6aa"   # primary text
+grey  = "#859289"   # muted / inactive text
+white = "#9da9a0"   # terminal white slot
+
+# --- Accents ---
+pink   = "#e67e80"   # red — primary accent (cursor, active tabs, borders)
+blue   = "#7fbbb3"   # blue — secondary
+green  = "#a7c080"   # green — tertiary
+yellow = "#dbbc7f"   # yellow
+purple = "#d699b6"   # purple
+orange = "#e69875"   # orange
+
+# --- Brights (ANSI 8–15) ---
+black_bright  = "#7a8478"   # grey0
+pink_bright   = "#e67e80"   # red (same — everforest uses soft palette)
+green_bright  = "#83c092"   # aqua
+yellow_bright = "#dbbc7f"   # yellow (same)
+blue_bright   = "#83c092"   # aqua
+purple_bright = "#d699b6"   # purple (same)
+orange_bright = "#e69875"   # orange (same)
+white_bright  = "#d3c6aa"   # fg
+
+# --- Misc ---
+battery_warning = "#e69875"   # orange, waybar battery warning only
+shadow          = "#1e2326"   # window shadow
+border_inactive = "#7a8478"   # grey0
+
+# --- Rofi ---
+rofi_bg     = "#343f44"   # bg1
+rofi_bg_alt = "#3d484d"   # bg2
+rofi_fg_dim = "#859289"   # grey1
+rofi_fg_sec = "#d3c6aa"   # fg

@@ -14,7 +14,7 @@ bg_cursorline = "#d0cfdf" # cursorline + statusline
 
 # --- Text ---
 fg    = "#1a1a2e"   # deep navy (primary text)
-grey  = "#5a5c7a"   # muted purple-grey (inactive / secondary text)
+grey  = "#51536e"   # muted purple-grey (inactive / secondary text)
 white = "#2e3050"   # dark indigo (terminal white slot)
 
 # --- Accents (same hues as dark.toml, darkened for a light surface) ---
