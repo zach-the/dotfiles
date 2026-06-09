@@ -557,9 +557,10 @@ def main():
             ["tmux", "ls"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
         ).returncode == 0
         if in_session:
-            tmux_colors = ROOT / "tmux-colors.conf"
-            subprocess.run(["tmux", "source-file", str(tmux_colors)], check=False)
-            print("  reloaded tmux colors")
+            tmux_conf = Path("~/.tmux.conf").expanduser()
+            subprocess.run(["tmux", "source-file", str(tmux_conf)], check=False)
+            subprocess.run(["tmux", "display-message", "tmux.conf reloaded"], check=False)
+            print("  reloaded tmux")
 
     for display, generator in NVIM_OUTPUTS.items():
         path = Path(display).expanduser()
