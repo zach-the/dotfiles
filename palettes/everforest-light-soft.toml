@@ -3,6 +3,8 @@
 # Edit here, then run: python3 generate_colors.py
 
 [palette]
+background = "light"
+
 # --- Backgrounds ---
 bg          = "#f0ead6"   # bg0 — main background
 bg_dim      = "#e5dfc5"   # bg2 — tmux inactive pane

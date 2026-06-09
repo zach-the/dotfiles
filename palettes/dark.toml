@@ -2,6 +2,8 @@
 # Edit here, then run: python3 generate_colors.py
 
 [palette]
+background = "dark"
+
 # --- Backgrounds ---
 # Full gradient from darkest to normal — comment/uncomment to remap bg_dim etc.
 # bg_super_duper_darkest = "#090910"

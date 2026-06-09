@@ -3,6 +3,8 @@
 # Edit here, then run: python3 generate_colors.py light
 
 [palette]
+background = "light"
+
 # --- Backgrounds ---
 # Note: bg also doubles as the ANSI "black" terminal slot (color0).
 bg          = "#f5f4fc"   # near-white lavender (base — tab edges)

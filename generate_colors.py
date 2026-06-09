@@ -274,8 +274,10 @@ def gen_nvim_colorscheme(p: dict, name: str) -> str:
         if strikethrough: attrs.append('strikethrough = true')
         return f'hl(0, {g:<37s}, {{ {", ".join(attrs)} }})'
 
+    bg_setting = p.get('background', 'dark')
     ln = [
         f'-- GENERATED from palettes/{name}.toml — run generate_colors.py to update',
+        f'vim.o.background = "{bg_setting}"',
         'vim.cmd("highlight clear")',
         'if vim.fn.exists("syntax_on") == 1 then vim.cmd("syntax reset") end',
         f'vim.g.colors_name = "{cs_name}"',
