@@ -8,6 +8,7 @@ Usage:
   python3 generate_colors.py light        # use palettes/light.toml
   python3 generate_colors.py /path/to/x.toml  # use any file
 """
+import os
 import re
 import shutil
 import subprocess
@@ -549,6 +550,12 @@ def main():
         path = ROOT / rel
         path.write_text(generator(p, palette_name))
         print(f"  wrote {rel}")
+
+    if "TMUX" in os.environ:
+        tmux_colors = ROOT / "tmux-colors.conf"
+        subprocess.run(["tmux", "source-file", str(tmux_colors)], check=False)
+        print("  reloaded tmux colors")
+
     for display, generator in NVIM_OUTPUTS.items():
         path = Path(display).expanduser()
         path.parent.mkdir(parents=True, exist_ok=True)
