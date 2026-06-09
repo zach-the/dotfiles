@@ -71,7 +71,7 @@ def resolve_palette(arg) -> Path:
                 input="\n".join(names),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True,
+                universal_newlines=True,
             )
         except KeyboardInterrupt:
             sys.exit(0)
