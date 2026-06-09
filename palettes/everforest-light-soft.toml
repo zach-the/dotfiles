@@ -7,7 +7,7 @@ background = "light"
 
 # --- Backgrounds ---
 bg          = "#f0ead6"   # bg0 — main background
-bg_dim      = "#e5dfc5"   # bg2 — tmux inactive pane
+bg_dim      = "#ded6b6"   # bg2 — tmux inactive pane
 bg_inactive = "#ede8d4"   # bg1 — inactive tab background
 bg_normal   = "#e5dfc5"   # bg2 — normal surface
 bg_cursorline = "#d5d0b8" # bg4 — cursorline + statusline
