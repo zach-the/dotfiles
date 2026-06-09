@@ -69,7 +69,8 @@ def resolve_palette(arg) -> Path:
             result = subprocess.run(
                 ["fzf", "--prompt=palette> ", "--height=~10", "--layout=reverse"],
                 input="\n".join(names),
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
             )
         except KeyboardInterrupt:
@@ -551,10 +552,14 @@ def main():
         path.write_text(generator(p, palette_name))
         print(f"  wrote {rel}")
 
-    if "TMUX" in os.environ:
-        tmux_colors = ROOT / "tmux-colors.conf"
-        subprocess.run(["tmux", "source-file", str(tmux_colors)], check=False)
-        print("  reloaded tmux colors")
+    if shutil.which("tmux"):
+        in_session = "TMUX" in os.environ or subprocess.run(
+            ["tmux", "ls"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        ).returncode == 0
+        if in_session:
+            tmux_colors = ROOT / "tmux-colors.conf"
+            subprocess.run(["tmux", "source-file", str(tmux_colors)], check=False)
+            print("  reloaded tmux colors")
 
     for display, generator in NVIM_OUTPUTS.items():
         path = Path(display).expanduser()
