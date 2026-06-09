@@ -765,7 +765,7 @@ hs.hotkey.bind(hyper, "E", twoThirds(2))             -- Last Two Thirds
 -- Sizing & Restoration
 hs.hotkey.bind(hyper, "F", maximize)                -- Maximize
 hs.hotkey.bind(hyper, "C", center)                  -- Center
-hs.hotkey.bind(hyper, "R", unMinimizeAll)           -- Unminimize All
+-- hs.hotkey.bind(hyper, "R", unMinimizeAll)           -- Unminimize All
 hs.hotkey.bind(hyper, "M", isolateActiveWindow)     -- Minimize All Except Active
 hs.hotkey.bind(hyper, "Q", minimizeFocused)         -- Minimize
 hs.hotkey.bind(hyper, "return", fullscreen)         -- Fullscreen
