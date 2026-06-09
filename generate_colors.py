@@ -9,6 +9,8 @@ Usage:
   python3 generate_colors.py /path/to/x.toml  # use any file
 """
 import re
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -60,11 +62,30 @@ def resolve_palette(arg) -> Path:
     names = available_palettes()
     if not names:
         sys.exit(f"error: no palettes found in {PALETTES_DIR}")
+
+    if shutil.which("fzf"):
+        try:
+            result = subprocess.run(
+                ["fzf", "--prompt=palette> ", "--height=~10", "--layout=reverse"],
+                input="\n".join(names),
+                capture_output=True,
+                text=True,
+            )
+        except KeyboardInterrupt:
+            sys.exit(0)
+        if result.returncode != 0:
+            sys.exit(0)
+        choice = result.stdout.strip()
+        named = PALETTES_DIR / f"{choice}.toml"
+        if named.is_file():
+            return named
+        sys.exit(f"error: fzf returned unknown palette: {choice!r}")
+
     print("Available palettes:")
     for i, name in enumerate(names, 1):
         print(f"  {i}. {name}")
     try:
-        raw = input(f"Select [1]: ").strip()
+        raw = input("Select [1]: ").strip()
     except (EOFError, KeyboardInterrupt):
         sys.exit(0)
     choice = raw if raw else "1"
