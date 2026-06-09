@@ -6,8 +6,8 @@
 background = "dark"
 
 # --- Backgrounds ---
-bg          = "#272e33"   # bg0 — main background
-bg_dim      = "#1e2326"   # bg_dim — tmux inactive pane
+bg_dim          = "#272e33"   # bg0 — main background
+bg      = "#1e2326"   # bg_dim — tmux inactive pane
 bg_inactive = "#2e383c"   # bg1 — inactive tab background
 bg_normal   = "#374145"   # bg2 — normal surface
 bg_cursorline = "#2e383c" # bg1 — cursorline + statusline
