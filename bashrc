@@ -28,6 +28,39 @@ export LESSCHARSET="utf-8"
 # Toggle live with: PROMPT_STYLE=ascii  or  PROMPT_STYLE=powerline
 PROMPT_STYLE="${PROMPT_STYLE:-ascii}"
 
+_lsf_parse_file() {
+    local found_header=0
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        local clean="${line#"${line%%[^[:space:]]*}"}"  # strip leading whitespace
+        clean="${clean%"${clean##*[^[:space:]]}"}"       # strip trailing whitespace
+        if [[ "$found_header" -eq 0 ]]; then
+            [[ "$clean" == *ClusterName* && "$clean" == *Servers* ]] && found_header=1
+        else
+            [[ -z "$clean" || "$clean" == '#'* ]] && continue
+            read -r name _ <<< "$clean" && echo "$name"  # first word, splits on any whitespace
+            return
+        fi
+    done < "$1" 2>/dev/null
+}
+
+_lsf_cluster_name() {
+    local envdir="${LSF_ENVDIR:-}"
+    [[ -z "$envdir" || ! -d "$envdir" ]] && return
+
+    local name standard="$envdir/lsf.shared"
+    [[ -f "$standard" ]] && name=$(_lsf_parse_file "$standard")
+
+    if [[ -z "$name" ]]; then
+        local f
+        for f in "$envdir"/*; do
+            [[ "$f" == "$standard" || ! -f "$f" ]] && continue
+            name=$(_lsf_parse_file "$f")
+            [[ -n "$name" ]] && break
+        done
+    fi
+    echo "$name"
+}
+
 _ascii_prompt() {
     # --- color bank ---
     local reset='\[\e[0m\]'
@@ -53,15 +86,22 @@ _ascii_prompt() {
     local c_venv=$grn
     local c_ssh=$yel
     local c_user=$bwht
-    local c_gev=$bblu
-    local c_block=$bcyn
-    local c_pwd=$mag
+    local c_lsf=$bred
+    local c_gev=$cyn
+    local c_block=$grn
+    local c_pwd=$blu
     local c_git=$grn
 
     local p=''
 
     if [[ -n "$SSH_CLIENT" || -n "$SSH_TTY" ]]; then
         p+="${c_ssh}[SSH]${reset}"
+    fi
+
+    local lsf_cluster
+    lsf_cluster=$(_lsf_cluster_name)
+    if [[ -n "$lsf_cluster" ]]; then
+        p+="${c_lsf}[${lsf_cluster}]${reset}"
     fi
 
     if [[ -n "$VIRTUAL_ENV" ]]; then
