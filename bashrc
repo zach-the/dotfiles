@@ -78,7 +78,10 @@ _ascii_prompt() {
 
     # p+="${c_user}[\u : ${reset}"
 
-    p+="${c_pwd}[\w]${reset}"
+    local resolved_pwd
+    resolved_pwd=$(pwd -P)
+    resolved_pwd="${resolved_pwd/#$HOME/~}"
+    p+="${c_pwd}[${resolved_pwd}]${reset}"
 
     local branch
     branch=$(git branch --show-current 2>/dev/null)
@@ -95,7 +98,11 @@ _ascii_prompt() {
         [[ "$ahead_n" -gt 0 ]] 2>/dev/null && ahead="+${ahead_n}"
         [[ "$behind_n" -gt 0 ]] 2>/dev/null && behind="-${behind_n}"
 
-        p+="${c_git}(${branch}${dirty}${ahead}${behind})${reset}"
+        local git_body="${c_git}${branch}${reset}"
+        [[ -n "$dirty"  ]] && git_body+="${yel}${dirty}${reset}"
+        [[ -n "$ahead"  ]] && git_body+="${grn}${ahead}${reset}"
+        [[ -n "$behind" ]] && git_body+="${red}${behind}${reset}"
+        p+="${c_git}(${git_body}${c_git})${reset}"
     fi
 
     p+='\n\$ '

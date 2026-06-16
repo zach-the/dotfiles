@@ -1,6 +1,7 @@
 # --- Aliases ---
 alias ls='ls --color=auto'
 alias grep='grep --color=auto'
+alias pwd='pwd -P'
 # alias zg='rg -z'
 # alias rgs='rg -S'
 # alias zgs='rg -z -S'
