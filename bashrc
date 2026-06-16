@@ -24,10 +24,6 @@ export LESS="-XR"
 export LESSCHARSET="utf-8"
 
 # --- Prompt & Tab Title ---
-# Set PROMPT_STYLE="ascii" to use the ASCII prompt; default uses powerline-shell.
-# Toggle live with: PROMPT_STYLE=ascii  or  PROMPT_STYLE=powerline
-PROMPT_STYLE="${PROMPT_STYLE:-ascii}"
-
 _lsf_parse_file() {
     local found_header=0
     while IFS= read -r line || [[ -n "$line" ]]; do
@@ -88,7 +84,7 @@ _ascii_prompt() {
     local c_user=$bwht
     local c_lsf=$bred
     local c_gev=$cyn
-    local c_block=$grn
+    local c_block=$mag
     local c_pwd=$blu
     local c_git=$grn
 
@@ -150,13 +146,8 @@ _ascii_prompt() {
 }
 
 _update_ps1() {
-    local exit_code=$?
     printf "\033]2;%s\007" "${PWD/#$HOME/~}"
-    if [[ "$PROMPT_STYLE" == "ascii" ]] || ! command -v powerline-shell &>/dev/null || [[ $TERM == linux ]]; then
-        _ascii_prompt
-    else
-        PS1=$(powerline-shell $exit_code)
-    fi
+    _ascii_prompt
 }
 
 if [[ ! "$PROMPT_COMMAND" =~ _update_ps1 ]]; then
