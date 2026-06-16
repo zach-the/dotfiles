@@ -567,6 +567,26 @@ require("lazy").setup({
       "nvim-lualine/lualine.nvim",
       config = function()
         vim.opt.rtp:append(vim.fn.stdpath("data") .. "/lazy/onehalf/vim")
+        local function make_theme()
+          local black  = vim.g.terminal_color_0  or "#000000"
+          local green  = vim.g.terminal_color_10 or "#98c379"
+          local blue   = vim.g.terminal_color_12 or "#61afef"
+          local purple = vim.g.terminal_color_13 or "#c678dd"
+          local red    = vim.g.terminal_color_9  or "#e06c75"
+          local yellow = vim.g.terminal_color_11 or "#e5c07b"
+          local cyan   = vim.g.terminal_color_14 or "#56b6c2"
+          local gray   = vim.g.terminal_color_8  or "#abb2bf"
+          return {
+            normal   = { a = { fg = green,  bg = black }, b = { bg = black }, c = { bg = black } },
+            insert   = { a = { fg = blue,   bg = black }, b = { bg = black }, c = { bg = black } },
+            visual   = { a = { fg = purple, bg = black }, b = { bg = black }, c = { bg = black } },
+            replace  = { a = { fg = red,    bg = black }, b = { bg = black }, c = { bg = black } },
+            command  = { a = { fg = yellow, bg = black }, b = { bg = black }, c = { bg = black } },
+            terminal = { a = { fg = cyan,   bg = black }, b = { bg = black }, c = { bg = black } },
+            inactive = { a = { fg = gray,   bg = black }, b = { bg = black }, c = { bg = black } },
+          }
+        end
+
         local config = {
           options = {
             component_separators = "",
@@ -579,9 +599,9 @@ require("lazy").setup({
                 fmt = function(s)
                   local map = {
                     NORMAL = "N", INSERT = "I", VISUAL = "V", ["V-LINE"] = "VL",
-                    REPLACE = "R", COMMAND = "!", TERMINAL = "T",
+                    ["V-BLOCK"] = "VB", REPLACE = "R", COMMAND = "!", TERMINAL = "T",
                   }
-                  return map[s] or s
+                  return "[" .. (map[s] or s) .. "]"
                 end,
               },
             },
@@ -608,12 +628,9 @@ require("lazy").setup({
               { "diagnostics", sources = { "nvim_diagnostic" } },
               {
                 function()
-                  return "lines:" .. vim.api.nvim_buf_line_count(0)
+                  return vim.fn.line('.') .. ' / ' .. vim.fn.line('$')
                 end,
               },
-              { "progress" },   -- percentage through the file
-              { "location" },   -- current line:column
-              { "fileformat", fmt = string.upper },
             },
             lualine_y = {},
             lualine_z = {},
@@ -625,6 +642,13 @@ require("lazy").setup({
         }
 
         require("lualine").setup(config)
+        vim.api.nvim_create_autocmd("ColorScheme", {
+          callback = function()
+            require("lualine").setup(vim.tbl_deep_extend("force", config, {
+              options = { theme = make_theme() },
+            }))
+          end,
+        })
       end,
     },
     -- end of plugins
@@ -645,7 +669,7 @@ end
 -- Transparency: clear bg on Normal and related groups; CursorLine/CursorColumn keep their bg
 local function apply_transparency()
   local transparent = { "Normal", "NormalNC", "NormalFloat", "SignColumn",
-                        "StatusLine", "StatusLineNC", "VertSplit", "WinSeparator",
+                        "VertSplit", "WinSeparator",
                         "EndOfBuffer", "LineNr", "FoldColumn", "Folded" }
   for _, group in ipairs(transparent) do
     local hl = vim.api.nvim_get_hl(0, { name = group, link = false })
@@ -653,6 +677,9 @@ local function apply_transparency()
     hl.ctermbg = nil
     vim.api.nvim_set_hl(0, group, hl)
   end
+  local black = vim.fn.str2nr(string.sub(vim.g.terminal_color_0 or "#000000", 2), 16)
+  vim.api.nvim_set_hl(0, "StatusLine",   { bg = black, ctermbg = 0 })
+  vim.api.nvim_set_hl(0, "StatusLineNC", { bg = black, ctermbg = 0 })
 end
 
 apply_transparency()

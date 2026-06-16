@@ -24,31 +24,88 @@ export LESS="-XR"
 export LESSCHARSET="utf-8"
 
 # --- Prompt & Tab Title ---
-# Only run this if the terminal supports colors and powerline-shell is installed
-if command -v powerline-shell &>/dev/null && [[ $TERM != linux ]]; then
-    function _update_ps1() {
-        # 1. Generate the Powerline Prompt
-        PS1=$(powerline-shell $?)
-        
-        # 2. Set the Ghostty Tab Title (Current Directory)
-        # ${PWD/#$HOME/~} replaces /home/user with ~ to save space
-        printf "\033]2;%s\007" "${PWD/#$HOME/~}"
-    }
+# Set PROMPT_STYLE="ascii" to use the ASCII prompt; default uses powerline-shell.
+# Toggle live with: PROMPT_STYLE=ascii  or  PROMPT_STYLE=powerline
+PROMPT_STYLE="${PROMPT_STYLE:-ascii}"
 
-    # Append _update_ps1 to PROMPT_COMMAND if not already present
-    if [[ ! "$PROMPT_COMMAND" =~ _update_ps1 ]]; then
-        PROMPT_COMMAND="_update_ps1; $PROMPT_COMMAND"
+_ascii_prompt() {
+    # --- color bank ---
+    local reset='\[\e[0m\]'
+    # normal (dim) fg
+    local blk='\[\e[30m\]'
+    local red='\[\e[31m\]'
+    local grn='\[\e[32m\]'
+    local yel='\[\e[33m\]'
+    local blu='\[\e[34m\]'
+    local mag='\[\e[35m\]'
+    local cyn='\[\e[36m\]'
+    local wht='\[\e[37m\]'
+    # bright fg
+    local bblk='\[\e[90m\]'
+    local bred='\[\e[91m\]'
+    local bgrn='\[\e[92m\]'
+    local byel='\[\e[93m\]'
+    local bblu='\[\e[94m\]'
+    local bmag='\[\e[95m\]'
+    local bcyn='\[\e[96m\]'
+    local bwht='\[\e[97m\]'
+    # --- segment colors (edit these) ---
+    local c_venv=$grn
+    local c_ssh=$yel
+    local c_user=$bwht
+    local c_gev=$bblu
+    local c_block=$bcyn
+    local c_pwd=$mag
+    local c_git=$grn
+
+    local p=''
+
+    if [[ -n "$SSH_CLIENT" || -n "$SSH_TTY" ]]; then
+        p+="${c_ssh}[SSH]${reset}"
     fi
-else
-    # Fallback prompt (if powerline isn't installed)
-    PS1='[\u@\h \W]\$ '
-    
-    # Fallback title setting
-    case "$TERM" in
-    xterm*|rxvt*|screen*|ghostty*)
-        PROMPT_COMMAND='printf "\033]2;%s\007" "${PWD/#$HOME/~}"; '"$PROMPT_COMMAND"
-        ;;
-    esac
+
+    if [[ -n "$VIRTUAL_ENV" ]]; then
+        p+="${c_venv}($(basename "$VIRTUAL_ENV"))${reset}"
+    fi
+
+    if [[ -n "$MY_BLOCK" ]]; then
+        p+="${c_block}[${MY_BLOCK}]${reset}"
+    fi
+
+    if [[ -n "$GEV_CHAR_MODE" ]]; then
+        p+="${c_gev}[${GEV_CHAR_MODE}]${reset}"
+    fi
+
+    # p+="${c_user}[\u : ${reset}"
+
+    p+="${c_pwd}[\w]${reset}"
+
+    local branch
+    branch=$(git branch --show-current 2>/dev/null)
+    if [[ -n "$branch" ]]; then
+        local dirty=''
+        git diff --quiet 2>/dev/null || dirty='*'
+        git diff --cached --quiet 2>/dev/null || dirty='*'
+        [[ -n "$(git ls-files --others --exclude-standard 2>/dev/null)" ]] && dirty='*'
+        p+="${c_git}(${branch}${dirty})${reset}"
+    fi
+
+    p+='\n\$ '
+    PS1="$p"
+}
+
+_update_ps1() {
+    local exit_code=$?
+    printf "\033]2;%s\007" "${PWD/#$HOME/~}"
+    if [[ "$PROMPT_STYLE" == "ascii" ]] || ! command -v powerline-shell &>/dev/null || [[ $TERM == linux ]]; then
+        _ascii_prompt
+    else
+        PS1=$(powerline-shell $exit_code)
+    fi
+}
+
+if [[ ! "$PROMPT_COMMAND" =~ _update_ps1 ]]; then
+    PROMPT_COMMAND="_update_ps1; $PROMPT_COMMAND"
 fi
 
 

@@ -17,6 +17,7 @@ alias fgrep='fgrep --color=auto'
 alias egrep='egrep --color=auto'
 alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo error)" "$(history | tail -n1 | sed -e "s/^\s*[0-9]\+\s*//;s/[;&|]\s*alert$//")"'
 alias py='python3'
+
 unalias tl 2>/dev/null
 function tl() {
     if [ $# -le 1 ]; then
@@ -28,6 +29,7 @@ function tl() {
     # Use our custom python script for side-by-side tailing
     python3 ~/dotfiles/bin/tl "$@"
 }
+
 alias cp='cp -a'
 alias lg='ls -lrga | rg -i'
 alias nvs='nv -O'
