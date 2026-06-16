@@ -87,7 +87,15 @@ _ascii_prompt() {
         git diff --quiet 2>/dev/null || dirty='*'
         git diff --cached --quiet 2>/dev/null || dirty='*'
         [[ -n "$(git ls-files --others --exclude-standard 2>/dev/null)" ]] && dirty='*'
-        p+="${c_git}(${branch}${dirty})${reset}"
+
+        local ahead='' behind=''
+        local ahead_n behind_n
+        ahead_n=$(git rev-list @{u}..HEAD --count 2>/dev/null)
+        behind_n=$(git rev-list HEAD..@{u} --count 2>/dev/null)
+        [[ "$ahead_n" -gt 0 ]] 2>/dev/null && ahead="+${ahead_n}"
+        [[ "$behind_n" -gt 0 ]] 2>/dev/null && behind="-${behind_n}"
+
+        p+="${c_git}(${branch}${dirty}${ahead}${behind})${reset}"
     fi
 
     p+='\n\$ '
