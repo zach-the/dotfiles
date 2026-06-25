@@ -599,7 +599,7 @@ require("lazy").setup({
                 fmt = function(s)
                   local map = {
                     NORMAL = "N", INSERT = "I", VISUAL = "V", ["V-LINE"] = "VL",
-                    ["V-BLOCK"] = "VB", REPLACE = "R", COMMAND = "!", TERMINAL = "T",
+                    ["V-BLOCK"] = "VB", REPLACE = "R", COMMAND = ":", TERMINAL = "T",
                   }
                   return "[" .. (map[s] or s) .. "]"
                 end,

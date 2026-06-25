@@ -154,30 +154,6 @@ if [[ ! "$PROMPT_COMMAND" =~ _update_ps1 ]]; then
     PROMPT_COMMAND="_update_ps1; $PROMPT_COMMAND"
 fi
 
-
-# --- Key Bindings ---
-bind 'TAB:menu-complete'
-bind '"\e[Z":menu-complete-backward'
-bind "set show-all-if-ambiguous on"
-bind "set menu-complete-display-prefix on"
-bind "set completion-ignore-case on"
-set -o vi
-set -show-mode-in-prompt on
-set vi-ins-mode-string \1\e[6 q\2
-set vi-cmd-mode-string \1\e[2 q\2
-
-# Enable vi editing mode
-set editing-mode vi
-set show-mode-in-prompt on
-
-# Insert Mode (Green block -> Green arrow on Dark Grey background)
-set vi-ins-mode-string "\1\e[42;30m\2 I \1\e[100;32m\2\1\e[0m\2"
-
-# Normal/Command Mode (Blue block -> Blue arrow on Dark Grey background)
-set vi-cmd-mode-string "\1\e[44;30m\2 N \1\e[100;34m\2\1\e[0m\2"
-
-
-
 export EDITOR='nvim'
 export VISUAL='nvim'
 

@@ -37,6 +37,8 @@ for p in EXCLUDE_PATTERNS:
         compiled_excludes.append(re.compile(fnmatch.translate(p)))
 
 def get_terminal_width():
+    if not sys.stdout.isatty():
+        return 120
     return shutil.get_terminal_size((80, 24)).columns
 
 def build_ansi_string(char_color_list, width):
