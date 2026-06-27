@@ -1,4 +1,5 @@
 # --- Aliases ---
+alias sudo='sudo '
 alias ls='ls --color=auto'
 alias grep='grep --color=auto'
 # alias zg='rg -z'
@@ -8,9 +9,9 @@ alias rg='rg -zS'
 alias fzv='tmp=$(fzf) && history -s "nvim \"$tmp\"" && echo "$tmp" && nvim "$tmp"'
 alias fzd='tmp=$(fd --type d -d 4 | fzf) && history -s "d \"$tmp\"" && echo "$tmp" && d "$tmp"'
 alias e='clear && exit'
-alias ll='ls -lrt'
-alias l='ls -l'
-alias la='ls -la'
+alias ll='ls -lrth'
+alias l='ls -lh'
+alias la='ls -lah'
 alias dir='dir --color=auto'
 alias vdir='vdir --color=auto'
 alias fgrep='fgrep --color=auto'
@@ -32,7 +33,7 @@ function tl() {
 }
 
 alias cp='cp -a'
-alias lg='ls -lrga | rg -i'
+alias lg='ls -lrgah | rg -i'
 alias nvs='nv -O'
 alias work='autossh -M 0 -t -Y zb900042@lvnvda8240.lvn.broadcom.net "LAUNCH_NEW_TMUX=true exec bash -l"'
 alias color_test='for i in {0..7}; do printf "\e[48;5;${i}m  "; done; printf "\e[0m\n"; for i in {8..15}; do printf "\e[48;5;${i}m  "; done; printf "\e[0m\n"'
@@ -186,11 +187,11 @@ fzf() {
 d() {
     if [[ -z "$1" ]]; then
         cd ~/
-        ls -lrt
+        ls -lrth
         return 0
     fi
     cd "$1" || return 1
-    ls -lrt
+    ls -lrth
 }
 
 # --- make a directory and go to it ---
