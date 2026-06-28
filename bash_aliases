@@ -237,3 +237,10 @@ f() {
     fi
 }
 
+nvg() {
+    local files=()
+    for arg in "$@"; do
+        files+=( *$arg* )
+    done
+    nv -O "${files[@]}"
+}
