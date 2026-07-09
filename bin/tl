@@ -4,105 +4,259 @@ import os
 import subprocess
 import selectors
 import signal
+import re
+import fcntl
+
+_ANSI_ESC = re.compile(r'\033\[[^a-zA-Z]*[a-zA-Z]')
+_SGR = re.compile(r'\033\[([0-9;]*)m')
+_SGR_MOUSE = re.compile(rb'\033\[<(\d+);(\d+);(\d+)([Mm])')
+MAX_BUFFER = 10_000  # lines per file
+
+def _visible_len(s):
+    return len(_ANSI_ESC.sub('', s))
+
+def _ljust_visible(s, width):
+    pad = width - _visible_len(s)
+    return s + ' ' * pad if pad > 0 else s
+
+def _wrap_ansi(line, width):
+    """Wrap line at `width` visible characters, carrying active SGR color state to each new chunk."""
+    chunks, active, chunk, visible = [], [], "", 0
+    i = 0
+    while i < len(line):
+        m = _ANSI_ESC.match(line, i)
+        if m:
+            seq = m.group()
+            chunk += seq
+            i = m.end()
+            sgr = _SGR.fullmatch(seq)
+            if sgr:
+                if sgr.group(1) in ('', '0'):
+                    active = []
+                else:
+                    active.append(seq)
+        else:
+            chunk += line[i]
+            visible += 1
+            i += 1
+            if visible >= width:
+                chunks.append(chunk)
+                chunk = ''.join(active)
+                visible = 0
+    if chunk:
+        chunks.append(chunk)
+    return chunks if chunks else [""]
 
 def get_terminal_size():
     try:
-        import fcntl
-        import termios
-        import struct
-        h, w, hp, wp = struct.unpack('HHHH',
-            fcntl.ioctl(sys.stdout.fileno(), termios.TIOCGWINSZ,
+        import struct, termios as _t
+        h, w, _, _ = struct.unpack('HHHH',
+            fcntl.ioctl(sys.stdout.fileno(), _t.TIOCGWINSZ,
             struct.pack('HHHH', 0, 0, 0, 0)))
         if w > 0 and h > 0:
             return w, h
-    except:
+    except Exception:
         pass
-        
     try:
         import shutil
-        size = shutil.get_terminal_size((80, 24))
-        if size.columns > 0 and size.lines > 0:
-            return size.columns, size.lines
-    except:
+        s = shutil.get_terminal_size((80, 24))
+        if s.columns > 0 and s.lines > 0:
+            return s.columns, s.lines
+    except Exception:
         pass
-        
     return 80, 24
 
-def draw_screen(files, buffers, width, height, drawn_lines, n_lines):
-    if width < len(files) * 5:
-        msg = f"Terminal too small: {width}x{height}"
-        if drawn_lines > 0:
-            sys.stdout.write(f'\033[{drawn_lines - 1}A\r')
-        sys.stdout.write(msg + '\033[K')
+def parse_mouse(raw):
+    """Parse SGR mouse event. Returns (btn, col, row, pressed) or None. col/row are 0-indexed."""
+    m = _SGR_MOUSE.match(raw)
+    if not m:
+        return None
+    btn = int(m.group(1))
+    col = int(m.group(2)) - 1
+    row = int(m.group(3)) - 1
+    pressed = m.group(4) == b'M'
+    return btn, col, row, pressed
+
+def compute_col_widths(total_width, n_files):
+    """Equal column content widths (excluding │ dividers) that together fill total_width."""
+    content = max(n_files, total_width - (n_files - 1))
+    base = content // n_files
+    rem = content % n_files
+    return [base + (1 if i < rem else 0) for i in range(n_files)]
+
+def get_divider_cols(col_widths):
+    """0-indexed absolute column positions of each │ divider."""
+    cols, pos = [], 0
+    for w in col_widths[:-1]:
+        pos += w
+        cols.append(pos)
+        pos += 1
+    return cols
+
+def fracs_to_col_widths(fracs, total_width, n_files):
+    """Reconstruct col_widths from saved divider fractions after a terminal resize."""
+    if not fracs:
+        return compute_col_widths(total_width, n_files)
+    MIN_W = 5
+    div_cols = [round(f * total_width) for f in fracs]
+    limit = MIN_W
+    for i in range(len(div_cols)):
+        if div_cols[i] < limit:
+            div_cols[i] = limit
+        limit = div_cols[i] + MIN_W + 1
+    limit = total_width - 1 - MIN_W
+    for i in range(len(div_cols) - 1, -1, -1):
+        if div_cols[i] > limit:
+            div_cols[i] = limit
+        limit = div_cols[i] - MIN_W - 1
+    return dividers_to_widths(div_cols, total_width, n_files)
+
+def dividers_to_widths(d_cols, total_width, n_files):
+    """Derive col_widths from absolute divider column positions."""
+    widths, prev = [], 0
+    for d in d_cols:
+        widths.append(max(1, d - prev))
+        prev = d + 1
+    widths.append(max(1, total_width - prev))
+    return widths
+
+def drag_divider(d_idx, new_col, div_cols, width):
+    """
+    Move divider d_idx to new_col, cascading into neighbors when the gap
+    would fall below MIN_W, so dragging one border into another pushes both.
+    """
+    MIN_W = 5
+    n = len(div_cols)
+    result = list(div_cols)
+    result[d_idx] = new_col
+
+    # Push dividers to the right of d_idx rightward if needed
+    for i in range(d_idx + 1, n):
+        min_pos = result[i - 1] + MIN_W + 1
+        if result[i] < min_pos:
+            result[i] = min_pos
+
+    # Push dividers to the left of d_idx leftward if needed
+    for i in range(d_idx - 1, -1, -1):
+        max_pos = result[i + 1] - MIN_W - 1
+        if result[i] > max_pos:
+            result[i] = max_pos
+
+    # Hard clamp from right boundary, cascading leftward
+    limit = width - 1 - MIN_W
+    for i in range(n - 1, -1, -1):
+        if result[i] > limit:
+            result[i] = limit
+        limit = result[i] - MIN_W - 1
+
+    # Hard clamp from left boundary, cascading rightward
+    limit = MIN_W
+    for i in range(n):
+        if result[i] < limit:
+            result[i] = limit
+        limit = result[i] + MIN_W + 1
+
+    return result
+
+def read_key(fd):
+    """Read a key or escape sequence from fd; returns bytes."""
+    c = os.read(fd, 1)
+    if c == b'\x1b':
+        flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+        fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+        try:
+            c += os.read(fd, 32)
+        except (BlockingIOError, OSError):
+            pass
+        finally:
+            fcntl.fcntl(fd, fcntl.F_SETFL, flags)
+    return c
+
+def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_widths):
+    """
+    Render the TUI. Returns updated view_tops.
+    col_widths: list of content widths per column (not counting │ dividers).
+    """
+    n = len(files)
+    if width < n * 5:
+        sys.stdout.write(f'\033[H Terminal too small: {width}x{height}\033[K')
         sys.stdout.flush()
-        return 1
+        return view_tops
 
-    col_width = width // len(files)
+    content_lines = height - 1  # one row for the header
 
-    wrapped_buffers = []
+    # Wrap all raw buffers into display lines
+    wrapped = []
     for i, buf in enumerate(buffers):
-        w_buf = []
-        max_len = col_width - 2 if i < len(files) - 1 else col_width - 1
-        if max_len < 1: max_len = 1
-        for line in buf:
-            line = line.replace('\t', '    ')
-            if not line:
-                w_buf.append("")
-                continue
-            for j in range(0, len(line), max_len):
-                w_buf.append(line[j:j+max_len])
-        wrapped_buffers.append(w_buf)
+        cw = col_widths[i]
+        max_len = max(1, cw - 1 if i < n - 1 else cw)
+        w = []
+        for raw in buf:
+            raw = raw.replace('\t', '    ')
+            for chunk in (_wrap_ansi(raw, max_len) if raw else [""]):
+                w.append(chunk)
+        wrapped.append(w)
 
-    content_lines = height - 1
-    
-    # Move to top-left instead of moving cursor up
+    # Compute effective view start positions
+    new_tops = []
+    for i, w in enumerate(wrapped):
+        total = len(w)
+        if follow_mode:
+            new_tops.append(max(0, total - content_lines))
+        else:
+            prev = view_tops[i] if i < len(view_tops) else 0
+            new_tops.append(max(0, min(prev, max(0, total - content_lines))))
+
     sys.stdout.write('\033[H')
-    
-    frame = []
-    
-    # Draw headers
-    header_line = ""
+    out = []
+
+    # Header row: each column gets its own filename + scroll indicator
+    header = ""
     for i, f in enumerate(files):
-        title = f" {f} "
-        if len(title) > col_width - 1:
-            title = title[:col_width - 4] + "... "
-        
-        title_padded = title.center(col_width - (1 if i < len(files) - 1 else 0))
-        header_line += f'\033[7m{title_padded}\033[0m'
-        
-        if i < len(files) - 1:
-            header_line += '│'
-            
-    frame.append(header_line + '\033[K')
-    
-    # Draw content
+        is_last = i == n - 1
+        cw = col_widths[i]
+        name = f" {os.path.basename(f)} "
+
+        if follow_mode:
+            ind = " LIVE "
+        else:
+            wi = wrapped[i]
+            behind = max(0, len(wi) - (new_tops[i] + content_lines))
+            ind = f" -{behind}L " if behind > 0 else " END "
+
+        avail = cw - _visible_len(ind) - 1
+        if _visible_len(name) > avail:
+            name = " " + f[:max(1, avail - 3)] + "… "
+        pad = cw - _visible_len(name) - _visible_len(ind)
+        cell = name + " " * max(0, pad) + ind
+
+        header += f'\033[7m{_ljust_visible(cell, cw)}\033[0m'
+        if not is_last:
+            header += '│'
+    out.append(header + '\033[K')
+
+    # Content rows
     for y in range(content_lines):
-        line_str = ""
-        for i in range(len(files)):
-            buf = wrapped_buffers[i]
-            offset = max(0, len(buf) - content_lines)
-            idx = offset + y
-            
-            display_line = ""
-            if idx < len(buf):
-                display_line = buf[idx]
-                
-            if i < len(files) - 1:
-                display_line = display_line.ljust(col_width - 1) + '│'
+        row = ""
+        for i in range(n):
+            w = wrapped[i]
+            cw = col_widths[i]
+            idx = new_tops[i] + y
+            line = w[idx] if idx < len(w) else ""
+            is_last = i == n - 1
+            if not is_last:
+                row += _ljust_visible(line, cw) + '\033[0m│'
             else:
-                display_line = display_line.ljust(col_width)
-                
-            line_str += display_line
-            
-        frame.append(line_str + '\033[K')
-        
-    for i, line in enumerate(frame):
+                row += _ljust_visible(line, cw) + '\033[0m'
+        out.append(row + '\033[K')
+
+    for i, line in enumerate(out):
         sys.stdout.write(line)
-        if i < len(frame) - 1:
+        if i < len(out) - 1:
             sys.stdout.write('\n')
-            
     sys.stdout.flush()
-    return height
+    return new_tops
+
 
 def main():
     width, height = get_terminal_size()
@@ -110,81 +264,74 @@ def main():
     n_lines = height
     n_lines_given = False
     files = []
-    
+
     i = 0
     while i < len(args):
-        if args[i] == '-n':
-            if i + 1 < len(args):
-                try:
-                    n_lines = int(args[i+1])
-                    n_lines_given = True
-                except ValueError:
-                    pass
-                i += 2
-            else:
-                i += 1
-        elif args[i].startswith('-n'):
+        if args[i] == '-n' and i + 1 < len(args):
             try:
-                n_lines = int(args[i][2:])
-                n_lines_given = True
+                n_lines = int(args[i + 1]); n_lines_given = True
             except ValueError:
                 pass
-            i += 1
+            i += 2
+        elif args[i].startswith('-n') and args[i][2:].isdigit():
+            n_lines = int(args[i][2:]); n_lines_given = True; i += 1
         elif args[i].startswith('-') and args[i][1:].isdigit():
-            n_lines = int(args[i][1:])
-            n_lines_given = True
-            i += 1
+            n_lines = int(args[i][1:]); n_lines_given = True; i += 1
         else:
-            files.append(args[i])
-            i += 1
+            files.append(args[i]); i += 1
 
     if not files:
         sys.exit(0)
 
-    # Enter alternate screen and hide cursor
-    sys.stdout.write('\033[?1049h\033[2J\033[H\033[?25l')
+    col_widths = compute_col_widths(width, len(files))
+    div_fracs = [d / width for d in get_divider_cols(col_widths)]
+
+    # Enter alternate screen, hide cursor, enable mouse (button+motion, SGR encoding)
+    sys.stdout.write('\033[?1049h\033[2J\033[H\033[?25l\033[?1002h\033[?1006h')
     sys.stdout.flush()
 
-    # Set stdin to raw mode to handle keys and prevent echoing
     old_termios = None
     if sys.stdin.isatty():
-        import termios
-        import tty
+        import termios, tty
         old_termios = termios.tcgetattr(sys.stdin.fileno())
         tty.setcbreak(sys.stdin.fileno())
 
     running = True
-    def signal_handler(sig, frame):
+    follow_mode = True          # True = live tail; False = frozen at view_tops
+    view_tops = [0] * len(files)
+    dragging_divider = None     # index of divider currently being dragged
+
+    def _quit(sig, frame):
         nonlocal running
         running = False
 
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, _quit)
+    signal.signal(signal.SIGTERM, _quit)
 
     needs_redraw = True
-    def resize_handler(sig, frame):
-        nonlocal width, height, needs_redraw, n_lines
+
+    def _resize(sig, frame):
+        nonlocal width, height, needs_redraw, n_lines, col_widths
         width, height = get_terminal_size()
         if not n_lines_given:
             n_lines = height
+        col_widths = fracs_to_col_widths(div_fracs, width, len(files))
         needs_redraw = True
 
-    signal.signal(signal.SIGWINCH, resize_handler)
+    signal.signal(signal.SIGWINCH, _resize)
 
-    procs = []
-    sel = selectors.DefaultSelector()
-    drawn_lines = 0
-    
+    procs, sel = [], selectors.DefaultSelector()
+
     try:
         if sys.stdin.isatty():
             sel.register(sys.stdin, selectors.EVENT_READ, data='stdin')
 
         for i, f in enumerate(files):
-            p = subprocess.Popen(['tail', '-Fn', str(n_lines), f], 
-                               stdout=subprocess.PIPE, 
-                               stderr=subprocess.STDOUT, 
-                               universal_newlines=True, 
-                               bufsize=1)
+            p = subprocess.Popen(
+                ['tail', '-Fn', str(n_lines), f],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                universal_newlines=True, bufsize=1,
+            )
             os.set_blocking(p.stdout.fileno(), False)
             sel.register(p.stdout, selectors.EVENT_READ, data=i)
             procs.append(p)
@@ -193,33 +340,94 @@ def main():
 
         while running:
             if needs_redraw:
-                drawn_lines = draw_screen(files, buffers, width, height, drawn_lines, n_lines)
+                view_tops = draw_screen(files, buffers, width, height, follow_mode, view_tops, col_widths)
                 needs_redraw = False
 
-            events = sel.select(timeout=0.1)
-            for key, _ in events:
+            for key, _ in sel.select(timeout=0.1):
                 if key.data == 'stdin':
                     try:
-                        c = os.read(sys.stdin.fileno(), 1).decode('utf-8', 'ignore')
-                        if c and c.lower() == 'q':
+                        raw = read_key(sys.stdin.fileno())
+                        cl = height - 1  # visible content lines
+
+                        mouse = parse_mouse(raw)
+                        if mouse:
+                            btn, col, row, pressed = mouse
+                            if btn == 0 and pressed:
+                                # Left button press: start drag if on a divider
+                                div_cols = get_divider_cols(col_widths)
+                                dragging_divider = None
+                                for d_idx, d_col in enumerate(div_cols):
+                                    if col == d_col:
+                                        dragging_divider = d_idx
+                                        break
+                            elif btn == 32 and dragging_divider is not None:
+                                # Left drag: move split, cascading into neighbors if needed
+                                div_cols = get_divider_cols(col_widths)
+                                new_div_cols = drag_divider(dragging_divider, col, div_cols, width)
+                                col_widths = dividers_to_widths(new_div_cols, width, len(files))
+                                div_fracs = [d / width for d in new_div_cols]
+                                needs_redraw = True
+                            elif not pressed:
+                                dragging_divider = None
+
+                        elif raw == b'q':
                             running = False
-                        else:
+
+                        elif raw in (b'k', b'\033[A'):  # k / Up: scroll up one line
+                            follow_mode = False
+                            view_tops = [max(0, t - 1) for t in view_tops]
                             needs_redraw = True
+
+                        elif raw in (b'j', b'\033[B'):  # j / Down: scroll down one line
+                            if not follow_mode:
+                                view_tops = [t + 1 for t in view_tops]
+                                needs_redraw = True
+
+                        elif raw in (b'u', b'\033[5~'):  # u / PgUp: half page up
+                            follow_mode = False
+                            view_tops = [max(0, t - max(1, cl // 2)) for t in view_tops]
+                            needs_redraw = True
+
+                        elif raw in (b'd', b'\033[6~'):  # d / PgDn: half page down
+                            if not follow_mode:
+                                view_tops = [t + max(1, cl // 2) for t in view_tops]
+                                needs_redraw = True
+
+                        elif raw == b'b':  # b: full page up
+                            follow_mode = False
+                            view_tops = [max(0, t - cl) for t in view_tops]
+                            needs_redraw = True
+
+                        elif raw == b'f':  # f: full page down
+                            if not follow_mode:
+                                view_tops = [t + cl for t in view_tops]
+                                needs_redraw = True
+
+                        elif raw == b'G':  # G: go to bottom / resume live tail
+                            follow_mode = True
+                            needs_redraw = True
+
+                        elif raw == b'g':  # g: go to top of history
+                            follow_mode = False
+                            view_tops = [0] * len(files)
+                            needs_redraw = True
+
                     except (IOError, OSError):
                         pass
                     continue
 
-                i = key.data
-                p = procs[i]
+                fi = key.data
                 try:
                     while True:
-                        line = p.stdout.readline()
+                        line = procs[fi].stdout.readline()
                         if not line:
                             break
-                        buffers[i].append(line.rstrip('\n'))
-                        # Keep buffer size manageable
-                        if len(buffers[i]) > n_lines * 2:
-                            buffers[i] = buffers[i][-n_lines:]
+                        buffers[fi].append(line.rstrip('\n'))
+                        if len(buffers[fi]) > MAX_BUFFER:
+                            drop = len(buffers[fi]) - MAX_BUFFER
+                            buffers[fi] = buffers[fi][-MAX_BUFFER:]
+                            if not follow_mode and fi < len(view_tops):
+                                view_tops[fi] = max(0, view_tops[fi] - drop)
                         needs_redraw = True
                 except (IOError, OSError):
                     pass
@@ -228,12 +436,13 @@ def main():
         if old_termios:
             import termios
             termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, old_termios)
-        # Show cursor and exit alternate screen
-        sys.stdout.write('\033[?1049l\033[?25h')
+        # Disable mouse, restore screen, show cursor
+        sys.stdout.write('\033[?1002l\033[?1006l\033[?1049l\033[?25h')
         sys.stdout.flush()
         for p in procs:
             p.terminate()
             p.wait()
+
 
 if __name__ == '__main__':
     main()

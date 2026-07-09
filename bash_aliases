@@ -19,19 +19,7 @@ alias egrep='egrep --color=auto'
 alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo error)" "$(history | tail -n1 | sed -e "s/^\s*[0-9]\+\s*//;s/[;&|]\s*alert$//")"'
 alias py='python3'
 alias lns='ln -s'
-
-unalias tl 2>/dev/null
-function tl() {
-    if [ $# -le 1 ]; then
-        local lines=$(tput lines 2>/dev/null || echo 70)
-        tail -Fn "$lines" "$@"
-        return
-    fi
-    
-    # Use our custom python script for side-by-side tailing
-    python3 ~/dotfiles/bin/tl "$@"
-}
-
+alias tl='~/dotfiles/bin/tl'
 alias cp='cp -a'
 alias lg='ls -lrgah | rg -i'
 alias nvs='nv -O'
@@ -162,12 +150,12 @@ nv() {
         echo -e "\e[31mFile is too large for Neovim ($single_human_size).\e[0m"
         
         if [ "$single_is_gz" = true ]; then
-            echo "Opening with 'zless' in 2 seconds..."
-            sleep 2
+            echo "Opening with 'zless' in 1 seconds..."
+            sleep 1
             zless "$1"
         else
-            echo "Opening with 'less' in 2 seconds..."
-            sleep 2
+            echo "Opening with 'less' in 1 seconds..."
+            sleep 1
             less "$1"
         fi
         return
@@ -237,10 +225,18 @@ f() {
     fi
 }
 
+# --- Open all files that match a grep input in split fiew ---
 nvg() {
     local files=()
     for arg in "$@"; do
         files+=( *$arg* )
     done
     nv -O "${files[@]}"
+}
+
+# --- Open all files which you select from a fzf window ---
+nvf() {
+    local files
+    files=$(fzf --multi) || return
+    nv -O $(echo "$files")
 }

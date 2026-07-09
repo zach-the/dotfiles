@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 import sys
+import os
+import io
 import subprocess
 import difflib
 import shutil
 import re
 import fnmatch
+import fcntl
+import signal
+import selectors
 
 RESET = '\033[0m'
 RED = '\033[31m'
@@ -33,13 +38,67 @@ for p in EXCLUDE_PATTERNS:
     try:
         compiled_excludes.append(re.compile(p))
     except re.error:
-        # If it's not a valid regex (like a shell glob), convert it
         compiled_excludes.append(re.compile(fnmatch.translate(p)))
+
+_ANSI_ESC = re.compile(r'\033\[[^a-zA-Z]*[a-zA-Z]')
+_SGR = re.compile(r'\033\[([0-9;]*)m')
+
+def _visible_len(s):
+    return len(_ANSI_ESC.sub('', s))
+
+def _ljust_visible(s, width):
+    pad = width - _visible_len(s)
+    return s + ' ' * pad if pad > 0 else s
+
+def _wrap_ansi(line, width):
+    """Wrap line at `width` visible characters, carrying active SGR color state to each chunk."""
+    chunks, active, chunk, visible = [], [], "", 0
+    i = 0
+    while i < len(line):
+        m = _ANSI_ESC.match(line, i)
+        if m:
+            seq = m.group()
+            chunk += seq
+            i = m.end()
+            sgr = _SGR.fullmatch(seq)
+            if sgr:
+                if sgr.group(1) in ('', '0'):
+                    active = []
+                else:
+                    active.append(seq)
+        else:
+            chunk += line[i]
+            visible += 1
+            i += 1
+            if visible >= width:
+                chunks.append(chunk)
+                chunk = ''.join(active)
+                visible = 0
+    if chunk and visible > 0:
+        chunks.append(chunk)
+    return chunks if chunks else [""]
+
+def get_terminal_size():
+    try:
+        import struct, termios as _t
+        h, w, _, _ = struct.unpack('HHHH',
+            fcntl.ioctl(sys.stdout.fileno(), _t.TIOCGWINSZ,
+            struct.pack('HHHH', 0, 0, 0, 0)))
+        if w > 0 and h > 0:
+            return w, h
+    except Exception:
+        pass
+    try:
+        s = shutil.get_terminal_size((80, 24))
+        return s.columns, s.lines
+    except Exception:
+        pass
+    return 80, 24
 
 def get_terminal_width():
     if not sys.stdout.isatty():
         return 120
-    return shutil.get_terminal_size((80, 24)).columns
+    return get_terminal_size()[0]
 
 def build_ansi_string(char_color_list, width):
     out = []
@@ -53,13 +112,10 @@ def build_ansi_string(char_color_list, width):
             current_color = color
         out.append(ch)
         visual_len += 1
-        
     if current_color != '':
         out.append(RESET)
-        
     if visual_len < width:
         out.append(' ' * (width - visual_len))
-        
     return "".join(out)
 
 def get_inline_diff(old_line, new_line):
@@ -69,7 +125,7 @@ def get_inline_diff(old_line, new_line):
         return [], [(ch, GREEN) for ch in new_line]
     if new_line is None:
         return [(ch, RED) for ch in old_line], []
-        
+
     old_char_color = []
     new_char_color = []
     sm = difflib.SequenceMatcher(None, old_line, new_line)
@@ -84,11 +140,11 @@ def get_inline_diff(old_line, new_line):
         elif ctag == 'replace':
             old_char_color.extend((old_line[i], RED) for i in range(i1, i2))
             new_char_color.extend((new_line[j], GREEN) for j in range(j1, j2))
-            
     return old_char_color, new_char_color
 
-def process_diff(iterable):
-    term_width = get_terminal_width()
+def process_diff(iterable, out, ignore_ws=False, term_width=None):
+    if term_width is None:
+        term_width = get_terminal_width()
     mid_sep = " | "
     left_width = (term_width - len(mid_sep)) // 2
     right_width = term_width - len(mid_sep) - left_width
@@ -102,10 +158,9 @@ def process_diff(iterable):
             old_block.clear()
             new_block.clear()
             return
-            
         if not old_block and not new_block:
             return
-            
+
         old_lines = [line[1:] for line in old_block]
         new_lines = [line[1:] for line in new_block]
 
@@ -139,8 +194,8 @@ def process_diff(iterable):
             o_colors, n_colors = get_inline_diff(o, n)
             left_str = build_ansi_string(o_colors, left_width)
             right_str = build_ansi_string(n_colors, right_width)
-            sys.stdout.write(f"{left_str}{DIM}{mid_sep}{RESET}{right_str}\n")
-            
+            out.write(f"{left_str}{DIM}{mid_sep}{RESET}{right_str}\n")
+
         old_block.clear()
         new_block.clear()
 
@@ -157,10 +212,10 @@ def process_diff(iterable):
                 skip_current_file = any(p.search(f1) or p.search(f2) for p in compiled_excludes)
                 if skip_current_file:
                     continue
-                sys.stdout.write(f"\n{BLUE}{BOLD}FILE: {f1} <-> {f2}{RESET}\n")
+                out.write(f"\n{BLUE}{BOLD}FILE: {f1} <-> {f2}{RESET}\n")
             else:
                 skip_current_file = False
-                sys.stdout.write(f"\n{BLUE}{BOLD}{line}{RESET}\n")
+                out.write(f"\n{BLUE}{BOLD}{line}{RESET}\n")
         elif skip_current_file:
             continue
         elif line.startswith('@@ '):
@@ -173,11 +228,11 @@ def process_diff(iterable):
                     new_nums = nums[1][1:]
                     old_start = old_nums.split(',')[0]
                     new_start = new_nums.split(',')[0]
-                    sys.stdout.write(f"{PURPLE}{BOLD}Lines {old_start} (left) / {new_start} (right):{RESET}\n")
+                    out.write(f"{PURPLE}{BOLD}Lines {old_start} (left) / {new_start} (right):{RESET}\n")
                 else:
-                    sys.stdout.write(f"{PURPLE}{line}{RESET}\n")
+                    out.write(f"{PURPLE}{line}{RESET}\n")
             else:
-                sys.stdout.write(f"{PURPLE}{line}{RESET}\n")
+                out.write(f"{PURPLE}{line}{RESET}\n")
         elif line.startswith('-'):
             old_block.append(line)
         elif line.startswith('+'):
@@ -188,34 +243,325 @@ def process_diff(iterable):
             c_colors = [(ch, '') for ch in content]
             left_str = build_ansi_string(c_colors, left_width)
             right_str = build_ansi_string(c_colors, right_width)
-            sys.stdout.write(f"{left_str}{DIM}{mid_sep}{RESET}{right_str}\n")
+            out.write(f"{left_str}{DIM}{mid_sep}{RESET}{right_str}\n")
         elif line.startswith('\\'):
             flush_blocks()
-            sys.stdout.write(f"{DIM}{line}{RESET}\n")
+            out.write(f"{DIM}{line}{RESET}\n")
         else:
             flush_blocks()
-            sys.stdout.write(f"{line}\n")
-            
+            out.write(f"{line}\n")
+
     flush_blocks()
 
+def generate_full_diff(file1, file2, ignore_ws=False, out=None, term_width=None):
+    """Full side-by-side view of both files with line numbers and inline diff highlighting."""
+    if out is None:
+        out = sys.stdout
+    if term_width is None:
+        term_width = get_terminal_width()
+
+    with open(file1) as f:
+        lines1 = [l.rstrip('\n').expandtabs(4) for l in f]
+    with open(file2) as f:
+        lines2 = [l.rstrip('\n').expandtabs(4) for l in f]
+    ln_width = max(len(str(len(lines1))), len(str(len(lines2))), 3)
+    mid_sep = " | "
+    ln_sep = " "
+    # Layout: {lnum}{ln_sep}{left}{mid_sep}{right}{ln_sep}{rnum}
+    overhead = (ln_width + len(ln_sep)) * 2 + len(mid_sep)
+    content_total = max(10, term_width - overhead)
+    left_width = content_total // 2
+    right_width = content_total - left_width
+
+    def norm(s):
+        return re.sub(r'\s+', ' ', s.strip()) if ignore_ws else s
+
+    cmp1 = [norm(l) for l in lines1]
+    cmp2 = [norm(l) for l in lines2]
+    sm = difflib.SequenceMatcher(None, cmp1, cmp2)
+
+    has_diff = False
+    ln1 = 0
+    ln2 = 0
+
+    out.write(f"\n{BLUE}{BOLD}FILE: {file1} <-> {file2}{RESET}\n")
+
+    for ctag, i1, i2, j1, j2 in sm.get_opcodes():
+        if ctag == 'equal':
+            for i, j in zip(range(i1, i2), range(j1, j2)):
+                ln1 += 1
+                ln2 += 1
+                c_colors = [(ch, '') for ch in lines1[i]]
+                left_str = build_ansi_string(c_colors, left_width)
+                right_str = build_ansi_string(c_colors, right_width)
+                lnum = f"{DIM}{ln1:{ln_width}}{ln_sep}{RESET}"
+                rnum = f"{DIM}{ln_sep}{ln2:{ln_width}}{RESET}"
+                out.write(f"{lnum}{left_str}{DIM}{mid_sep}{RESET}{right_str}{rnum}\n")
+        elif ctag == 'replace':
+            has_diff = True
+            chunk1 = lines1[i1:i2]
+            chunk2 = lines2[j1:j2]
+            max_len = max(len(chunk1), len(chunk2))
+            for k in range(max_len):
+                o = chunk1[k] if k < len(chunk1) else None
+                n = chunk2[k] if k < len(chunk2) else None
+                if o is not None:
+                    ln1 += 1
+                if n is not None:
+                    ln2 += 1
+                o_colors, n_colors = get_inline_diff(o, n)
+                left_str = build_ansi_string(o_colors, left_width)
+                right_str = build_ansi_string(n_colors, right_width)
+                lnum = f"{DIM}{ln1:{ln_width}}{ln_sep}{RESET}" if o is not None else ' ' * (ln_width + len(ln_sep))
+                rnum = f"{DIM}{ln_sep}{ln2:{ln_width}}{RESET}" if n is not None else ' ' * (ln_width + len(ln_sep))
+                out.write(f"{lnum}{left_str}{DIM}{mid_sep}{RESET}{right_str}{rnum}\n")
+        elif ctag == 'delete':
+            has_diff = True
+            for i in range(i1, i2):
+                ln1 += 1
+                o_colors, _ = get_inline_diff(lines1[i], None)
+                left_str = build_ansi_string(o_colors, left_width)
+                right_str = build_ansi_string([], right_width)
+                lnum = f"{DIM}{ln1:{ln_width}}{ln_sep}{RESET}"
+                rnum = ' ' * (ln_width + len(ln_sep))
+                out.write(f"{lnum}{left_str}{DIM}{mid_sep}{RESET}{right_str}{rnum}\n")
+        elif ctag == 'insert':
+            has_diff = True
+            for j in range(j1, j2):
+                ln2 += 1
+                _, n_colors = get_inline_diff(None, lines2[j])
+                left_str = build_ansi_string([], left_width)
+                right_str = build_ansi_string(n_colors, right_width)
+                lnum = ' ' * (ln_width + len(ln_sep))
+                rnum = f"{DIM}{ln_sep}{ln2:{ln_width}}{RESET}"
+                out.write(f"{lnum}{left_str}{DIM}{mid_sep}{RESET}{right_str}{rnum}\n")
+
+    return has_diff
+
+def read_key(fd):
+    """Read a key or escape sequence from fd; returns bytes."""
+    c = os.read(fd, 1)
+    if c == b'\x1b':
+        flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+        fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+        try:
+            c += os.read(fd, 16)
+        except (BlockingIOError, OSError):
+            pass
+        finally:
+            fcntl.fcntl(fd, fcntl.F_SETFL, flags)
+    return c
+
+def run_viewer(raw_lines, title="zd", regenerate=None):
+    """Display rendered lines in an interactive TUI pager with vim/less keybindings."""
+    try:
+        tty_file = open('/dev/tty', 'rb')
+        tty_fd = tty_file.fileno()
+    except Exception:
+        tty_file = None
+        tty_fd = sys.stdin.fileno()
+
+    import termios, tty as tty_mod
+    old_termios = termios.tcgetattr(tty_fd)
+
+    width, height = get_terminal_size()
+    content_h = height - 1
+
+    def make_wrapped(w):
+        result = []
+        for line in raw_lines:
+            for chunk in _wrap_ansi(line, w):
+                result.append(chunk)
+        return result
+
+    wrapped = make_wrapped(width)
+    total = len(wrapped)
+    top = 0
+    needs_redraw = True
+    running = True
+
+    def draw():
+        nonlocal top
+        top = max(0, min(top, max(0, total - content_h)))
+        sys.stdout.write('\033[H')
+        rows = []
+        for y in range(content_h):
+            idx = top + y
+            line = wrapped[idx] if idx < total else ""
+            rows.append(_ljust_visible(line, width) + '\033[0m\033[K')
+        pct = min(100, int(100 * (top + content_h) / total)) if total > 0 else 100
+        status = f" {title}  {top+1}-{min(top+content_h, total)}/{total}  {pct}% "
+        rows.append(f'\033[7m{_ljust_visible(status, width)}\033[0m\033[K')
+        sys.stdout.write('\n'.join(rows))
+        sys.stdout.flush()
+
+    def handle_resize(sig, frame):
+        nonlocal width, height, content_h, wrapped, total, needs_redraw, raw_lines
+        width, height = get_terminal_size()
+        content_h = height - 1
+        if regenerate is not None:
+            raw_lines = regenerate(width)
+        wrapped = make_wrapped(width)
+        total = len(wrapped)
+        needs_redraw = True
+
+    def handle_quit(sig, frame):
+        nonlocal running
+        running = False
+
+    try:
+        tty_mod.setcbreak(tty_fd)
+        sys.stdout.write('\033[?1049h\033[2J\033[H\033[?25l')
+        sys.stdout.flush()
+        signal.signal(signal.SIGWINCH, handle_resize)
+        signal.signal(signal.SIGINT, handle_quit)
+        signal.signal(signal.SIGTERM, handle_quit)
+
+        sel = selectors.DefaultSelector()
+        sel.register(tty_fd, selectors.EVENT_READ, data='key')
+
+        while running:
+            if needs_redraw:
+                draw()
+                needs_redraw = False
+            for key, _ in sel.select(timeout=0.1):
+                try:
+                    raw = read_key(tty_fd)
+                    cl = content_h
+                    if raw in (b'q', b'Q'):
+                        running = False
+                    elif raw in (b'k', b'\033[A'):
+                        top = max(0, top - 1)
+                        needs_redraw = True
+                    elif raw in (b'j', b'\033[B'):
+                        top = min(max(0, total - cl), top + 1)
+                        needs_redraw = True
+                    elif raw in (b'u', b'\033[5~'):
+                        top = max(0, top - max(1, cl // 2))
+                        needs_redraw = True
+                    elif raw in (b'd', b'\033[6~'):
+                        top = min(max(0, total - cl), top + max(1, cl // 2))
+                        needs_redraw = True
+                    elif raw == b'b':
+                        top = max(0, top - cl)
+                        needs_redraw = True
+                    elif raw == b'f':
+                        top = min(max(0, total - cl), top + cl)
+                        needs_redraw = True
+                    elif raw == b'G':
+                        top = max(0, total - cl)
+                        needs_redraw = True
+                    elif raw == b'g':
+                        top = 0
+                        needs_redraw = True
+                except (IOError, OSError):
+                    pass
+    finally:
+        import termios as _t
+        _t.tcsetattr(tty_fd, _t.TCSADRAIN, old_termios)
+        sys.stdout.write('\033[?1049l\033[?25h')
+        sys.stdout.flush()
+        if tty_file:
+            tty_file.close()
+
 def main():
-    if len(sys.argv) == 2 and sys.argv[1] in ('-h', '--help'):
-        print("Usage: zd <file1> <file2>   OR   <diff generating command> | zd")
+    args = sys.argv[1:]
+    ignore_ws = False
+    full_mode = False
+    viewer_mode = False
+    files = []
+    show_help = False
+
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a in ('-h', '--help'):
+            show_help = True
+            break
+        elif a.startswith('-') and len(a) > 1 and not a.startswith('--'):
+            for c in a[1:]:
+                if c == 'w':
+                    ignore_ws = True
+                elif c == 'f':
+                    full_mode = True
+                elif c == 'v':
+                    viewer_mode = True
+                elif c == 'h':
+                    show_help = True
+                else:
+                    print(f"zd: unknown option: -{c}", file=sys.stderr)
+                    sys.exit(1)
+        else:
+            files.append(a)
+        i += 1
+
+    if show_help:
+        print("Usage: zd [-w] [-f] [-v] <file1> <file2>   OR   <cmd> | zd [-w] [-f] [-v]")
+        print("  -w  ignore whitespace differences")
+        print("  -f  show full files side by side with line numbers (requires two file args)")
+        print("  -v  interactive viewer  keybindings: j/k scroll  u/d half-page  b/f full-page  g/G top/bottom  q quit")
         sys.exit(0)
-        
-    if len(sys.argv) == 1:
+
+    if not files:
         if sys.stdin.isatty():
-            print("Usage: zd <file1> <file2>   OR   <diff generating command> | zd")
+            print("Usage: zd [-w] [-f] [-v] <file1> <file2>   OR   <cmd> | zd [-w] [-f] [-v]")
             sys.exit(1)
-        process_diff(sys.stdin)
-    elif len(sys.argv) == 3:
-        cmd = ['diff', '-u', sys.argv[1], sys.argv[2]]
-        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, universal_newlines=True)
-        process_diff(p.stdout)
-        p.wait()
-        sys.exit(p.returncode)
+        if full_mode:
+            print("zd: -f requires two file arguments", file=sys.stderr)
+            sys.exit(1)
+        if viewer_mode:
+            raw_input = list(sys.stdin)
+            def _regen(w, _r=raw_input, _iw=ignore_ws):
+                b = io.StringIO()
+                process_diff(iter(_r), b, ignore_ws=_iw, term_width=w)
+                return b.getvalue().splitlines()
+            buf = io.StringIO()
+            process_diff(iter(raw_input), buf, ignore_ws=ignore_ws)
+            run_viewer(buf.getvalue().splitlines(), title="zd", regenerate=_regen)
+        else:
+            process_diff(sys.stdin, sys.stdout, ignore_ws=ignore_ws)
+    elif len(files) == 2:
+        if full_mode:
+            if viewer_mode:
+                def _regen_full(w, _f0=files[0], _f1=files[1], _iw=ignore_ws):
+                    b = io.StringIO()
+                    generate_full_diff(_f0, _f1, ignore_ws=_iw, out=b, term_width=w)
+                    return b.getvalue().splitlines()
+                buf = io.StringIO()
+                has_diff = generate_full_diff(files[0], files[1], ignore_ws=ignore_ws, out=buf)
+                run_viewer(buf.getvalue().splitlines(),
+                           title=f"{os.path.basename(files[0])} <-> {os.path.basename(files[1])}",
+                           regenerate=_regen_full)
+                sys.exit(1 if has_diff else 0)
+            else:
+                has_diff = generate_full_diff(files[0], files[1], ignore_ws=ignore_ws)
+                sys.exit(1 if has_diff else 0)
+        else:
+            diff_flags = ['-u']
+            if ignore_ws:
+                diff_flags.append('-w')
+            cmd = ['diff'] + diff_flags + files
+            p = subprocess.Popen(cmd, stdout=subprocess.PIPE, universal_newlines=True)
+            if viewer_mode:
+                raw_diff = list(p.stdout)
+                p.wait()
+                rc = p.returncode
+                def _regen_diff(w, _r=raw_diff, _iw=ignore_ws):
+                    b = io.StringIO()
+                    process_diff(iter(_r), b, ignore_ws=_iw, term_width=w)
+                    return b.getvalue().splitlines()
+                buf = io.StringIO()
+                process_diff(iter(raw_diff), buf, ignore_ws=ignore_ws)
+                run_viewer(buf.getvalue().splitlines(),
+                           title=f"{os.path.basename(files[0])} <-> {os.path.basename(files[1])}",
+                           regenerate=_regen_diff)
+                sys.exit(rc)
+            else:
+                process_diff(p.stdout, sys.stdout, ignore_ws=ignore_ws)
+                p.wait()
+                sys.exit(p.returncode)
     else:
-        print("Usage: zd <file1> <file2>   OR   <diff generating command> | zd")
+        print("Usage: zd [-w] [-f] [-v] <file1> <file2>   OR   <cmd> | zd [-w] [-f] [-v]")
         sys.exit(1)
 
 if __name__ == "__main__":
