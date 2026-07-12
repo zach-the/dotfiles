@@ -1,0 +1,247 @@
+====================================================================
+MANUAL MODE WORKSHEET
+--------------------------------------------------------------------
+Fill in the blanks below, then hand this file back to Claude with:
+"build manual mode from hypr/manual-mode-worksheet.txt"
+It contains every decision and conflict identified so far. Anything
+left blank will be built using the "default" noted for that item.
+====================================================================
+
+
+--------------------------------------------------------------------
+1. TOGGLE KEY
+--------------------------------------------------------------------
+Which key combo enters/exits manual mode? Nothing currently uses
+these. Pick one or write your own.
+
+  [ ] $hyper, Space
+  [ ] $hyper, Escape
+  [ ] Other: ______________________
+
+  ANSWER: hyper, space
+
+
+--------------------------------------------------------------------
+2. MODIFIER MAPPING (cmd -> ?)
+--------------------------------------------------------------------
+Hammerspoon's hyper = ctrl+alt+cmd+shift. Hyprland's $hyper =
+CONTROL_ALT_SHIFT_SUPER. Default assumption: SUPER stands in for
+macOS cmd everywhere below (including the cmd+alt / cmd+ctrl focus
+binds, which become SUPER+ALT / SUPER+CTRL).
+
+  CONFIRM SUPER = cmd?  [ ] yes (default)   [ ] no, use: _________
+
+  ummmmm yes most likely. i want to keep my super+hjkl focus binds though, i think i like that better and the only reason it's cmd+opt in macos is because the way the bindings stack up in macos there wasnt a better option.
+
+
+--------------------------------------------------------------------
+3. MODE INDICATOR (waybar)
+--------------------------------------------------------------------
+Plan: custom/mode module in modules-right, next to pulseaudio.
+Reads a state file (~/.config/hypr/mode_state) written by the
+toggle script. Toggle script signals waybar to refresh
+(pkill -RTMIN+X waybar) instead of polling.
+
+  Label text for each mode (keep short, this is what displays):
+  Normal mode label: TILE  (default: "TILE")
+  Manual mode label: FLOAT (default: "FLOAT")
+
+  Click behavior on the module (optional):
+  [ ] none
+  [x] left-click toggles mode
+  [ ] Other: ______________________
+
+
+--------------------------------------------------------------------
+4. AUTO-FLOAT MECHANISM
+--------------------------------------------------------------------
+Plan: on entering manual mode, run
+  hyprctl keyword windowrulev2 "float,class:.*"
+and float every currently-open tiled window via a loop over
+`hyprctl clients -j`. On exit, unset the rule and leave already-
+floating windows as they are (no forced re-tile).
+
+  Before building this, check whether toggle_workspace_float.sh or
+  toggle_global_float.sh (hypr/) already do something close enough
+  to reuse instead of writing a new mechanism.
+  Checked?  [x] yes, reuse: ________________   [ ] no, write new
+
+  On exiting manual mode, should windows that were floated
+  automatically snap back to tiled?
+  [x] yes, re-tile everything (order not guaranteed to match before) EXCEPT FOR THE SPECIAL WORKSPACE. THOSE SHOULD STAY FLOATING
+  [ ] no, leave them floating until manually tiled (default)
+
+
+--------------------------------------------------------------------
+5. KEYBIND MAP — fill in "BUILD?" for each row
+--------------------------------------------------------------------
+Y = build now, N = skip for v1, later = revisit after v1 works.
+Every row assumes it's bound inside `submap = manual` under $hyper
+unless noted otherwise.
+
+  WINDOW POSITIONING (needs new script: winmove.sh)
+  Key    Function            Hyprland equivalent                BUILD?
+  A      Left half           winmove.sh 0 0 0.5 1                [Y]
+  D      Right half          winmove.sh 0.5 0 0.5 1               [Y]
+  S      Center half         winmove.sh 0.25 0 0.5 1              [Y]
+  G      Top half            winmove.sh 0 0 1 0.5                 [y]
+  B      Bottom half         winmove.sh 0 0.5 1 0.5                [y]
+  U      Top left            winmove.sh 0 0 0.5 0.5                [y]
+  I      Top right           winmove.sh 0.5 0 0.5 0.5              [y]
+  J      Bottom left         winmove.sh 0 0.5 0.5 0.5              [y]
+  K      Bottom right        winmove.sh 0.5 0.5 0.5 0.5            [y]
+  1/2/3  Thirds              winmove.sh (aspect-aware)             [y]
+  W/E    Two-thirds          winmove.sh (aspect-aware)             [y]
+
+  SIZING & RESTORATION
+  Key    Function            Hyprland equivalent                BUILD?
+  F      Maximize            winmove.sh 0 0 1 1                   [y]
+  C      Center              centerwindow (native)                [y]
+  Return Fullscreen          fullscreen, 0 (native, same as now)  [n]
+  -      Smaller             resizeactive, -20 -20 (native)       [y]
+  =      Larger              resizeactive, 20 20 (native)         [y]
+  Q      Minimize            movetoworkspacesilent special (fake) [n] keep this as to kill a window in both modes
+  M      Isolate/minimize others   script, loop hyprctl clients   [n]
+
+  NOTE - CONFLICT: hyper+Q = killactive in normal mode, minimize in
+  manual mode. Opposite destructiveness. Confirm you're OK with this
+  before building:  [ ] confirmed OK   [ ] change manual-mode key to: ___ as i said above, keep it as killactive in both scenarios
+
+  DISPLAYS  (verify dispatcher syntax against your Hyprland version
+  before relying on this — may have changed across releases)
+  Key    Function                        Hyprland equivalent      BUILD?
+  O      Move window to next display     movewindow, mon:+1        [y]
+  Y      Move window to previous display movewindow, mon:-1        [y]
+
+  NOTE - CONFLICT: hyper+Y = toggle_global_float.sh in normal mode,
+  move-to-prev-display in manual mode. Confirm OK: [ ] yes  [ ] change to: ___
+  just remove the toggle_global_float.sh from normal mode entirely. what we're building is the big brother version of that anyways
+
+
+  FOCUS SHIFTING
+  Key      Function          Hyprland equivalent                 BUILD?
+  h/j/k/l  Directional focus movefocus l/d/u/r (re-declare inside  [y]
+                              submap, or it stops working there)
+  Skip porting cmd+alt / cmd+ctrl duplicate smartFocus binds?
+  [y] yes, skip (default — Hyprland's movefocus already handles
+      adjacency without needing macOS's multi-Space workaround)
+  [ ] no, port anyway: reason __________________________________
+
+  WORKSPACE / SPACE SWITCHING
+  Key    Function            Hyprland equivalent                BUILD?
+  H      Previous space      ws_nav.sh prev (same as normal mode) [y]
+  L      Next space          ws_nav.sh next (same as normal mode) [y]
+
+  LAUNCHERS
+  Key    Function            Hyprland equivalent                BUILD?
+  T      Terminal            $terminal (same as normal mode)     [y]
+  N      Browser             $browser --profile-directory=Default[y]
+                              (same as normal mode)
+
+  NOTE - CONFLICT: hyper+M = launch work-profile browser in normal
+  mode, isolate/minimize-others in manual mode. Confirm OK: [ ] yes
+  [ ] change manual-mode key to: ___
+  keep hyper+m as launch a work browser in manual mode and in tiled mode
+
+
+--------------------------------------------------------------------
+6. EXPLICITLY SKIPPED (mac-specific, no clean Linux equivalent)
+--------------------------------------------------------------------
+Uncheck any you actually want built despite the note.
+
+  [x] P — debugSpaces (macOS Spaces diagnostic overlay, N/A)
+  [x] Z — hs.reload() (Hyprland config hot-reloads differently;
+          keep hyper+Z as screenshot-to-clipboard like normal mode)
+  [x] V — save monitor-plugged/unplugged window layout snapshot
+          (solves a different problem than normal/manual mode)
+  [x] cmd+H block (prevents "hide app" — concept doesn't exist
+          the same way on Hyprland)
+  [ ] ctrl+shift+J/K — smooth scroll ramp. Needs ydotool/wtype +
+          a running ydotoold daemon w/ uinput permissions. Bigger
+          lift than everything else here.
+          Build in v1?  [ ] yes   [x] no, revisit later (default)
+
+
+--------------------------------------------------------------------
+7. SUBMAP FALLTHROUGH — things to re-declare inside `manual`
+--------------------------------------------------------------------
+Once inside `submap = manual`, only binds declared in that submap
+fire — normal-mode top-level binds do NOT fall through. Decide
+which normal-mode conveniences you still want available while in
+manual mode (each needs to be duplicated into the submap):
+
+  [y] R — rofi menu
+  [y] Backspace — hyprlock
+  [y] E — file manager
+  [y] D — nwg-displays
+  [y] S — special workspace toggle (scratchpad)
+  [y] SUPER+SHIFT+S — move to/from special workspace
+  [y] SUPER+SHIFT+L/H — move window to next/prev workspace
+  [y] mouse hyper+drag / hyper+resize (bindm)
+  [ ] Other: ______________________
+
+
+--------------------------------------------------------------------
+8. RE-TILE ON EXIT (open question from architecture discussion)
+--------------------------------------------------------------------
+Floating windows won't automatically snap back into a sane dwindle
+order when you leave manual mode. Already covered in section 4, but
+flagging again since it's the biggest "will this feel broken"
+risk in the whole plan.
+
+  Anything else you want noted here: also, i want anything sent to the special workspace to automatically float. the special workspace should only ever have floating windows
+  
+
+
+--------------------------------------------------------------------
+9. NEW CONFLICTS FOUND WHILE SCANNING YOUR ANSWERS
+--------------------------------------------------------------------
+
+  9a. SAME-SUBMAP COLLISIONS — you assigned these letters to two
+  different jobs, both inside `manual`:
+
+    S: "center half" (section 5) vs re-declared special-workspace
+       toggle (section 7, currently $hyper,S in normal mode)
+       Pick one:
+       [ ] S = center half; special workspace toggle drops from
+           manual mode (use SUPER+SHIFT+S only, which you also
+           checked yes to keep)
+       [ ] S = special workspace toggle; center half moves to: ___
+       [x] Other resolution: keep hyper+s as center half. IN BOTH MODES: make SUPER+p toggle the special workspace, and super+shift+p send windows to/from special workspace 
+
+    D: "right half" (section 5) vs re-declared nwg-displays
+       (section 7, currently $hyper,D in normal mode)
+       Pick one:
+       [ ] D = right half; nwg-displays drops from manual mode
+           (only reachable from normal mode)
+       [ ] D = nwg-displays; right half moves to: ___
+       [x] Other resolution: hyper+d will be right half; let's make nwg-displays bound to SUPER+i
+
+    E: "last two-thirds" (section 5) vs re-declared file manager
+       (section 7, currently $hyper,E in normal mode)
+       Pick one:
+       [ ] E = two-thirds; file manager drops from manual mode
+       [ ] E = file manager; two-thirds-last moves to: ___
+       [x] Other resolution: keep E = two-thirds, make super+o the file manager
+
+  9b. hyper+Y IN NORMAL MODE — you're removing toggle_global_float.sh
+  entirely, which frees up $hyper,Y in normal mode. Should normal
+  mode get "move window to previous display" there too (matching
+  manual mode), or stay unbound in normal mode?
+    [y] bind it in normal mode too (same as manual: movewindow mon:-1) also make sure that it's partner super+o gets bound as well
+    [ ] leave unbound in normal mode, manual-mode-only
+    [ ] bind something else: ______________________________________
+
+  9c. "STAYS FLOATING" ON RE-TILE (section 4 clarification) — when
+  you exit manual mode and everything re-tiles except the special
+  workspace, does that mean:
+    [x] windows already sitting in the special workspace (scratchpad)
+        at the moment you exit manual mode should be skipped by the
+        re-tile sweep (default assumption)
+    [ ] something else: ________________________________________
+
+  9d. Confirm: extend toggle_global_float.sh in place (rename/repurpose
+  it as the manual-mode engine, since it already does ~90% of the
+  auto-float mechanism) rather than writing a separate new script?
+    [x] yes, extend it
+    [ ] no, keep it separate: reason ______________________________

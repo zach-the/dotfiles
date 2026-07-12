@@ -1,0 +1,169 @@
+====================================================================
+MANUAL MODE — TEST WORKSHEET
+--------------------------------------------------------------------
+Check each item as you verify it. Note anything broken/weird in the
+NOTES line under it so it can be fixed. Test on both your laptop
+screen and an external monitor if you have one plugged in — several
+items (displays, aspect-aware thirds) depend on monitor geometry.
+====================================================================
+
+
+--------------------------------------------------------------------
+1. MODE TOGGLE ITSELF
+--------------------------------------------------------------------
+  [y] hyper+Space from normal mode enters manual mode
+  [y] All currently-open tiled windows float immediately on entry
+  [y] Opening a NEW app while in manual mode spawns it floating
+      (confirms the catch-all windowrule is live, not just the
+      one-time sweep)
+  [y] hyper+Space again exits manual mode
+  [y] Windows re-tile into a sane dwindle layout on exit
+  [y] Any window you had manually sent to the special workspace
+      stays floating and stays in the special workspace (does NOT
+      get swept into the re-tile)
+  [y] Rapidly toggling hyper+Space twice in a row doesn't leave
+      things in a broken/half-state
+  NOTES: ____________________________________________________________
+
+
+--------------------------------------------------------------------
+2. WAYBAR MODE INDICATOR
+--------------------------------------------------------------------
+  [y] Shows "TILE" in normal mode
+  [y] Shows "FLOAT" in manual mode
+  [y] Updates immediately when you hyper+Space toggle (no lag /
+      manual waybar restart needed)
+  [y] Left-clicking the indicator toggles the mode (same as hyper+Space)
+  [y] Indicator is positioned where you expect (left of pulseaudio)
+  [y] Styling looks right (not just plain text, matches bar's
+      neon-pink accent)
+  NOTES: ____________________________________________________________
+
+
+--------------------------------------------------------------------
+3. BINDS THAT WORK IN BOTH MODES — verify each ONCE IN NORMAL MODE,
+   ONCE IN MANUAL MODE (submap re-declares everything, so a bind
+   working normally doesn't guarantee it works inside the submap)
+--------------------------------------------------------------------
+  Key              Function                      Normal   Manual
+  hyper+R          rofi menu                      [y]      [y]
+  hyper+Backspace  hyprlock                       [y]      [y]
+  hyper+T          launch terminal                [y]      [y]
+  hyper+N          launch browser (personal)      [y]      [y]
+  hyper+M          launch browser (work)          [y]      [y]
+  hyper+Q          kill active window             [y]      [y]
+  hyper+Z          screenshot region -> clipboard [y]      [y]
+  hyper+Return     fullscreen toggle              [y]      [y]
+  hyper+H          previous workspace             [y]      [y]
+  hyper+L          next workspace                 [y]      [y]
+  hyper+O          move window to next display    [y]      [y]
+  hyper+Y          move window to prev display    [y]      [y]
+  SUPER+P          toggle special workspace       [y]      [y]
+  SUPER+SHIFT+P    send window to/from special    [y]      [y]
+  SUPER+I          nwg-displays                   [y]      [y]
+  SUPER+O          file manager                   [y]      [y]
+  SUPER+h/j/k/l    directional focus              [y]      [y]
+  SUPER+arrows     directional focus              [y]      [y]
+  SUPER+SHIFT+L    move window to next workspace  [y]      [y]
+  SUPER+SHIFT+H    move window to prev workspace  [y]      [y]
+  hyper+drag       move window (mouse)            [y]      [y]
+  hyper+rightdrag  resize window (mouse)          [y]      [y]
+
+  ESPECIALLY VERIFY:
+  [y] hyper+O/Y "move to next/prev display" dispatcher actually
+      works at all — syntax (`movewindow, mon:+1`) was not 100%
+      confirmed against this Hyprland version when built
+  [y] SUPER+SHIFT+P: sending a TILED window to special auto-floats
+      it (the "should only ever have floating windows" rule)
+  [y] SUPER+SHIFT+P: sending a window that's already floating to
+      special does NOT un-float it (toggle-safety check)
+  NOTES: ____________________________________________________________
+
+
+--------------------------------------------------------------------
+4. MANUAL-MODE-ONLY BINDS (window positioning) — test in manual mode
+--------------------------------------------------------------------
+  Halves
+  [y] hyper+A  left half
+  [y] hyper+D  right half
+  [y] hyper+S  center half
+  [y] hyper+G  top half
+  [y] hyper+B  bottom half
+
+  Corners
+  [y] hyper+U  top left
+  [y] hyper+I  top right
+  [y] hyper+J  bottom left
+  [y] hyper+K  bottom right
+
+  Thirds / two-thirds (test on your normal landscape monitor AND,
+  if you have one, a portrait monitor — behavior should rotate)
+  [y] hyper+1  first third
+  [y] hyper+2  middle third
+  [y] hyper+3  last third
+  [y] hyper+W  first two-thirds
+  [y] hyper+E  last two-thirds
+  [ ] On a portrait monitor, thirds/two-thirds split HORIZONTALLY
+      (stacked top/middle/bottom) instead of vertically
+
+  Sizing
+  [y] hyper+F      maximize (fills monitor, respects gaps)
+  [y] hyper+C      center (uses native centerwindow, doesn't resize)
+  [y] hyper+minus  shrink window
+  [y] hyper+equal  grow window
+
+  Gap / spacing sanity check
+  [y] Windows placed via halves/corners/thirds have visible gaps
+      between them and the screen edge, matching normal-mode
+      gaps_out/gaps_in visually (10px outer / 5px inner)
+  [y] Two windows placed adjacently (e.g. hyper+A then hyper+D on a
+      second window) don't overlap and don't have a double-wide gap
+      between them
+
+  NOTES: ____________________________________________________________
+
+
+--------------------------------------------------------------------
+5. THINGS THAT SHOULD *NOT* WORK / SHOULD BEHAVE DIFFERENTLY
+--------------------------------------------------------------------
+  [y] hyper+E and hyper+D no longer launch file manager / nwg-displays
+      in normal mode (moved to SUPER+O / SUPER+I)
+  [y] hyper+S no longer toggles the special workspace in normal mode
+      (moved to SUPER+P)
+  [y] Typing the letters a/d/s/g/b/u/i/j/k/1/2/3/w/e/f/c/-/= normally
+      (no modifiers) still works fine in every app while in manual
+      mode — submap binds are all under hyper/SUPER, plain letters
+      should pass through untouched
+  [y] Pressing Escape while in manual mode does NOT get swallowed
+      (no escape bind was added, so this should just work — but
+      worth a sanity check since a stuck submap eating Escape would
+      be very annoying)
+  NOTES: ____________________________________________________________
+
+
+--------------------------------------------------------------------
+6. FAILURE / RECOVERY CASES
+--------------------------------------------------------------------
+  [ ] If you get stuck in the manual submap somehow (a bind doesn't
+      fire), hyper+Space still gets you out
+  [ ] Killing/restarting waybar (`pkill waybar && waybar &`) doesn't
+      break the mode toggle script or leave mode_state in a bad state
+  [ ] Reloading Hyprland config (`hyprctl reload`) while in manual
+      mode doesn't kick you back to normal mode unexpectedly
+  [ ] After a full logout/login or Hyprland restart, mode_state
+      correctly reflects reality (may default to stale FLOAT/TILE
+      from before restart — decide if that's acceptable or if
+      mode_state should reset to TILE on session start)
+  NOTES: ____________________________________________________________
+
+
+--------------------------------------------------------------------
+7. OPEN ITEMS TO DECIDE AFTER TESTING
+--------------------------------------------------------------------
+  - Anything from hypr/manual-mode-worksheet.txt Section 6 (skipped
+    items: debugSpaces, hs.reload, monitor-mode snapshot, cmd+H
+    block, scroll ramp) you now want built after living with v1?
+  - Any keybind that felt wrong / want remapped?
+  - Anything missing entirely?
+  ______________________________________________________________
+  ______________________________________________________________

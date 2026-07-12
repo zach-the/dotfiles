@@ -1,0 +1,170 @@
+#!/usr/bin/env bash
+# audio-combine — select PipeWire sinks, combine them, control per-device volume
+set -euo pipefail
+
+COMBINED_MODULE_ID=""
+COMBINED_SINK="pw_combo_$$"
+CURSOR=0
+STEP=5
+declare -a SINKS=()
+declare -a DESCS=()
+declare -A SINK_DESC=()
+
+# ── Utilities ──────────────────────────────────────────────────────────────────
+
+die() { printf 'error: %s\n' "$1" >&2; exit 1; }
+
+check_deps() {
+    local miss=()
+    for d in pactl fzf; do command -v "$d" &>/dev/null || miss+=("$d"); done
+    (( ${#miss[@]} == 0 )) || die "missing: ${miss[*]}"
+}
+
+cleanup() {
+    stty echo 2>/dev/null || true
+    tput cnorm 2>/dev/null || true
+    tput rmcup 2>/dev/null || true
+    if [[ -n "$COMBINED_MODULE_ID" ]]; then
+        pactl unload-module "$COMBINED_MODULE_ID" 2>/dev/null || true
+    fi
+}
+
+# ── Sink discovery ─────────────────────────────────────────────────────────────
+
+list_sinks() {
+    # Output lines: name TAB description TAB state
+    pactl list sinks | awk '
+        /^Sink #/ {
+            if (name) printf "%s\t%s\t%s\n", name, (desc?desc:name), state
+            name=""; desc=""; state="UNKNOWN"
+        }
+        /^\tName:/        { name=$2 }
+        /^\tState:/       { state=$2 }
+        /^\tDescription:/ { sub(/^\tDescription: /,""); desc=$0 }
+        END { if (name) printf "%s\t%s\t%s\n", name, (desc?desc:name), state }
+    '
+}
+
+# ── Volume ─────────────────────────────────────────────────────────────────────
+
+get_vol() {
+    pactl get-sink-volume "$1" 2>/dev/null | grep -oP '\d+(?=%)' | head -1 || printf '0'
+}
+
+adj_vol() {
+    local sink=$1 delta=$2 cur new
+    cur=$(get_vol "$sink")
+    new=$(( cur + delta ))
+    new=$(( new < 0 ? 0 : new > 150 ? 150 : new ))
+    pactl set-sink-volume "$sink" "${new}%"
+}
+
+vol_bar() {
+    local v=$1 w=20 f bar="" i
+    f=$(( v * w / 100 ))
+    for (( i=0; i<w; i++ )); do (( i < f )) && bar+="█" || bar+="░"; done
+    printf '%s' "$bar"
+}
+
+# ── TUI ────────────────────────────────────────────────────────────────────────
+
+draw() {
+    printf '\033[H'
+    printf '\033[2K\033[1mCombined Audio Output\033[0m\n'
+    printf '\033[2K\033[2mRoute your player to: \033[0;33m%s\033[0m\n' "$COMBINED_SINK"
+    printf '\033[2K\033[2m↑↓ select   ←→ volume (%d%% steps)   q quit\033[0m\n\n' "$STEP"
+
+    local i vol bar
+    for i in "${!SINKS[@]}"; do
+        vol=$(get_vol "${SINKS[$i]}")
+        bar=$(vol_bar "$vol")
+        printf '\033[2K'
+        if (( i == CURSOR )); then
+            printf ' \033[7m ▶  %-36s  %s  %3d%%  \033[0m\n' "${DESCS[$i]}" "$bar" "$vol"
+        else
+            printf '     %-36s  %s  %3d%%\n' "${DESCS[$i]}" "$bar" "$vol"
+        fi
+    done
+
+    printf '\033[J'
+}
+
+read_key() {
+    local k s=""
+    IFS= read -r -s -n1 k
+    [[ $k == $'\x1b' ]] && { IFS= read -r -s -n2 -t 0.15 s 2>/dev/null || true; }
+    printf '%s' "${k}${s}"
+}
+
+# ── Main ───────────────────────────────────────────────────────────────────────
+
+main() {
+    check_deps
+    trap cleanup EXIT INT TERM
+
+    # Step 1 — discover sinks
+    local raw
+    raw=$(list_sinks) || die "failed to list sinks"
+    [[ -z "$raw" ]] && die "no sinks found"
+
+    # Build SINK_DESC lookup and fzf display lines ("display TAB name")
+    local fzf_lines=""
+    while IFS=$'\t' read -r name desc state; do
+        SINK_DESC["$name"]="$desc"
+        local dot
+        [[ $state =~ ^(RUNNING|IDLE)$ ]] \
+            && dot=$'\033[32m●\033[0m' \
+            || dot=$'\033[2m○\033[0m'
+        fzf_lines+="${dot} ${desc}  \033[2m[${state}]\033[0m"$'\t'"${name}"$'\n'
+    done <<< "$raw"
+
+    # Step 2 — multi-select with fzf
+    local selected
+    selected=$(printf '%s' "$fzf_lines" | fzf \
+        --multi \
+        --ansi \
+        --prompt="Select outputs › " \
+        --header="TAB multi-select  ENTER confirm  (need ≥ 2)" \
+        --delimiter=$'\t' \
+        --with-nth=1) || die "cancelled"
+
+    local nsel; nsel=$(printf '%s' "$selected" | grep -c . || true)
+    (( nsel >= 2 )) || die "select at least 2 sinks"
+
+    while IFS=$'\t' read -r _disp name; do
+        name=$(printf '%s' "$name" | tr -d '[:space:]')
+        SINKS+=("$name")
+        DESCS+=("${SINK_DESC[$name]:-$name}")
+    done <<< "$selected"
+
+    # Step 3 — create combined sink and set as default
+    local slaves
+    slaves=$(IFS=,; printf '%s' "${SINKS[*]}")
+
+    COMBINED_MODULE_ID=$(pactl load-module module-combine-sink \
+        sink_name="$COMBINED_SINK" \
+        "sink_properties=device.description=Combined" \
+        slaves="$slaves") || die "failed to create combined sink (are the devices connected?)"
+
+    pactl set-default-sink "$COMBINED_SINK" 2>/dev/null || true
+    sleep 0.3  # let PipeWire settle
+
+    # Step 4 — volume TUI
+    local n=${#SINKS[@]}
+    tput smcup; tput civis; stty -echo; clear
+    draw
+
+    while true; do
+        local key; key=$(read_key)
+        case "$key" in
+            $'\x1b[A') (( CURSOR > 0   )) && (( CURSOR-- )) || true ;;  # Up
+            $'\x1b[B') (( CURSOR < n-1 )) && (( CURSOR++ )) || true ;;  # Down
+            $'\x1b[C') adj_vol "${SINKS[$CURSOR]}"  "$STEP" ;;           # Right → vol+
+            $'\x1b[D') adj_vol "${SINKS[$CURSOR]}" "-$STEP" ;;           # Left → vol−
+            q|Q)        break ;;
+        esac
+        draw
+    done
+}
+
+main "$@"

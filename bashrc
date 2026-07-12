@@ -157,9 +157,6 @@ fi
 export EDITOR='nvim'
 export VISUAL='nvim'
 
-# --- Time Zone Fix ---
-export TZ='America/Denver'
-
 [ -f ~/.bash_aliases ] && source ~/.bash_aliases
     
 [ -f ~/.fzf.bash ] && source ~/.fzf.bash

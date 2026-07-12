@@ -1,5 +1,5 @@
 @theme "/dev/null"
-@import "rofi-colors.rasi"
+@import "~/.config/rofi/rofi-colors.rasi"
 
 /* Approximating macOS Spotlight with a hyprland twist */
 /* Real blur requires a compositor like picom with blur enabled */

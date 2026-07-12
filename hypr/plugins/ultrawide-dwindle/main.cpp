@@ -197,7 +197,7 @@ class CUltrawideAlgorithm final : public ITiledAlgorithm {
         recalculate();
     }
 
-    void recalculate() override {
+    void recalculate(eRecalculateReason reason = RECALCULATE_REASON_UNKNOWN) override {
         auto parent = m_parent.lock();
         if (!parent) return;
         auto workArea = parent->space()->workArea();

@@ -10,8 +10,8 @@
 
 window#waybar {
     /* Using a very subtle dark tint to make the neon colors pop */
-    background: rgba(15, 17, 23, 0); 
-    color: var(--fg);
+    background: rgba(15, 17, 23, 0);
+    color: @fg;
     border-radius: 10px;
     margin: 5px 5px 0 5px; /* Added slight margin for a floating look */
     padding: 0px;
@@ -19,17 +19,17 @@ window#waybar {
 
 #workspaces button {
     padding: 0 8px;
-    color: var(--fg-dim); /* Dimmed inactive state */
+    color: @fg-dim; /* Dimmed inactive state */
     background: transparent;
     transition: all 0.2s ease-in-out;
 }
 
 #workspaces button.active {
-    color: var(--pink); /* Cyberpunk Neon Pink */
+    color: @pink; /* Cyberpunk Neon Pink */
 }
 
 #workspaces button:hover {
-    color: var(--blue); /* Blue hover effect */
+    color: @blue; /* Blue hover effect */
     /*background: rgba(51, 204, 255, 0.1);*/
 }
 
@@ -38,38 +38,44 @@ window#waybar {
 #battery,
 #network,
 #pulseaudio,
+#custom-mode,
 #tray {
     padding: 0 12px;
-    color: var(--fg);
+    color: @fg;
+}
+
+#custom-mode {
+    color: @pink; /* Neon Pink — stands out as a mode indicator */
+    font-weight: bold;
 }
 
 #clock {
-    color: var(--blue); /* Neon Blue */
+    color: @blue; /* Neon Blue */
     font-weight: bold;
 }
 
 #backlight {
-    color: var(--green); /* Neon Green */
+    color: @green; /* Neon Green */
 }
 
 #battery {
-    color: var(--green); /* Green for healthy battery */
+    color: @green; /* Green for healthy battery */
 }
 
 #battery.warning {
-    color: var(--battery-warn); /* Warm orange for warning */
+    color: @battery-warn; /* Warm orange for warning */
 }
 
 #battery.critical {
-    color: var(--pink); /* Neon Pink for critical alerts */
+    color: @pink; /* Neon Pink for critical alerts */
 }
 
 #network {
-    color: var(--blue); /* Neon Blue */
+    color: @blue; /* Neon Blue */
 }
 
 #pulseaudio {
-    color: var(--green); /* Neon Green */
+    color: @green; /* Neon Green */
 }
 
 #tray {

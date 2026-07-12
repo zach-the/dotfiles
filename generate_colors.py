@@ -226,15 +226,13 @@ $shadow_color        = {rgba(p['shadow'], 'ee')}
 def gen_waybar_css(p: dict, name: str) -> str:
     return f"""\
 {_header_css(name)}
-:root {{
-  --fg:           {p['fg']};
-  --fg-muted:     {p['grey']};
-  --fg-dim:       {p['black_bright']};
-  --pink:         {p['pink']};
-  --blue:         {p['blue']};
-  --green:        {p['green']};
-  --battery-warn: {p['battery_warning']};
-}}
+@define-color fg           {p['fg']};
+@define-color fg-muted     {p['grey']};
+@define-color fg-dim       {p['black_bright']};
+@define-color pink         {p['pink']};
+@define-color blue         {p['blue']};
+@define-color green        {p['green']};
+@define-color battery-warn {p['battery_warning']};
 """
 
 

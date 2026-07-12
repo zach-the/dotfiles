@@ -1,6 +1,5 @@
 {
   "layer": "top",
-  "output": "eDP-1",
   "position": "top",
   "height": 36,
   "spacing": 0,
@@ -11,7 +10,7 @@
 
   "modules-left": ["clock"],
   "modules-center": ["hyprland/workspaces"],
-  "modules-right": ["pulseaudio", "backlight", "network", "battery"], //tray was here, but i removed it. look into optimizing that and figurig out system76-power later
+  "modules-right": ["custom/mode", "pulseaudio", "backlight", "network", "battery"], //tray was here, but i removed it. look into optimizing that and figurig out system76-power later
 
   "hyprland/workspaces": {
     "format": "{icon}",
@@ -53,6 +52,14 @@
     "format-ethernet": "LAN: {ipaddr}",
     "format-disconnected": "No Network",
     "tooltip-format": "{ifname}: {ipaddr}\n{gwaddr} — {bandwidthUpBits} up / {bandwidthDownBits} down"
+  },
+
+  "custom/mode": {
+    "exec": "cat ~/.config/hypr/mode_state 2>/dev/null || echo TILE",
+    "interval": "once",
+    "signal": 8,
+    "on-click": "~/.config/hypr/mode_toggle.sh",
+    "tooltip": false
   },
 
   "pulseaudio": {
