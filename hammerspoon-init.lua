@@ -739,10 +739,28 @@ end
 hs.hotkey.bind(hyper, "H", function() switchSpace("prev") end)
 hs.hotkey.bind(hyper, "L", function() switchSpace("next") end)
 
--- Halves
-hs.hotkey.bind(hyper, "A", move(0, 0, 0.5, 1))      -- Left Half
-hs.hotkey.bind(hyper, "D", move(0.5, 0, 0.5, 1))    -- Right Half
-hs.hotkey.bind(hyper, "S", move(0.25, 0, 0.5, 1))   -- Center Half
+-- Halves (portrait monitor: horizontal splits; landscape: vertical splits)
+hs.hotkey.bind(hyper, "A", function()
+    local win = hs.window.focusedWindow()
+    if not win then return end
+    local sf = win:screen():frame()
+    if sf.h > sf.w then move(0, 0, 1, 0.5)()    -- Top Half
+    else             move(0, 0, 0.5, 1)() end    -- Left Half
+end)
+hs.hotkey.bind(hyper, "D", function()
+    local win = hs.window.focusedWindow()
+    if not win then return end
+    local sf = win:screen():frame()
+    if sf.h > sf.w then move(0, 0.5, 1, 0.5)()  -- Bottom Half
+    else             move(0.5, 0, 0.5, 1)() end  -- Right Half
+end)
+hs.hotkey.bind(hyper, "S", function()
+    local win = hs.window.focusedWindow()
+    if not win then return end
+    local sf = win:screen():frame()
+    if sf.h > sf.w then move(0, 0.25, 1, 0.5)() -- Center Half (vertical)
+    else             move(0.25, 0, 0.5, 1)() end -- Center Half (horizontal)
+end)
 
 hs.hotkey.bind(hyper, "G", move(0, 0, 1, 0.5))      -- Top Half
 hs.hotkey.bind(hyper, "B", move(0, 0.5, 1, 0.5))    -- Bottom Half
