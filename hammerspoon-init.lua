@@ -25,11 +25,11 @@
 --   T Y        → launch WezTerm / prev display
 --   U I        → top-left / top-right quarter
 --   O P        → next display / debug spaces
---   A S D      → half-split (context-aware: portrait vs. landscape)
+--   A S D      → third(1) / third(2) / third(3) window snap
 --   F G        → maximize / top-half
 --   H L        → prev space / next space
 --   J K        → bottom-left / bottom-right quarter
---   Z X C      → third(1) / third(2) / third(3) window snap
+--   Z X C      → half-split (context-aware: portrait vs. landscape)
 --   V          → center window
 --   B N M      → bottom-half / launch Chrome / minimize-all-except-active
 --   RETURN     → fullscreen
@@ -770,21 +770,21 @@ hs.hotkey.bind(hyper, "H", function() switchSpace("prev") end)
 hs.hotkey.bind(hyper, "L", function() switchSpace("next") end)
 
 -- Halves (portrait monitor: horizontal splits; landscape: vertical splits)
-hs.hotkey.bind(hyper, "A", function()
+hs.hotkey.bind(hyper, "Z", function()
     local win = hs.window.focusedWindow()
     if not win then return end
     local sf = win:screen():frame()
     if sf.h > sf.w then move(0, 0, 1, 0.5)()    -- Top Half
     else             move(0, 0, 0.5, 1)() end    -- Left Half
 end)
-hs.hotkey.bind(hyper, "D", function()
+hs.hotkey.bind(hyper, "C", function()
     local win = hs.window.focusedWindow()
     if not win then return end
     local sf = win:screen():frame()
     if sf.h > sf.w then move(0, 0.5, 1, 0.5)()  -- Bottom Half
     else             move(0.5, 0, 0.5, 1)() end  -- Right Half
 end)
-hs.hotkey.bind(hyper, "S", function()
+hs.hotkey.bind(hyper, "X", function()
     local win = hs.window.focusedWindow()
     if not win then return end
     local sf = win:screen():frame()
@@ -802,9 +802,9 @@ hs.hotkey.bind(hyper, "J", move(0, 0.5, 0.5, 0.5))  -- Bottom Left
 hs.hotkey.bind(hyper, "K", move(0.5, 0.5, 0.5, 0.5))-- Bottom Right
 
 -- Thirds (portrait monitor: horizontal thirds; landscape: vertical thirds)
-hs.hotkey.bind(hyper, "Z", third(1))
-hs.hotkey.bind(hyper, "X", third(2))
-hs.hotkey.bind(hyper, "C", third(3))
+hs.hotkey.bind(hyper, "A", third(1))
+hs.hotkey.bind(hyper, "S", third(2))
+hs.hotkey.bind(hyper, "D", third(3))
 
 -- Two Thirds (portrait monitor: horizontal; landscape: vertical)
 hs.hotkey.bind(hyper, "W", twoThirds(1))             -- First Two Thirds

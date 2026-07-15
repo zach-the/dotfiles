@@ -7,27 +7,8 @@
             "complex_modifications": {
                 "rules": [
                     {
-                        "description": "Caps Lock to Hyper (hold), Escape (tap), fn+Hyper toggles real Caps Lock",
+                        "description": "Caps Lock to Hyper (hold) and Escape (tap)",
                         "manipulators": [
-                            {
-                                "type": "basic",
-                                "from": {
-                                    "key_code": "caps_lock",
-                                    "modifiers": {
-                                        "mandatory": [
-                                            "fn"
-                                        ],
-                                        "optional": [
-                                            "any"
-                                        ]
-                                    }
-                                },
-                                "to": [
-                                    {
-                                        "key_code": "caps_lock"
-                                    }
-                                ]
-                            },
                             {
                                 "from": {
                                     "key_code": "caps_lock",
