@@ -71,7 +71,7 @@ window#waybar {
 }
 
 #network {
-    color: @blue; /* Neon Blue */
+    color: @green; /* Neon Blue */
 }
 
 #pulseaudio {
