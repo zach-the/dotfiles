@@ -19,6 +19,11 @@ PURPLE = '\033[35m'
 DIM = '\033[2m'
 BOLD = '\033[1m'
 CYAN = '\033[36m'
+MATCH_BG = '\033[105m'
+CUR_MATCH_BG = '\033[104m'
+DARK_FG = '\033[30m'
+FG_OFF = '\033[39m'
+BG_OFF = '\033[49m'
 
 # Add your regex patterns here to ignore specific files/directories
 # e.g., r'\.git/.*', r'.*\.pyc'
@@ -77,6 +82,73 @@ def _wrap_ansi(line, width):
     if chunk and visible > 0:
         chunks.append(chunk)
     return chunks if chunks else [""]
+
+def _strip_ansi(s):
+    return _ANSI_ESC.sub('', s)
+
+def _highlight_line(line, spans):
+    """Overlay `spans` (list of (start, end, is_current) into the line's stripped text) as a
+    background-only highlight, leaving the line's own foreground (red/green diff color, or
+    default) untouched. Falls back to a dark foreground only where no foreground is active,
+    so the highlight stays readable over unstyled text without clobbering diff coloring."""
+    if not spans:
+        return line
+    spans = sorted(spans, key=lambda x: x[0])
+    out = []
+    visible = 0
+    i = 0
+    sidx = 0
+    fg_active = False
+    cur_key = None
+    forced_fg = False
+
+    def open_span(is_current):
+        nonlocal forced_fg
+        out.append(CUR_MATCH_BG if is_current else MATCH_BG)
+        forced_fg = not fg_active
+        if forced_fg:
+            out.append(DARK_FG)
+
+    def close_span():
+        nonlocal forced_fg
+        out.append(BG_OFF)
+        if forced_fg:
+            out.append(FG_OFF)
+        forced_fg = False
+
+    while i < len(line):
+        m = _ANSI_ESC.match(line, i)
+        if m:
+            seq = m.group()
+            out.append(seq)
+            sgr = _SGR.fullmatch(seq)
+            if sgr:
+                for p in sgr.group(1).split(';'):
+                    code = int(p) if p else 0
+                    if code in (0, 39):
+                        fg_active = False
+                    elif 30 <= code <= 37 or 90 <= code <= 97:
+                        fg_active = True
+                if sgr.group(1) in ('', '0') and cur_key is not None:
+                    open_span(cur_key)
+            i = m.end()
+            continue
+        while sidx < len(spans) and visible >= spans[sidx][1]:
+            sidx += 1
+        hit = sidx < len(spans) and spans[sidx][0] <= visible < spans[sidx][1]
+        new_key = spans[sidx][2] if hit else None
+        if new_key != cur_key:
+            if cur_key is not None:
+                close_span()
+            if new_key is not None:
+                open_span(new_key)
+            cur_key = new_key
+        out.append(line[i])
+        visible += 1
+        i += 1
+    if cur_key is not None:
+        close_span()
+    return ''.join(out)
 
 def get_terminal_size():
     try:
@@ -380,29 +452,134 @@ def run_viewer(raw_lines, title="zd", regenerate=None):
     needs_redraw = True
     running = True
 
-    def draw():
-        nonlocal top
-        top = max(0, min(top, max(0, total - content_h)))
-        sys.stdout.write('\033[H')
+    search_pattern = None
+    search_dir = 1
+    all_matches = []       # [(line_idx, start, end), ...] sorted by line_idx
+    matches_by_line = {}   # line_idx -> [(start, end, global_index), ...]
+    match_pos = -1         # index into all_matches of the currently selected match
+
+    def compute_matches(pattern):
+        matches = []
+        by_line = {}
+        for idx, line in enumerate(wrapped):
+            text = _strip_ansi(line)
+            for m in pattern.finditer(text):
+                if m.start() == m.end():
+                    continue
+                gi = len(matches)
+                matches.append((idx, m.start(), m.end()))
+                by_line.setdefault(idx, []).append((m.start(), m.end(), gi))
+        return matches, by_line
+
+    def clear_search():
+        nonlocal search_pattern, all_matches, matches_by_line, match_pos
+        search_pattern = None
+        all_matches = []
+        matches_by_line = {}
+        match_pos = -1
+
+    def jump_to(pos):
+        nonlocal top, match_pos
+        match_pos = pos % len(all_matches)
+        line_idx = all_matches[match_pos][0]
+        if line_idx < top or line_idx >= top + content_h:
+            top = line_idx
+
+    def render_rows(status_text, status_reverse):
         rows = []
         for y in range(content_h):
             idx = top + y
             line = wrapped[idx] if idx < total else ""
+            line_matches = matches_by_line.get(idx)
+            if line_matches:
+                spans = [(s, e, gi == match_pos) for s, e, gi in line_matches]
+                line = _highlight_line(line, spans)
             rows.append(_ljust_visible(line, width) + '\033[0m\033[K')
-        pct = min(100, int(100 * (top + content_h) / total)) if total > 0 else 100
-        status = f" {title}  {top+1}-{min(top+content_h, total)}/{total}  {pct}% "
-        rows.append(f'\033[7m{_ljust_visible(status, width)}\033[0m\033[K')
-        sys.stdout.write('\n'.join(rows))
+        if status_reverse:
+            rows.append(f'\033[7m{_ljust_visible(status_text, width)}\033[0m\033[K')
+        else:
+            rows.append(_ljust_visible(status_text, width) + '\033[0m\033[K')
+        return rows
+
+    def draw(message=None):
+        nonlocal top
+        top = max(0, min(top, max(0, total - content_h)))
+        if message is not None:
+            status, reverse = message, False
+        else:
+            pct = min(100, int(100 * (top + content_h) / total)) if total > 0 else 100
+            if search_pattern is None:
+                suffix = ''
+            elif all_matches:
+                suffix = f"  [match {match_pos+1}/{len(all_matches)}]"
+            else:
+                suffix = "  [no matches]"
+            status, reverse = f" {title}  {top+1}-{min(top+content_h, total)}/{total}  {pct}%{suffix} ", True
+        sys.stdout.write('\033[H')
+        sys.stdout.write('\n'.join(render_rows(status, reverse)))
         sys.stdout.flush()
 
+    def prompt(prefix):
+        buf = ''
+        while True:
+            sys.stdout.write('\033[H')
+            sys.stdout.write('\n'.join(render_rows(f"{prefix}{buf}", False)))
+            sys.stdout.flush()
+            raw = read_key(tty_fd)
+            if raw in (b'\r', b'\n'):
+                return buf
+            if raw in (b'\x1b', b'\x03'):
+                return None
+            if raw in (b'\x7f', b'\x08'):
+                buf = buf[:-1]
+            elif raw == b'\x15':
+                buf = ''
+            elif len(raw) == 1 and raw[0] >= 0x20:
+                buf += raw.decode('utf-8', errors='ignore')
+
+    def do_search(prefix, direction):
+        nonlocal search_pattern, search_dir, all_matches, matches_by_line
+        pat = prompt(prefix)
+        if not pat:
+            return None
+        try:
+            regex = re.compile(pat, re.IGNORECASE)
+        except re.error as e:
+            return f" Invalid pattern: {e} "
+        search_pattern = regex
+        search_dir = direction
+        all_matches, matches_by_line = compute_matches(regex)
+        if not all_matches:
+            return " Pattern not found "
+        start_line = top + direction
+        if direction == 1:
+            candidates = [i for i, (ln, _, _) in enumerate(all_matches) if ln >= start_line]
+            pos = candidates[0] if candidates else 0
+        else:
+            candidates = [i for i, (ln, _, _) in enumerate(all_matches) if ln <= start_line]
+            pos = candidates[-1] if candidates else len(all_matches) - 1
+        jump_to(pos)
+        return None
+
+    def repeat_search(direction):
+        if search_pattern is None:
+            return " No previous search "
+        if not all_matches:
+            return " Pattern not found "
+        jump_to(match_pos + direction)
+        return None
+
     def handle_resize(sig, frame):
-        nonlocal width, height, content_h, wrapped, total, needs_redraw, raw_lines
+        nonlocal width, height, content_h, wrapped, total, needs_redraw, raw_lines, all_matches, matches_by_line, match_pos
         width, height = get_terminal_size()
         content_h = height - 1
         if regenerate is not None:
             raw_lines = regenerate(width)
         wrapped = make_wrapped(width)
         total = len(wrapped)
+        if search_pattern is not None:
+            all_matches, matches_by_line = compute_matches(search_pattern)
+            match_pos = min(match_pos, len(all_matches) - 1) if all_matches else -1
         needs_redraw = True
 
     def handle_quit(sig, frame):
@@ -420,9 +597,11 @@ def run_viewer(raw_lines, title="zd", regenerate=None):
         sel = selectors.DefaultSelector()
         sel.register(tty_fd, selectors.EVENT_READ, data='key')
 
+        pending_message = None
         while running:
             if needs_redraw:
-                draw()
+                draw(pending_message)
+                pending_message = None
                 needs_redraw = False
             for key, _ in sel.select(timeout=0.1):
                 try:
@@ -453,6 +632,21 @@ def run_viewer(raw_lines, title="zd", regenerate=None):
                         needs_redraw = True
                     elif raw == b'g':
                         top = 0
+                        needs_redraw = True
+                    elif raw == b'/':
+                        pending_message = do_search('/', 1)
+                        needs_redraw = True
+                    elif raw == b'?':
+                        pending_message = do_search('?', -1)
+                        needs_redraw = True
+                    elif raw == b'n':
+                        pending_message = repeat_search(search_dir)
+                        needs_redraw = True
+                    elif raw == b'N':
+                        pending_message = repeat_search(-search_dir)
+                        needs_redraw = True
+                    elif raw == b'\x1b':
+                        clear_search()
                         needs_redraw = True
                 except (IOError, OSError):
                     pass
@@ -499,7 +693,8 @@ def main():
         print("Usage: zd [-w] [-f] [-v] <file1> <file2>   OR   <cmd> | zd [-w] [-f] [-v]")
         print("  -w  ignore whitespace differences")
         print("  -f  show full files side by side with line numbers (requires two file args)")
-        print("  -v  interactive viewer  keybindings: j/k scroll  u/d half-page  b/f full-page  g/G top/bottom  q quit")
+        print("  -v  interactive viewer  keybindings: j/k scroll  u/d half-page  b/f full-page  g/G top/bottom")
+        print("      / search  ? reverse search  n/N next/previous match  Esc clear search  q quit")
         sys.exit(0)
 
     if not files:
