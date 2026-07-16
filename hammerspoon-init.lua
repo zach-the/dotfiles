@@ -15,7 +15,7 @@
 --  [ ][ ][ ][ ][ ][ ][ ][ ][ ][0][-][=]
 --    [Q][W][E][ ][T][Y][U][I][O][P]
 --      [A][S][D][F][G][H][J][K][L]
---         [Z][X][C][V][ ][N][M]
+--         [Z][X][C][ ][ ][N][M]
 --
 --                                         [ RETURN ]
 --
@@ -27,7 +27,7 @@
 --   O P        → next display / debug spaces
 --   A S D      → third(1) / third(2) / third(3) window snap
 --   F          → maximize
---   G V        → center window (duplicate binds)
+--   G          → center window
 --   H L        → prev space / next space
 --   J K        → bottom-left / bottom-right quarter
 --   Z X C      → half-split (context-aware: portrait vs. landscape)
@@ -36,7 +36,7 @@
 --   - =        → resize smaller / larger
 --   0          → reload Hammerspoon config
 --
---   FREE: 1 2 3 4 5 6 7 8 9, R, B
+--   FREE: 1 2 3 4 5 6 7 8 9, R, B, V
 
 -- =====================================================================
 -- INSTRUCTIONS
@@ -855,7 +855,6 @@ hs.window.filter.default:subscribe(hs.window.filter.windowFocused, function(win)
     end
 end)
 
-hs.hotkey.bind(hyper, "V", center)                  -- Center
 
 -- =====================================================================
 -- CONFIG LOADED MESSAGE
