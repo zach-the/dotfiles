@@ -15,7 +15,7 @@
 --  [ ][ ][ ][ ][ ][ ][ ][ ][ ][0][-][=]
 --    [Q][W][E][ ][T][Y][U][I][O][P]
 --      [A][S][D][F][G][H][J][K][L]
---         [Z][X][C][V][B][N][M]
+--         [Z][X][C][V][ ][N][M]
 --
 --                                         [ RETURN ]
 --
@@ -26,17 +26,17 @@
 --   U I        → top-left / top-right quarter
 --   O P        → next display / debug spaces
 --   A S D      → third(1) / third(2) / third(3) window snap
---   F G        → maximize / top-half
+--   F          → maximize
+--   G V        → center window (duplicate binds)
 --   H L        → prev space / next space
 --   J K        → bottom-left / bottom-right quarter
 --   Z X C      → half-split (context-aware: portrait vs. landscape)
---   V          → center window
---   B N M      → bottom-half / launch Chrome / minimize-all-except-active
+--   N M        → launch Chrome / minimize-all-except-active
 --   RETURN     → fullscreen
 --   - =        → resize smaller / larger
 --   0          → reload Hammerspoon config
 --
---   FREE: 1 2 3 4 5 6 7 8 9, R
+--   FREE: 1 2 3 4 5 6 7 8 9, R, B
 
 -- =====================================================================
 -- INSTRUCTIONS
@@ -792,9 +792,6 @@ hs.hotkey.bind(hyper, "X", function()
     else             move(0.25, 0, 0.5, 1)() end -- Center Half (horizontal)
 end)
 
-hs.hotkey.bind(hyper, "G", move(0, 0, 1, 0.5))      -- Top Half
-hs.hotkey.bind(hyper, "B", move(0, 0.5, 1, 0.5))    -- Bottom Half
-
 -- Corners (Quarters)
 hs.hotkey.bind(hyper, "U", move(0, 0, 0.5, 0.5))    -- Top Left
 hs.hotkey.bind(hyper, "I", move(0.5, 0, 0.5, 0.5))  -- Top Right
@@ -812,6 +809,7 @@ hs.hotkey.bind(hyper, "E", twoThirds(2))             -- Last Two Thirds
 
 -- Sizing & Restoration
 hs.hotkey.bind(hyper, "F", maximize)                -- Maximize
+hs.hotkey.bind(hyper, "G", center)                  -- Center
 hs.hotkey.bind(hyper, "M", isolateActiveWindow)     -- Minimize All Except Active
 hs.hotkey.bind(hyper, "Q", minimizeFocused)         -- Minimize
 hs.hotkey.bind(hyper, "return", fullscreen)         -- Fullscreen

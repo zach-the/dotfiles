@@ -9,23 +9,20 @@
 # unreachable while MODES omits it.
 MODES=(WIDE-TILE FLOAT)
 
-#   TILE      = stock dwindle layout, normal binds
-#   WIDE-TILE = ultrawide-dwindle-improved plugin layout, normal binds
-#   FLOAT     = everything floating, manual-mode submap
+#   TILE      = stock dwindle layout
+#   WIDE-TILE = ultrawide-dwindle-improved plugin layout
+#   FLOAT     = everything floating
 #
-# Floats/re-tiles windows as needed, flips the catch-all float
-# windowrule, switches the active tiling algorithm (via a sourced
-# config file, same trick as the float rule below), writes the state
-# file waybar's custom/mode module reads, signals waybar to refresh,
-# and switches the `manual` submap. The submap switch is dispatched
-# here (last, after the reload) rather than via a separate stacked
-# `bind = ..., submap, ...` line, so there's no race between this
-# script's own reload and an independently-triggered submap
-# dispatcher on the same keypress.
+# Keybinds are identical across all three — this only floats/re-tiles
+# windows as needed, flips the catch-all float windowrule, switches
+# the active tiling algorithm (via a sourced config file, same trick
+# as the float rule below), writes the state file waybar's custom/mode
+# module reads, and signals waybar to refresh.
 
 STATE_FILE="$HOME/.config/hypr/mode_state"
 FLOAT_RULE_FILE="$HOME/.config/hypr/mode_float_rule.conf"
 LAYOUT_FILE="$HOME/.config/hypr/mode_layout.conf"
+FLOAT_LAYOUT_SCRIPT="$HOME/.config/hypr/float_layout.sh"
 SKIP_WORKSPACE_PREFIX="special"
 
 CURRENT="$(cat "$STATE_FILE" 2>/dev/null)"
@@ -55,33 +52,40 @@ float_all() {
     done
 }
 
-TARGET_SUBMAP="reset"
-
 case "$NEXT" in
     WIDE-TILE)
-        [ "$CURRENT" = "FLOAT" ] && retile_all
+        # Leaving float mode: snapshot every floating window's position
+        # and size before re-tiling, so FLOAT can restore it later.
+        if [ "$CURRENT" = "FLOAT" ]; then
+            "$FLOAT_LAYOUT_SCRIPT" save
+            retile_all
+        fi
         echo "# managed by mode_toggle.sh — do not edit by hand" > "$FLOAT_RULE_FILE"
         echo "general:layout = ultrawide-dwindle-improved" > "$LAYOUT_FILE"
         ;;
     TILE)
-        [ "$CURRENT" = "FLOAT" ] && retile_all
+        if [ "$CURRENT" = "FLOAT" ]; then
+            "$FLOAT_LAYOUT_SCRIPT" save
+            retile_all
+        fi
         echo "# managed by mode_toggle.sh — do not edit by hand" > "$FLOAT_RULE_FILE"
         echo "general:layout = dwindle" > "$LAYOUT_FILE"
         ;;
     FLOAT)
-        # Entering manual mode: float everything currently tiled, and
+        # Entering float mode: float everything currently tiled, and
         # make all future windows spawn floating too. Written to a
         # sourced file (not just `hyprctl keyword`) so the rule
         # survives any later `hyprctl reload`, not just this script's.
         float_all
         echo 'windowrule = match:class ^(.*)$, float 1' > "$FLOAT_RULE_FILE"
-        TARGET_SUBMAP="manual"
+        # Put back whatever position/size each window had the last
+        # time we left float mode, where a match (by address) exists.
+        "$FLOAT_LAYOUT_SCRIPT" restore
         ;;
 esac
 
 echo "$NEXT" > "$STATE_FILE"
 
 hyprctl reload config-only
-hyprctl dispatch submap "$TARGET_SUBMAP"
 
 pkill -RTMIN+8 waybar

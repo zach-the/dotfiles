@@ -7,6 +7,8 @@ Usage:
   winmove.sh X Y W H        fractions 0..1 of monitor width/height
   winmove.sh third N        aspect-aware thirds (N=1,2,3)
   winmove.sh twothirds N    aspect-aware two-thirds (N=1,2)
+  winmove.sh half N         aspect-aware half (N=1 top/left, N=2 bottom/right)
+  winmove.sh halfcenter     aspect-aware centered half
 """
 import json
 import subprocess
@@ -42,6 +44,16 @@ def thirds_rect(mode, n, portrait):
     return off, 0.0, size, 1.0
 
 
+def half_rect(mode, n, portrait):
+    # Mirrors hammerspoon's Z (half 1) / C (half 2) / X (halfcenter):
+    # top/bottom on portrait monitors, left/right on landscape.
+    if mode == "halfcenter":
+        return (0.0, 0.25, 1.0, 0.5) if portrait else (0.25, 0.0, 0.5, 1.0)
+    if n == 1:
+        return (0.0, 0.0, 1.0, 0.5) if portrait else (0.0, 0.0, 0.5, 1.0)
+    return (0.0, 0.5, 1.0, 0.5) if portrait else (0.5, 0.0, 0.5, 1.0)
+
+
 def main():
     args = sys.argv[1:]
     if not args:
@@ -64,6 +76,13 @@ def main():
         n = int(args[1])
         portrait = mh > mw
         x, y, w, h = thirds_rect(args[0], n, portrait)
+    elif args[0] == "halfcenter":
+        portrait = mh > mw
+        x, y, w, h = half_rect(args[0], None, portrait)
+    elif args[0] == "half":
+        n = int(args[1])
+        portrait = mh > mw
+        x, y, w, h = half_rect(args[0], n, portrait)
     else:
         x, y, w, h = (float(a) for a in args[:4])
 
