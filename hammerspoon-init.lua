@@ -415,22 +415,6 @@ local function twoThirds(n)
     end
 end
 
--- Function to minimize all windows except the focused one
-local function isolateActiveWindow()
-    local activeWindow = hs.window.focusedWindow()
-    if not activeWindow then return end
-
-    -- Get all visible windows across all screens
-    local allWindows = hs.window.visibleWindows()
-
-    for _, win in ipairs(allWindows) do
-        -- Check if the window is NOT the active one and is NOT already minimized
-        if win:id() ~= activeWindow:id() then
-            win:minimize()
-        end
-    end
-end
-
 -- =====================================================================
 -- HELPER FUNCTION FOR GHOSTTY/CHROME LAUNCH FUNCTIONS
 -- =====================================================================
@@ -719,43 +703,6 @@ local function switchSpace(direction)
     end
 end
 
--- =====================================================================
--- SPACES X-RAY DEBUGGER
--- =====================================================================
-
-local function debugSpaces()
-    local orderedScreens = getMacOSScreenOrder()
-    local focusedScreen = hs.mouse.getCurrentScreen()
-
-    local msg = "=== SPACES X-RAY ===\n\n"
-    local globalCounter = 1
-
-    for screenIndex, screen in ipairs(orderedScreens) do
-        local isPrimary = (screen:id() == hs.screen.primaryScreen():id()) and " [PRIMARY]" or ""
-        local isFocused = (screen:id() == focusedScreen:id()) and " [FOCUSED]" or ""
-
-        msg = msg .. "Screen " .. screenIndex .. isPrimary .. isFocused .. "\n"
-        msg = msg .. "Name: " .. screen:name() .. "\n"
-
-        local screenSpaces = hs.spaces.spacesForScreen(screen)
-        local activeSpace = hs.spaces.activeSpaceOnScreen(screen)
-
-        if screenSpaces then
-            for _, spaceID in ipairs(screenSpaces) do
-                local activeMark = (spaceID == activeSpace) and "  <-- ACTIVE" or ""
-                msg = msg .. "  -> Space ID: " .. spaceID .. "  |  Maps to: ^" .. globalCounter .. activeMark .. "\n"
-                globalCounter = globalCounter + 1
-            end
-        else
-            msg = msg .. "  -> No spaces found.\n"
-        end
-        msg = msg .. "\n"
-    end
-
-    print(msg)
-    hs.alert.show(msg, 8)
-end
-
 --==========================================--
 --  _  __          _     _           _      --
 -- | |/ /___ _   _| |__ (_)_ __   __| |___  --
@@ -810,7 +757,6 @@ hs.hotkey.bind(hyper, "E", twoThirds(2))             -- Last Two Thirds
 -- Sizing & Restoration
 hs.hotkey.bind(hyper, "F", maximize)                -- Maximize
 hs.hotkey.bind(hyper, "G", center)                  -- Center
-hs.hotkey.bind(hyper, "M", isolateActiveWindow)     -- Minimize All Except Active
 hs.hotkey.bind(hyper, "Q", minimizeFocused)         -- Minimize
 hs.hotkey.bind(hyper, "return", fullscreen)         -- Fullscreen
 
@@ -840,9 +786,6 @@ hs.hotkey.bind({"ctrl", "shift"}, "K", function() startScroll(BASE_SPEED) end, s
 -- Terminal and Browser
 hs.hotkey.bind(hyper, "T", launchWezterm)
 hs.hotkey.bind(hyper, "N", launchChrome)
-
--- Debug
-hs.hotkey.bind(hyper, "P", debugSpaces)
 
 -- Block cmd+h everywhere except TigerVNC
 local stopCmdH = hs.hotkey.new({"cmd"}, "h", function() end)
