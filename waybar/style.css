@@ -39,6 +39,7 @@ window#waybar {
 #network,
 #pulseaudio,
 #custom-mode,
+#custom-bluetooth,
 #tray {
     padding: 0 12px;
     color: @fg;
@@ -76,6 +77,10 @@ window#waybar {
 
 #pulseaudio {
     color: @green; /* Neon Green */
+}
+
+#custom-bluetooth {
+    color: @green; /* Neon Green — matches the other right-side modules */
 }
 
 #tray {

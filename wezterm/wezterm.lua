@@ -48,6 +48,7 @@ config.inactive_pane_hsb = {
 }
 
 -- Other Behavior
+config.window_close_confirmation = 'NeverPrompt'
 config.selection_word_boundary = " \t\n{}[]()\"'`|│"
 config.default_cursor_style = 'BlinkingBlock'
 config.pane_focus_follows_mouse = true

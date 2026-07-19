@@ -8,9 +8,9 @@
   "margin-right": 8,
   "margin-bottom": -10, // should always be opposite of gaps_out in hyprland.conf
 
-  "modules-left": ["clock"],
+  "modules-left": ["clock", "custom/mode"],
   "modules-center": ["hyprland/workspaces"],
-  "modules-right": ["custom/mode", "pulseaudio", "backlight", "network", "battery"], //tray was here, but i removed it. look into optimizing that and figurig out system76-power later
+  "modules-right": ["pulseaudio", "custom/bluetooth", "backlight", "network", "battery"], //tray was here, but i removed it. look into optimizing that and figurig out system76-power later
 
   "hyprland/workspaces": {
     "format": "{icon}",
@@ -51,7 +51,8 @@
     "format-wifi": "Wifi: {essid} ({signalStrength}%)",
     "format-ethernet": "LAN: {ipaddr}",
     "format-disconnected": "No Network",
-    "tooltip-format": "{ifname}: {ipaddr}\n{gwaddr} — {bandwidthUpBits} up / {bandwidthDownBits} down"
+    "tooltip-format": "{ifname}: {ipaddr}\n{gwaddr} — {bandwidthUpBits} up / {bandwidthDownBits} down",
+    "on-click": "~/.config/hypr/wifi_menu_launch.sh"
   },
 
   "custom/mode": {
@@ -62,11 +63,20 @@
     "tooltip": false
   },
 
+  "custom/bluetooth": {
+    "exec": "~/.config/hypr/bluetooth_status.sh",
+    "interval": 5,
+    "signal": 9,
+    "on-click": "~/.config/hypr/bluetooth_menu_launch.sh",
+    "tooltip": false
+  },
+
   "pulseaudio": {
     "max-volume": 150,
     "format": "Volume: {volume}%",
     "format-muted": "Muted",
-    "on-click": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
+    "on-click": "~/.config/hypr/audio_menu_launch.sh",
+    "on-click-middle": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
     "on-scroll-up": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 1%+ --limit 1.5",
     "on-scroll-down": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 1%-",
   },
