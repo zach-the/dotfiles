@@ -160,55 +160,7 @@ class CUltrawideImprovedAlgorithm final : public ITiledAlgorithm {
             return;
         }
 
-        auto existing = getUltrawideTiledTargets();
-        int  n        = (int)existing.size();
-
-        if (n == 0) {
-            m_numCols      = 1;
-            m_colWidths[0] = 1.0f;
-            m_colWidths[1] = 0.0f;
-            m_colWidths[2] = 0.0f;
-            m_colAssignment[target.get()] = 0;
-            insertIntoColTree(0, target);
-
-        } else if (n == 1) {
-            m_numCols      = 2;
-            m_colWidths[0] = 0.5f;
-            m_colWidths[1] = 0.5f;
-            m_colWidths[2] = 0.0f;
-
-            // Cursor picks which column the NEW window occupies.
-            // The existing window (currently in col 0) moves to the other column.
-            int newCol      = pickColumnByCentroid(workArea, 2);
-            int existingCol = 1 - newCol;
-
-            if (existingCol != 0) {
-                // Move existing window from col 0 to col 1.
-                m_colAssignment[existing[0].get()] = existingCol;
-                m_colRoots[existingCol]            = std::move(m_colRoots[0]);
-                // m_colRoots[0] is now nullptr (moved-from)
-            }
-            // existingCol == 0 means newCol == 1: existing stays in col 0, new goes to col 1.
-
-            m_colAssignment[target.get()] = newCol;
-            insertIntoColTree(newCol, target);
-
-        } else if (n == 2) {
-            m_numCols      = 3;
-            m_colWidths[0] = 1.0f / 3.0f;
-            m_colWidths[1] = 1.0f / 3.0f;
-            m_colWidths[2] = 1.0f / 3.0f;
-            int col = pickColumnByCentroid(workArea, 3);
-            m_colAssignment[target.get()] = col;
-            insertIntoColTree(col, target);
-
-        } else {
-            int col = pickColumnByCentroidActual(workArea);
-            m_colAssignment[target.get()] = col;
-            insertIntoColTree(col, target);
-        }
-
-        m_uwOrdered.emplace_back(target);
+        placeNewUltrawideTarget(target, workArea);
         recalculate();
     }
 
@@ -236,17 +188,8 @@ class CUltrawideImprovedAlgorithm final : public ITiledAlgorithm {
         for (auto& w : m_uwOrdered)
             if (w.lock() == target) { known = true; break; }
 
-        if (!known) {
-            int col = (m_numCols > 0) ? pickColumnByCentroidActual(workArea) : 0;
-            if (m_numCols == 0) {
-                m_numCols      = 1;
-                m_colWidths[0] = 1.0f;
-                col            = 0;
-            }
-            m_colAssignment[target.get()] = col;
-            insertIntoColTree(col, target);
-            m_uwOrdered.emplace_back(target);
-        }
+        if (!known)
+            placeNewUltrawideTarget(target, workArea);
 
         recalculate();
     }
@@ -549,6 +492,74 @@ class CUltrawideImprovedAlgorithm final : public ITiledAlgorithm {
             if (d < bestDist) { bestDist = d; best = t; }
         }
         return best;
+    }
+
+    // Assign `target` a column the first time it enters ultrawide
+    // tiling, growing m_numCols 1 -> 2 -> 3 as needed so the first
+    // three windows always claim three separate columns regardless of
+    // cursor position. Shared by newTarget and movedTarget's "unknown
+    // target" branch so a window arriving either way (a brand new
+    // window, or one coming back from floating, another workspace, or
+    // a plugin reload) gets the same placement guarantees — only once
+    // there are already 3+ columns does cursor position pick among the
+    // existing ones (pickColumnByCentroidActual), since at that point
+    // every column is already occupied and there's no empty slot to
+    // guarantee.
+    void placeNewUltrawideTarget(const SP<ITarget>& target, const CBox& workArea) {
+        auto existing = getUltrawideTiledTargets();
+        int  n        = (int)existing.size();
+
+        if (n == 0) {
+            m_numCols      = 1;
+            m_colWidths[0] = 1.0f;
+            m_colWidths[1] = 0.0f;
+            m_colWidths[2] = 0.0f;
+            m_colAssignment[target.get()] = 0;
+            insertIntoColTree(0, target);
+
+        } else if (n == 1) {
+            m_numCols      = 2;
+            m_colWidths[0] = 0.5f;
+            m_colWidths[1] = 0.5f;
+            m_colWidths[2] = 0.0f;
+
+            // Cursor picks which column the NEW window occupies.
+            // The existing window (currently in col 0) moves to the other column.
+            int newCol      = pickColumnByCentroid(workArea, 2);
+            int existingCol = 1 - newCol;
+
+            if (existingCol != 0) {
+                // Move existing window from col 0 to col 1.
+                m_colAssignment[existing[0].get()] = existingCol;
+                m_colRoots[existingCol]            = std::move(m_colRoots[0]);
+                // m_colRoots[0] is now nullptr (moved-from)
+            }
+            // existingCol == 0 means newCol == 1: existing stays in col 0, new goes to col 1.
+
+            m_colAssignment[target.get()] = newCol;
+            insertIntoColTree(newCol, target);
+
+        } else if (n == 2) {
+            m_numCols      = 3;
+            m_colWidths[0] = 1.0f / 3.0f;
+            m_colWidths[1] = 1.0f / 3.0f;
+            m_colWidths[2] = 1.0f / 3.0f;
+
+            // The third column is brand new and guaranteed empty, so
+            // (unlike the n==1 case) there's no ambiguity for the cursor
+            // to resolve — always claim it, rather than letting cursor
+            // position stack the new window onto an already-occupied
+            // column and leave column 2 permanently empty.
+            m_colAssignment[target.get()] = 2;
+            insertIntoColTree(2, target);
+
+        } else {
+            int col = pickColumnByCentroidActual(workArea);
+            m_colAssignment[target.get()] = col;
+            insertIntoColTree(col, target);
+        }
+
+        m_uwOrdered.emplace_back(target);
     }
 
     void insertIntoColTree(int col, const SP<ITarget>& target) {
