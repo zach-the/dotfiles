@@ -184,8 +184,17 @@ local function smartFocus(direction)
 
         local best = candidates[1]
         if best.window then
-            best.window:focus()
-            moveMouseToWindow(best.window)
+            local targetWindow = best.window
+            targetWindow:focus()
+            moveMouseToWindow(targetWindow)
+            -- Known Hammerspoon/macOS bug (hammerspoon#370, #2978): for apps with multiple
+            -- windows (e.g. Chrome), :focus() races the app's own window activation when
+            -- switching from a different app, so the wrong window ends up focused even
+            -- though the mouse lands in the right place. Re-assert focus shortly after
+            -- to win the race.
+            hs.timer.doAfter(0.1, function()
+                targetWindow:focus()
+            end)
         else
             -- Empty screen: just move the mouse, don't change focus
             hs.mouse.absolutePosition(best.point)
