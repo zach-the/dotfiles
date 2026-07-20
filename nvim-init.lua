@@ -478,8 +478,8 @@ require("lazy").setup({
 
         comment.setup()
 
-        -- Keymap <C-\> for intelligent commenting
-        vim.keymap.set("n", "<C-\\>", function()
+        -- Keymap <M-;> for intelligent commenting
+        vim.keymap.set("n", "<M-;>", function()
           local count = vim.v.count1
           for _ = 1, count do
             api.toggle.linewise.current()
@@ -487,14 +487,14 @@ require("lazy").setup({
           end
         end, { noremap = true, silent = true, desc = "Toggle comment line(s)" })
 
-        vim.keymap.set("x", "<C-\\>", function()
+        vim.keymap.set("x", "<M-;>", function()
           local esc = vim.api.nvim_replace_termcodes("<ESC>", true, false, true)
           vim.api.nvim_feedkeys(esc, "nx", false)
           api.toggle.linewise(vim.fn.visualmode())
           vim.cmd("normal! j")
         end, { noremap = true, silent = true, desc = "Toggle comment selection" })
 
-        vim.keymap.set("i", "<C-\\>", function()
+        vim.keymap.set("i", "<M-;>", function()
           vim.cmd("stopinsert")
           api.toggle.linewise.current()
           vim.cmd("normal! jA")
