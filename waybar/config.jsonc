@@ -10,7 +10,7 @@
 
   "modules-left": ["clock", "custom/mode"],
   "modules-center": ["hyprland/workspaces"],
-  "modules-right": ["pulseaudio", "custom/bluetooth", "backlight", "network", "battery"], //tray was here, but i removed it. look into optimizing that and figurig out system76-power later
+  "modules-right": ["custom/volume", "custom/bluetooth", "network", "backlight", "custom/battery"], //tray was here, but i removed it. look into optimizing that and figurig out system76-power later
 
   "hyprland/workspaces": {
     "format": "{icon}",
@@ -37,22 +37,20 @@
     "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>"
   },
 
-  "battery": {
-    "states": {
-      "warning": 30,
-      "critical": 15
-    },
-    "format": "Battery: {capacity}%",
-    "format-charging": "Charging: {capacity}%",
-    "tooltip-format": "{timeTo} — {power:.1f}W"
+  "custom/battery": {
+    "exec": "~/.config/hypr/battery_color.py",
+    "return-type": "json",
+    "interval": 30
   },
 
   "network": {
-    "format-wifi": "Wifi: {essid} ({signalStrength}%)",
+    "format-wifi": "WiFi: {essid} ({signalStrength}%)",
     "format-ethernet": "LAN: {ipaddr}",
     "format-disconnected": "No Network",
+    "format-disabled": "WiFi: Off",
     "tooltip-format": "{ifname}: {ipaddr}\n{gwaddr} — {bandwidthUpBits} up / {bandwidthDownBits} down",
-    "on-click": "~/.config/hypr/wifi_menu_launch.sh"
+    "on-click": "~/.config/hypr/wifi_menu_launch.sh",
+    "on-click-right": "~/.config/hypr/wifi_toggle.sh"
   },
 
   "custom/mode": {
@@ -68,17 +66,21 @@
     "interval": 5,
     "signal": 9,
     "on-click": "~/.config/hypr/bluetooth_menu_launch.sh",
+    "on-click-right": "~/.config/hypr/bluetooth_toggle.sh",
     "tooltip": false
   },
 
-  "pulseaudio": {
-    "max-volume": 150,
-    "format": "Volume: {volume}%",
-    "format-muted": "Muted",
+  "custom/volume": {
+    "exec": "~/.config/hypr/volume_color.py",
+    "return-type": "json",
+    "interval": 1,
+    "signal": 10,
     "on-click": "~/.config/hypr/audio_menu_launch.sh",
-    "on-click-middle": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle",
-    "on-scroll-up": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 1%+ --limit 1.5",
-    "on-scroll-down": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 1%-",
+    "on-click-middle": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle; ~/.config/hypr/volume_refresh.sh",
+    "on-click-right": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle; ~/.config/hypr/volume_refresh.sh",
+    "on-scroll-up": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 1%+ --limit 1.5; ~/.config/hypr/volume_refresh.sh",
+    "on-scroll-down": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 1%-; ~/.config/hypr/volume_refresh.sh",
+    "tooltip": false
   },
 
   "tray": {

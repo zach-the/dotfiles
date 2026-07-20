@@ -232,6 +232,9 @@ def gen_waybar_css(p: dict, name: str) -> str:
 @define-color pink         {p['pink']};
 @define-color blue         {p['blue']};
 @define-color green        {p['green']};
+@define-color yellow       {p['yellow']};
+@define-color purple       {p['purple']};
+@define-color orange       {p['orange']};
 @define-color battery-warn {p['battery_warning']};
 """
 

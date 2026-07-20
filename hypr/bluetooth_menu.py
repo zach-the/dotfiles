@@ -57,15 +57,19 @@ def get_devices():
     return paired
 
 
-def toggle_connection(mac, connected):
+def start_toggle(mac, connected):
+    """Kick off a connect/disconnect in the background and return the Popen
+    handle to poll. Runs detached (own session, no inherited stdio) so
+    bluetoothctl keeps running to completion even if the popup window
+    closes — e.g. the mouse moving off it — while it's still in flight."""
     cmd = ["bluetoothctl", "--timeout", str(ACTION_TIMEOUT), "disconnect" if connected else "connect", mac]
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=ACTION_TIMEOUT + 5)
-        ok = result.returncode == 0
-    except subprocess.TimeoutExpired:
-        ok = False
-    subprocess.run(["pkill", "-RTMIN+9", "waybar"], capture_output=True, check=False)
-    return ok
+    return subprocess.Popen(
+        cmd,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
 
 
 def draw(stdscr, devices, hover, powered, status=None):
@@ -104,10 +108,27 @@ def main(stdscr, close_event, own_addr):
     powered = is_powered()
     devices = get_devices() if powered else []
     hover = None
+    pending = None  # {"proc", "mac", "row"} while a connect/disconnect runs in the background
 
     draw(stdscr, devices, hover, powered)
     while not close_event.is_set():
         key = stdscr.getch()
+
+        # Runs every iteration (stdscr.timeout(100) guarantees one even
+        # without mouse activity) rather than blocking on the subprocess,
+        # so hover/close_event stay responsive while a connect/disconnect
+        # is in flight.
+        if pending is not None and pending["proc"].poll() is not None:
+            ok = pending["proc"].returncode == 0
+            subprocess.run(["pkill", "-RTMIN+9", "waybar"], capture_output=True, check=False)
+            devices = get_devices()
+            hover = next((i for i, dv in enumerate(devices) if dv["mac"] == pending["mac"]), pending["row"])
+            pending = None
+            if ok:
+                draw(stdscr, devices, hover, powered)
+                break
+            draw(stdscr, devices, hover, powered, "Connection failed")
+
         if key != curses.KEY_MOUSE:
             continue
         try:
@@ -116,13 +137,17 @@ def main(stdscr, close_event, own_addr):
             continue
         row = my - row_start
         valid_rows = 1 if not powered else len(devices)
-        new_hover = row if 0 <= row < valid_rows else None
-        if new_hover != hover:
-            hover = new_hover
-            draw(stdscr, devices, hover, powered)
+
+        # Keep the hover pinned on the connecting/disconnecting row while
+        # pending, rather than letting it drift to wherever the mouse is.
+        if pending is None:
+            new_hover = row if 0 <= row < valid_rows else None
+            if new_hover != hover:
+                hover = new_hover
+                draw(stdscr, devices, hover, powered)
 
         clicked = bstate & (curses.BUTTON1_CLICKED | curses.BUTTON1_PRESSED | curses.BUTTON1_RELEASED)
-        if not clicked:
+        if not clicked or pending is not None:
             continue
 
         if not powered:
@@ -139,13 +164,7 @@ def main(stdscr, close_event, own_addr):
         if devices and 0 <= row < len(devices):
             d = devices[row]
             draw(stdscr, devices, row, powered, f"{'Disconnecting from' if d['connected'] else 'Connecting to'} {d['name']}...")
-            ok = toggle_connection(d["mac"], d["connected"])
-            devices = get_devices()
-            idx = next((i for i, n in enumerate(devices) if n["mac"] == d["mac"]), row)
-            if ok:
-                draw(stdscr, devices, idx, powered)
-                break
-            draw(stdscr, devices, idx, powered, "Connection failed")
+            pending = {"proc": start_toggle(d["mac"], d["connected"]), "mac": d["mac"], "row": row}
 
 
 if __name__ == "__main__":

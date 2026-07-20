@@ -35,9 +35,9 @@ window#waybar {
 
 #clock,
 #backlight,
-#battery,
+#custom-battery,
 #network,
-#pulseaudio,
+#custom-volume,
 #custom-mode,
 #custom-bluetooth,
 #tray {
@@ -56,31 +56,24 @@ window#waybar {
 }
 
 #backlight {
-    color: @green; /* Neon Green */
-}
-
-#battery {
-    color: @green; /* Green for healthy battery */
-}
-
-#battery.warning {
-    color: @battery-warn; /* Warm orange for warning */
-}
-
-#battery.critical {
-    color: @pink; /* Neon Pink for critical alerts */
+    color: @orange; /* Neon Orange */
 }
 
 #network {
-    color: @green; /* Neon Blue */
+    color: @purple; /* Neon Purple */
 }
 
-#pulseaudio {
-    color: @green; /* Neon Green */
+#network.disconnected,
+#network.disabled {
+    color: @fg-muted; /* Grey when no Wi-Fi connection, or radio off */
 }
 
 #custom-bluetooth {
-    color: @green; /* Neon Green — matches the other right-side modules */
+    color: @blue; /* Neon Blue */
+}
+
+#custom-bluetooth.off {
+    color: @fg-muted; /* Grey when Bluetooth is powered off */
 }
 
 #tray {
