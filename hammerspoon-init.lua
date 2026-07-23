@@ -46,6 +46,8 @@
 -- =====================================================================
 -- DEFINE HYPER : CTRL + OPT + CMD + SHIFT
 -- =====================================================================
+require("hs.ipc")
+
 local hyper = {"ctrl", "alt", "cmd", "shift"}
 
 
@@ -724,6 +726,8 @@ end
 -- Space Switching
 hs.hotkey.bind(hyper, "H", function() switchSpace("prev") end)
 hs.hotkey.bind(hyper, "L", function() switchSpace("next") end)
+hs.hotkey.bind(hyper, "Left", function() switchSpace("prev") end)
+hs.hotkey.bind(hyper, "Right", function() switchSpace("next") end)
 
 -- Halves (portrait monitor: horizontal splits; landscape: vertical splits)
 hs.hotkey.bind(hyper, "Z", function()
@@ -782,10 +786,20 @@ hs.hotkey.bind({"cmd", "alt"}, "L", function() smartFocus("East") end)
 hs.hotkey.bind({"cmd", "alt"}, "K", function() smartFocus("North") end)
 hs.hotkey.bind({"cmd", "alt"}, "J", function() smartFocus("South") end)
 
+hs.hotkey.bind({"cmd", "alt"}, "Left", function() smartFocus("West") end)
+hs.hotkey.bind({"cmd", "alt"}, "Right", function() smartFocus("East") end)
+hs.hotkey.bind({"cmd", "alt"}, "Up", function() smartFocus("North") end)
+hs.hotkey.bind({"cmd", "alt"}, "Down", function() smartFocus("South") end)
+
 hs.hotkey.bind({"cmd", "ctrl"}, "H", function() smartFocus("West") end)
 hs.hotkey.bind({"cmd", "ctrl"}, "L", function() smartFocus("East") end)
 hs.hotkey.bind({"cmd", "ctrl"}, "K", function() smartFocus("North") end)
 hs.hotkey.bind({"cmd", "ctrl"}, "J", function() smartFocus("South") end)
+
+hs.hotkey.bind({"cmd", "ctrl"}, "Left", function() smartFocus("West") end)
+hs.hotkey.bind({"cmd", "ctrl"}, "Right", function() smartFocus("East") end)
+hs.hotkey.bind({"cmd", "ctrl"}, "Up", function() smartFocus("North") end)
+hs.hotkey.bind({"cmd", "ctrl"}, "Down", function() smartFocus("South") end)
 
 
 -- Scroll
