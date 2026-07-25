@@ -48,5 +48,6 @@ case "$1" in
   open)
     line=$(grep "^monitor=$INTERNAL," "$MONITORS_CONF")
     hyprctl keyword monitor "${line#monitor=}"
+    hyprctl dispatch dpms on "$INTERNAL"
     ;;
 esac
