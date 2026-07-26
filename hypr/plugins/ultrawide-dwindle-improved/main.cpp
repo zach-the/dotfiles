@@ -221,12 +221,13 @@ class CUltrawideImprovedAlgorithm final : public ITiledAlgorithm {
 
             compactColumns();
 
-            // On ultrawide with exactly 3 remaining windows, ensure we have 3 equal columns.
+            // On ultrawide, restore columns lost to compaction if the
+            // remaining window count still justifies them.
             auto parent2 = m_parent.lock();
             if (parent2) {
                 auto wa = parent2->space()->workArea();
                 if (isUltrawide(wa))
-                    tryRebalanceToThreeCols();
+                    rebalanceColumns();
             }
         }
 
@@ -545,13 +546,40 @@ class CUltrawideImprovedAlgorithm final : public ITiledAlgorithm {
             m_colWidths[1] = 1.0f / 3.0f;
             m_colWidths[2] = 1.0f / 3.0f;
 
-            // The third column is brand new and guaranteed empty, so
-            // (unlike the n==1 case) there's no ambiguity for the cursor
-            // to resolve — always claim it, rather than letting cursor
-            // position stack the new window onto an already-occupied
-            // column and leave column 2 permanently empty.
-            m_colAssignment[target.get()] = 2;
-            insertIntoColTree(2, target);
+            // The two existing windows are one-per-column under the
+            // current 2-column layout (cols 0 and 1) — sort them into
+            // left/right order so it can be preserved below.
+            SP<ITarget> leftExisting  = existing[0];
+            SP<ITarget> rightExisting = existing[1];
+            if (m_colAssignment[leftExisting.get()] > m_colAssignment[rightExisting.get()])
+                std::swap(leftExisting, rightExisting);
+
+            // Cursor picks which of the 3 new columns the NEW window
+            // claims; the two existing windows shift into the
+            // remaining slots, keeping their relative left-right
+            // order. Unlike just cursor-picking a slot for the new
+            // window alone (the old, buggy approach — it could stack
+            // onto an already-occupied column and leave column 2
+            // permanently empty), this guarantees all three columns
+            // end up occupied while still following the cursor,
+            // mirroring the n==1 reshuffle above.
+            int newCol = pickColumnByCentroid(workArea, 3);
+
+            std::unique_ptr<SDwindleNode> rest[2]        = {std::move(m_colRoots[0]), std::move(m_colRoots[1])};
+            SP<ITarget>                   restTargets[2] = {leftExisting, rightExisting};
+
+            int ri = 0;
+            for (int c = 0; c < 3; c++) {
+                if (c == newCol) {
+                    m_colRoots[c]         = std::make_unique<SDwindleNode>();
+                    m_colRoots[c]->target = target;
+                    m_colAssignment[target.get()] = c;
+                } else {
+                    m_colRoots[c]                        = std::move(rest[ri]);
+                    m_colAssignment[restTargets[ri].get()] = c;
+                    ri++;
+                }
+            }
 
         } else {
             int col = pickColumnByCentroidActual(workArea);
@@ -604,40 +632,46 @@ class CUltrawideImprovedAlgorithm final : public ITiledAlgorithm {
             m_colWidths[c] = (c < m_numCols) ? frac : 0.0f;
     }
 
-    // After compaction, if exactly 3 tiled windows remain but we have fewer than 3 columns,
-    // pop the last window from the largest column into a new rightmost column.
-    void tryRebalanceToThreeCols() {
-        if (m_numCols >= 3) return;
-
+    // After compaction, restore columns up to min(total windows, 3) —
+    // not just when exactly 3 remain. compactColumns() only ever
+    // shrinks m_numCols (whenever any column empties out), so without
+    // this, closing windows in the wrong order can strand a monitor at
+    // 1-2 columns even with far more than 3 windows still open, and
+    // every window added afterward keeps piling into those same few
+    // columns instead of spreading back out to 3. Loops rather than a
+    // single pop since compaction can drop more than one column at once.
+    void rebalanceColumns() {
         int total = 0;
         for (int c = 0; c < m_numCols; c++)
             total += (int)getColTargets(c).size();
-        if (total != 3) return;
 
-        // Find the column with the most windows.
-        int maxCol = 0, maxCount = 0;
-        for (int c = 0; c < m_numCols; c++) {
-            int cnt = (int)getColTargets(c).size();
-            if (cnt > maxCount) { maxCount = cnt; maxCol = c; }
+        int target = std::min(total, 3);
+        while (m_numCols < target) {
+            // Find the column with the most windows.
+            int maxCol = 0, maxCount = 0;
+            for (int c = 0; c < m_numCols; c++) {
+                int cnt = (int)getColTargets(c).size();
+                if (cnt > maxCount) { maxCount = cnt; maxCol = c; }
+            }
+            if (maxCount <= 1) break; // nothing left to redistribute
+
+            // Take the last window (in tree order) from that column.
+            auto colTargets = getColTargets(maxCol);
+            auto toMove     = colTargets.back();
+
+            if (m_colRoots[maxCol]->isLeaf() && m_colRoots[maxCol]->target == toMove)
+                m_colRoots[maxCol].reset();
+            else
+                SDwindleNode::remove(m_colRoots[maxCol], toMove);
+
+            int newCol = m_numCols;
+            m_numCols++;
+            m_colAssignment[toMove.get()] = newCol;
+            m_colRoots[newCol]            = std::make_unique<SDwindleNode>();
+            m_colRoots[newCol]->target    = toMove;
         }
-        if (maxCount <= 1) return;
 
-        // Take the last window (in tree order) from that column.
-        auto colTargets = getColTargets(maxCol);
-        auto toMove     = colTargets.back();
-
-        if (m_colRoots[maxCol]->isLeaf() && m_colRoots[maxCol]->target == toMove)
-            m_colRoots[maxCol].reset();
-        else
-            SDwindleNode::remove(m_colRoots[maxCol], toMove);
-
-        int newCol = m_numCols;
-        m_numCols++;
-        m_colAssignment[toMove.get()] = newCol;
-        m_colRoots[newCol]            = std::make_unique<SDwindleNode>();
-        m_colRoots[newCol]->target    = toMove;
-
-        float frac = 1.0f / (float)m_numCols;
+        float frac = (m_numCols > 0) ? (1.0f / (float)m_numCols) : 1.0f;
         for (int c = 0; c < 3; c++)
             m_colWidths[c] = (c < m_numCols) ? frac : 0.0f;
     }

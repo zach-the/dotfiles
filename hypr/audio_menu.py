@@ -41,6 +41,27 @@ def get_unavailable_sink_ids():
     return unavailable
 
 
+def simplify_names(names):
+    """Strip the shared device-description prefix (e.g. "Core Ultra
+    Processors (Series 3) HD Audio ") that ALSA/PipeWire prepend to every
+    port name on a device, then tidy up what's left."""
+    prefix = ""
+    if len(names) > 1:
+        prefix = os.path.commonprefix(names)
+        cut = prefix.rfind(" ")
+        prefix = prefix[: cut + 1] if cut != -1 else ""
+        if not (prefix and all(len(n) > len(prefix) for n in names)):
+            prefix = ""
+    return [cleanup_name(n[len(prefix):]) for n in names]
+
+
+def cleanup_name(name):
+    name = re.sub(r"HDMI\s*/\s*DisplayPort", "DisplayPort", name).strip()
+    if name in ("Speaker", "Speakers"):
+        name = "Built-In " + name
+    return name
+
+
 def get_sinks():
     out = subprocess.run(["wpctl", "status"], capture_output=True, text=True, check=True).stdout
     lines = out.splitlines()
@@ -65,6 +86,10 @@ def get_sinks():
             m = re.match(r"^[│\s]*(\*)?\s*(\d+)\.\s+(.*?)\s*\[vol:", stripped)
             if m and m.group(2) not in unavailable:
                 sinks.append({"id": m.group(2), "name": m.group(3).strip(), "default": m.group(1) is not None})
+
+    names = simplify_names([s["name"] for s in sinks])
+    for s, name in zip(sinks, names):
+        s["name"] = name
     return sinks
 
 
