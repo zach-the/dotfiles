@@ -25,7 +25,7 @@ alias lg='ls -lrgah | rg -i'
 alias nvs='nv -O'
 alias work='autossh -M 0 -t zb900042@lvnvda8240.lvn.broadcom.net "LAUNCH_NEW_TMUX=true exec bash -l"'
 alias color_test='for i in {0..7}; do printf "\e[48;5;${i}m  "; done; printf "\e[0m\n"; for i in {8..15}; do printf "\e[48;5;${i}m  "; done; printf "\e[0m\n"'
-alias zd='~/dotfiles/bin/zd'
+alias zd='~/dotfiles/bin/zd -vw'
 alias audio-combine='~/dotfiles/bin/audio-combine'
 alias pp='realpath'
 alias rs='rsync -aHAX --info=progress2'
@@ -77,7 +77,9 @@ tm() {
         # This allows multiple terminals to view different windows independently.
         # We also set destroy-unattached on the new session so it cleans up when detached.
         local group_session="${session_name}-$(date +%s)"
-        tmux new-session -t "$session_name" -s "$group_session" \; set-option -t "$group_session" destroy-unattached on
+        local parent_protected
+        parent_protected=$(tmux show-options -t "$session_name" -v @protected 2>/dev/null)
+        tmux new-session -t "$session_name" -s "$group_session" \; set-option -t "$group_session" destroy-unattached on \; set-option -t "$group_session" @protected "${parent_protected:-0}"
     fi
 }
 
