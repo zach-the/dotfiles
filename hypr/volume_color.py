@@ -1,30 +1,22 @@
 #!/usr/bin/env python3
 """Waybar custom/volume module: reports the default sink's volume via
-`wpctl` and colors the label along a grey -> green -> yellow -> orange ->
-red curve, mixed in OKLab the same way custom/battery does — see
-color_gradient.py.
+`wpctl` and colors the label by flat bands (no blending):
+    0%        -> grey   (@fg-muted)
+    0-85%     -> green  (@green)
+   85-100%    -> yellow (@yellow)
+  100-130%    -> orange (@orange)
+  130%+       -> red    (@pink)
+Muted is shown in that same grey regardless of the actual level, as a
+distinct "off" signal.
 
 Color stops come from waybar/colors.css (generated from the active
 palettes/*.toml by generate_colors.py), so switching palettes retints
-the volume gradient automatically:
-    0% -> grey/muted  (@fg-muted)
-   60% -> green       (@green), ramp from grey ends here
-  100% -> green       (@green), solid from 60% to here
-  120% -> yellow      (@yellow), full strength
-  135% -> orange      (@orange), full strength
-  150% -> red         (@pink), full strength from here up
-Muted is shown in that same 0% grey regardless of the actual level, as
-a distinct "off" signal.
+the volume module automatically.
 """
 import json
-import os
 import re
 import subprocess
-import sys
 from pathlib import Path
-
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from color_gradient import gradient_color
 
 COLORS_CSS = Path(__file__).resolve().parent.parent / "waybar" / "colors.css"
 SINK = "@DEFAULT_AUDIO_SINK@"
@@ -37,7 +29,15 @@ def load_palette_colors():
 
 
 def volume_color(pct, grey, green, yellow, orange, red):
-    return gradient_color(pct, [(0, grey), (60, green), (100, green), (120, yellow), (135, orange), (150, red)])
+    if pct <= 0:
+        return grey
+    if pct < 85:
+        return green
+    if pct < 100:
+        return yellow
+    if pct < 130:
+        return orange
+    return red
 
 
 def get_volume():

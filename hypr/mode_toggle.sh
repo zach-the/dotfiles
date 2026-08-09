@@ -76,11 +76,19 @@ case "$NEXT" in
         # make all future windows spawn floating too. Written to a
         # sourced file (not just `hyprctl keyword`) so the rule
         # survives any later `hyprctl reload`, not just this script's.
+        #
+        # Snapshot each window's current WIDE-TILE position/size
+        # *before* floating it, so the toggle itself is seamless —
+        # nothing jumps.
+        TILE_SNAPSHOT="$("$FLOAT_LAYOUT_SCRIPT" snapshot-tiled)"
         float_all
         echo 'windowrule = match:class ^(.*)$, float 1' > "$FLOAT_RULE_FILE"
         # Put back whatever position/size each window had the last
-        # time we left float mode, where a match (by address) exists.
+        # time we left float mode, where a match (by address) exists...
         "$FLOAT_LAYOUT_SCRIPT" restore
+        # ...then reapply the WIDE-TILE snapshot on top, so the layout
+        # you just left always wins over any older saved float session.
+        echo "$TILE_SNAPSHOT" | "$FLOAT_LAYOUT_SCRIPT" apply
         ;;
 esac
 

@@ -72,7 +72,7 @@ config.keys = {
 
   -- Font size
   { key = '+', mods = 'CTRL|SHIFT', action = act.IncreaseFontSize },
-  { key = '-', mods = 'CTRL|SHIFT', action = act.DecreaseFontSize },
+  { key = '_', mods = 'CTRL|SHIFT', action = act.DecreaseFontSize },
   { key = '0', mods = 'CTRL|SHIFT', action = act.ResetFontSize },
 
 

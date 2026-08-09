@@ -80,6 +80,7 @@
     "on-click-right": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle; ~/.config/hypr/volume_refresh.sh",
     "on-scroll-up": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 1%+ --limit 1.5; ~/.config/hypr/volume_refresh.sh",
     "on-scroll-down": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 1%-; ~/.config/hypr/volume_refresh.sh",
+    "smooth-scrolling-threshold": 0.2,
     "tooltip": false
   },
 
