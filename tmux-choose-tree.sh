@@ -9,9 +9,12 @@ trap 'rm -f "$list_file"' EXIT
 
 # Exclude session-group duplicates: tmux names these <session>-<10-digit
 # timestamp> when a session gets reattached/relinked into a group, and they
-# carry the same windows as the canonical session.
-tmux list-windows -a -F '#{session_name}	#{session_name}:#{window_index}	#{session_name} #{window_index}: #{window_name}#{?window_active, *,}' \
-    | grep -vE '^[^	]+-[0-9]{10}	' > "$list_file"
+# carry the same windows as the canonical session. Then insert an
+# unselectable divider row (empty target field) before each new session's
+# first window.
+tmux list-windows -a -F '#{session_name}	#{session_name}:#{window_index}	#{window_index}: #{window_name}#{?window_active, *,}' \
+    | grep -vE '^[^	]+-[0-9]{10}	' \
+    | awk -F'\t' '$1 != prev && NR > 1 { print $1 "\t\t── " $1 " ──" } { print; prev = $1 }' > "$list_file"
 
 sel=$(fzf-tmux -p 70%,60% -- \
     --reverse --delimiter=$'\t' --with-nth=3 \
@@ -22,4 +25,8 @@ sel=$(fzf-tmux -p 70%,60% -- \
     --bind "K:transform(~/dotfiles/tmux-choose-tree-jump.sh prev \$FZF_POS $list_file)" \
     < "$list_file")
 
-[ -n "$sel" ] && tmux switch-client -t "$(printf '%s' "$sel" | cut -f2)"
+if [ -n "$sel" ]; then
+    target=$(printf '%s' "$sel" | cut -f2)
+    [ -n "$target" ] && tmux switch-client -t "$target"
+fi
+exit 0
