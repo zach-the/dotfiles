@@ -6,10 +6,10 @@ alias grep='grep --color=auto'
 # alias rgs='rg -S'
 # alias zgs='rg -z -S'
 alias rg='rg -zS'
-alias fzv='tmp=$(fzf) && history -s "nvim \"$tmp\"" && echo "$tmp" && nvim "$tmp"'
-alias fzd='tmp=$(fd --type d -d 4 | fzf) && history -s "d \"$tmp\"" && echo "$tmp" && d "$tmp"'
+alias df='tmp=$(fd --type d -d 4 | fzf) && history -s "d \"$tmp\"" && echo "$tmp" && d "$tmp"'
 alias e='clear && exit'
 alias ll='ls -lrth'
+alias wcl='wc -l'
 alias l='ls -lh'
 alias la='ls -lah'
 alias dir='dir --color=auto'
@@ -23,6 +23,9 @@ alias tl='~/dotfiles/bin/tl'
 alias cp='cp -a'
 alias lg='ls -lrgah | rg -i'
 alias nvs='nv -O'
+alias nvr='nv -R'
+#proc nvg = open all files that match a grep input in split view
+#proc nvf = open all files that matcha fzf input in a split view
 alias work='autossh -M 0 -t zb900042@lvnvda8240.lvn.broadcom.net "LAUNCH_NEW_TMUX=true exec bash -l"'
 alias color_test='for i in {0..7}; do printf "\e[48;5;${i}m  "; done; printf "\e[0m\n"; for i in {8..15}; do printf "\e[48;5;${i}m  "; done; printf "\e[0m\n"'
 alias zd='~/dotfiles/bin/zd -vw'
@@ -75,11 +78,17 @@ tm() {
         
         # Create a new grouped session with a unique name based on time
         # This allows multiple terminals to view different windows independently.
-        # We also set destroy-unattached on the new session so it cleans up when detached.
+        # Clean it up on detach via a client-detached hook rather than the
+        # destroy-unattached option: that option is checked immediately when
+        # set, and this new session has zero attached clients until the
+        # new-session call above finishes handing off this client to it --
+        # setting destroy-unattached in that window destroys the session
+        # (and any option set on it, like @protected below) before it's ever
+        # used. A hook only fires on a real future detach, so it's race-free.
         local group_session="${session_name}-$(date +%s)"
         local parent_protected
         parent_protected=$(tmux show-options -t "$session_name" -v @protected 2>/dev/null)
-        tmux new-session -t "$session_name" -s "$group_session" \; set-option -t "$group_session" destroy-unattached on \; set-option -t "$group_session" @protected "${parent_protected:-0}"
+        tmux new-session -t "$session_name" -s "$group_session" \; set-hook -t "$group_session" client-detached "kill-session -t \"$group_session\"" \; set-option -t "$group_session" @protected "${parent_protected:-0}"
     fi
 }
 
@@ -91,7 +100,7 @@ nv() {
         return
     fi
 
-    local limit_mb=50
+    local limit_mb=100
     local limit_bytes=$((limit_mb * 1024 * 1024))
     local too_large=false
     local file_report=""
@@ -228,7 +237,7 @@ f() {
     fi
 }
 
-# --- Open all files that match a grep input in split fiew ---
+# --- Open all files that match a grep input in split view ---
 nvg() {
     local files=()
     for arg in "$@"; do
