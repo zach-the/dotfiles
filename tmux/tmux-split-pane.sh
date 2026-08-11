@@ -26,7 +26,10 @@ else
     resize_flag="-x"
 fi
 
-mapfile -t group < <(tmux list-panes -t "$pane_id" -F "$fields" \
+group=()   # not mapfile: macOS's /bin/bash (3.2, what the shebang always resolves to) predates it
+while IFS= read -r line; do
+    group+=("$line")
+done < <(tmux list-panes -t "$pane_id" -F "$fields" \
     | awk -v a="$match_a" -v b="$match_b" '$2 == a && $3 == b {print $1, $4}')
 
 count=${#group[@]}
