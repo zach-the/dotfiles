@@ -12,7 +12,7 @@
 -- HYPER (^⌥⌘⇧) KEYBIND MAP  —  [X] = bound   [ ] = free
 -- =====================================================================
 --
---  [ ][ ][ ][ ][ ][ ][ ][ ][ ][0][-][=]
+--  [ ][ ][ ][ ][4][5][6][7][8][9][0][-][=]
 --    [Q][W][E][ ][T][Y][U][I][O][P]
 --      [A][S][D][F][G][H][J][K][L]
 --         [Z][X][C][ ][ ][N][M]
@@ -35,8 +35,10 @@
 --   RETURN     → fullscreen
 --   - =        → resize smaller / larger
 --   0          → reload Hammerspoon config
+--   4 5 6      → sixths: upper-left / upper-middle / upper-right
+--   7 8 9      → sixths: lower-left / lower-middle / lower-right
 --
---   FREE: 1 2 3 4 5 6 7 8 9, R, B, V
+--   FREE: 1 2 3, R, B, V
 
 -- =====================================================================
 -- INSTRUCTIONS
@@ -412,6 +414,12 @@ local function third(n)
     end
 end
 
+local function sixth(row, col)
+    return function()
+        move(col/3, row/2, 1/3, 1/2)()
+    end
+end
+
 local function twoThirds(n)
     return function()
         local win = hs.window.focusedWindow()
@@ -766,6 +774,14 @@ hs.hotkey.bind(hyper, "D", third(3))
 -- Two Thirds (portrait monitor: horizontal; landscape: vertical)
 hs.hotkey.bind(hyper, "W", twoThirds(1))             -- First Two Thirds
 hs.hotkey.bind(hyper, "E", twoThirds(2))             -- Last Two Thirds
+
+-- Sixths (2 rows x 3 columns)
+hs.hotkey.bind(hyper, "4", sixth(0, 0))             -- Upper Left
+hs.hotkey.bind(hyper, "5", sixth(0, 1))             -- Upper Middle
+hs.hotkey.bind(hyper, "6", sixth(0, 2))             -- Upper Right
+hs.hotkey.bind(hyper, "7", sixth(1, 0))             -- Lower Left
+hs.hotkey.bind(hyper, "8", sixth(1, 1))             -- Lower Middle
+hs.hotkey.bind(hyper, "9", sixth(1, 2))             -- Lower Right
 
 -- Sizing & Restoration
 hs.hotkey.bind(hyper, "F", maximize)                -- Maximize
