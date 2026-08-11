@@ -30,5 +30,4 @@ while IFS= read -r s; do
     [ -n "$s" ] && tmux set-option -t "$s" @protected "$new"
 done <<< "$family"
 
-tmux display-popup -x C -y C -w 30 -h 3 -s "bg=colour1,fg=colour0" -S "bg=colour1,fg=colour0" \
-    -E "tput civis; echo \"  protected: $state  \"; sleep 1.5"
+tmux display-message "protected: $state"
