@@ -7,7 +7,11 @@
 list_file=$(mktemp)
 trap 'rm -f "$list_file"' EXIT
 
-tmux list-windows -a -F '#{session_name}	#{session_name}:#{window_index}	#{session_name} #{window_index}: #{window_name}#{?window_active, *,}' > "$list_file"
+# Exclude session-group duplicates: tmux names these <session>-<10-digit
+# timestamp> when a session gets reattached/relinked into a group, and they
+# carry the same windows as the canonical session.
+tmux list-windows -a -F '#{session_name}	#{session_name}:#{window_index}	#{session_name} #{window_index}: #{window_name}#{?window_active, *,}' \
+    | grep -vE '^[^	]+-[0-9]{10}	' > "$list_file"
 
 sel=$(fzf-tmux -p 70%,60% -- \
     --reverse --delimiter=$'\t' --with-nth=3 \
