@@ -8,8 +8,8 @@ config.disable_default_key_bindings = true
 local is_mac = wezterm.target_triple:find("darwin") ~= nil
 local is_linux = wezterm.target_triple:find("linux") ~= nil
 
-config.window_background_opacity = is_mac and 0.8 or 1.0
-config.text_background_opacity = is_mac and 0.8 or 1.0
+config.window_background_opacity = is_mac and 0.88 or 1.0
+config.text_background_opacity = is_mac and 0.88 or 1.0
 
 -- Font Configuration
 config.font = wezterm.font 'JetBrainsMono Nerd Font Mono'

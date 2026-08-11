@@ -530,7 +530,7 @@ def gen_nvim_colorscheme(p: dict, name: str) -> str:
 OUTPUTS = {
     "kitty/theme.conf":   gen_kitty_theme,
     "wezterm/colors.lua": gen_wezterm_colors,
-    "tmux-colors.conf":   gen_tmux_colors,
+    "tmux/tmux-colors.conf": gen_tmux_colors,
     "hypr/colors.conf":   gen_hypr_colors,
     "waybar/colors.css":  gen_waybar_css,
     "rofi-colors.rasi":   gen_rofi_colors,

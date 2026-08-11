@@ -16,7 +16,7 @@ else
 fi
 
 tmux set -g @transparent "$new"
-tmux source-file ~/dotfiles/tmux.conf
+tmux source-file ~/dotfiles/tmux/tmux.conf
 
 tmux display-popup -x C -y C -w 30 -h 3 -s "bg=colour2,fg=colour0" -S "bg=colour2,fg=colour0" \
     -E "tput civis; echo \"  $state  \"; sleep 1.5"

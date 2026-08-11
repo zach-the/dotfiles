@@ -23,7 +23,7 @@ universal_configs=(
   "Powerline Shell"  "$DOTFILES/powerline-shell.config.json"  "$HOME/.config/powerline-shell/config.json"
   "WezTerm"          "$DOTFILES/wezterm"                      "$HOME/.config/wezterm"
   # "Ghostty"          "$DOTFILES/ghostty-config"               "$HOME/.config/ghostty/config"
-  "TMUX"             "$DOTFILES/tmux.conf"                    "$HOME/.tmux.conf"
+  "TMUX"             "$DOTFILES/tmux/tmux.conf"               "$HOME/.tmux.conf"
 )
 
 linux_only_configs=(

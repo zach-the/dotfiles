@@ -1,5 +1,5 @@
 #!/bin/bash
-err=$(tmux source-file ~/dotfiles/tmux.conf 2>&1)
+err=$(tmux source-file ~/dotfiles/tmux/tmux.conf 2>&1)
 if [ -n "$err" ]; then
     printf "%s\n" "$err" > /tmp/_tmux_reload_err
     tmux display-popup -x C -y C -w 70 -h 8 -s "bg=colour1,fg=colour15" -S "bg=colour1,fg=colour15" \

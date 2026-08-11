@@ -22,8 +22,8 @@ sel=$(fzf-tmux -p 70%,60% -- \
     --prompt 'window> ' \
     --bind 'start:pos(2)' \
     --bind 'j:down,k:up' \
-    --bind "J:transform(~/dotfiles/tmux-choose-tree-jump.sh next \$FZF_POS $list_file)" \
-    --bind "K:transform(~/dotfiles/tmux-choose-tree-jump.sh prev \$FZF_POS $list_file)" \
+    --bind "J:transform(~/dotfiles/tmux/tmux-choose-tree-jump.sh next \$FZF_POS $list_file)" \
+    --bind "K:transform(~/dotfiles/tmux/tmux-choose-tree-jump.sh prev \$FZF_POS $list_file)" \
     < "$list_file")
 
 if [ -n "$sel" ]; then

@@ -13,7 +13,7 @@ Each top-level file or directory is a config that gets symlinked into the approp
 | Bash Aliases | `bash_aliases` | `~/.bash_aliases` |
 | Powerline Shell | `powerline-shell.config.json` | `~/.config/powerline-shell/config.json` |
 | WezTerm | `wezterm/` | `~/.config/wezterm` |
-| TMUX | `tmux.conf` | `~/.tmux.conf` |
+| TMUX | `tmux/tmux.conf` | `~/.tmux.conf` |
 | **macOS only** | | |
 | Hammerspoon | `hammerspoon-init.lua` | `~/.hammerspoon/init.lua` |
 | Karabiner | `karabiner/` | `~/.config/karabiner` |
