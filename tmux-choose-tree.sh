@@ -14,12 +14,13 @@ trap 'rm -f "$list_file"' EXIT
 # first window.
 tmux list-windows -a -F '#{session_name}	#{session_name}:#{window_index}	#{window_index}: #{window_name}#{?window_active, *,}' \
     | grep -vE '^[^	]+-[0-9]{10}	' \
-    | awk -F'\t' '$1 != prev && NR > 1 { print $1 "\t\t── " $1 " ──" } { print; prev = $1 }' > "$list_file"
+    | awk -F'\t' '$1 != prev { print $1 "\t\t── " $1 " ──" } { print; prev = $1 }' > "$list_file"
 
 sel=$(fzf-tmux -p 70%,60% -- \
     --reverse --delimiter=$'\t' --with-nth=3 \
     --header 'enter: switch    J/K: jump session    j/k: window' \
     --prompt 'window> ' \
+    --bind 'start:pos(2)' \
     --bind 'j:down,k:up' \
     --bind "J:transform(~/dotfiles/tmux-choose-tree-jump.sh next \$FZF_POS $list_file)" \
     --bind "K:transform(~/dotfiles/tmux-choose-tree-jump.sh prev \$FZF_POS $list_file)" \
