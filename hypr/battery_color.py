@@ -4,9 +4,11 @@ the label along a green -> yellow -> red curve, mixed in OKLab so the
 gradient stays perceptually smooth instead of drifting through the
 muddy tones a plain sRGB lerp produces between unrelated hues.
 
-Color stops come from waybar/colors.css (generated from the active
-palettes/*.toml by generate_colors.py), so switching palettes retints
-the battery gradient automatically:
+Color stops come from waybar/colors.css, a symlink toggled by
+waybar/toggle_colors.sh between the active palette (colors-neon.css,
+generated from palettes/*.toml by generate_colors.py) and a plain
+white scheme (colors-mono.css) — so switching palettes, or toggling
+mono mode, retints the battery gradient automatically:
   100% -> green   (@green)
    30% -> yellow  (@yellow), full strength
    20% -> orange  (@orange), full strength

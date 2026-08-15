@@ -9,9 +9,11 @@
 Muted is shown in that same grey regardless of the actual level, as a
 distinct "off" signal.
 
-Color stops come from waybar/colors.css (generated from the active
-palettes/*.toml by generate_colors.py), so switching palettes retints
-the volume module automatically.
+Color stops come from waybar/colors.css, a symlink toggled by
+waybar/toggle_colors.sh between the active palette (colors-neon.css,
+generated from palettes/*.toml by generate_colors.py) and a plain
+white scheme (colors-mono.css) — so switching palettes, or toggling
+mono mode, retints the volume module automatically.
 """
 import json
 import re

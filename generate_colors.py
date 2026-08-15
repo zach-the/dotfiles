@@ -532,7 +532,7 @@ OUTPUTS = {
     "wezterm/colors.lua": gen_wezterm_colors,
     "tmux/tmux-colors.conf": gen_tmux_colors,
     "hypr/colors.conf":   gen_hypr_colors,
-    "waybar/colors.css":  gen_waybar_css,
+    "waybar/colors-neon.css": gen_waybar_css,
     "rofi-colors.rasi":   gen_rofi_colors,
 }
 
@@ -552,6 +552,15 @@ def main():
         path = ROOT / rel
         path.write_text(generator(p, palette_name))
         print(f"  wrote {rel}")
+
+    # waybar/colors.css is a symlink toggled by waybar/toggle_colors.sh
+    # between colors-neon.css (this palette) and colors-mono.css (plain
+    # white). Only bootstrap it if missing — don't clobber the toggle
+    # state on a routine palette regeneration.
+    waybar_colors_link = ROOT / "waybar" / "colors.css"
+    if not waybar_colors_link.exists():
+        waybar_colors_link.symlink_to("colors-neon.css")
+        print("  linked waybar/colors.css -> colors-neon.css")
 
     if shutil.which("tmux"):
         in_session = "TMUX" in os.environ or subprocess.run(

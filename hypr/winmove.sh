@@ -124,10 +124,18 @@ def main():
     # subsequent moveactive (an absolute top-left, independent of size)
     # lands exactly where we want regardless of where the resize
     # center happened to be.
-    subprocess.run(
-        ["hyprctl", "dispatch", "resizeactive", f"exact {int(fw)} {int(fh)}"],
-        check=True,
-    )
+    #
+    # Sent twice: on a freshly mapped Firefox window, the FIRST
+    # resizeactive a window ever receives undershoots the requested
+    # width by a fixed ~26px (confirmed independent of target size;
+    # height is unaffected, other clients like wezterm don't do this
+    # at all) — a Firefox/GTK first-configure quirk, not a Hyprland or
+    # animation issue. The second call always lands exactly, so send
+    # it twice unconditionally; it's a no-op on windows that didn't
+    # need it.
+    resize_args = f"exact {int(fw)} {int(fh)}"
+    subprocess.run(["hyprctl", "dispatch", "resizeactive", resize_args], check=True)
+    subprocess.run(["hyprctl", "dispatch", "resizeactive", resize_args], check=True)
     subprocess.run(
         ["hyprctl", "dispatch", "moveactive", f"exact {int(fx)} {int(fy)}"],
         check=True,
