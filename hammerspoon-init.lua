@@ -31,7 +31,7 @@
 --   H L        → prev space / next space
 --   J K        → bottom-left / bottom-right quarter
 --   Z X C      → half-split (context-aware: portrait vs. landscape)
---   N M        → launch Chrome / minimize-all-except-active
+--   N M        → launch Chrome / launch Safari
 --   RETURN     → fullscreen
 --   - =        → resize smaller / larger
 --   0          → reload Hammerspoon config
@@ -825,6 +825,7 @@ hs.hotkey.bind({"ctrl", "shift"}, "K", function() startScroll(BASE_SPEED) end, s
 -- Terminal and Browser
 hs.hotkey.bind(hyper, "T", launchWezterm)
 hs.hotkey.bind(hyper, "N", launchChrome)
+hs.hotkey.bind(hyper, "M", function() hs.application.launchOrFocus("Safari") end)
 
 -- Block cmd+h everywhere except TigerVNC
 local stopCmdH = hs.hotkey.new({"cmd"}, "h", function() end)

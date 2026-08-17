@@ -410,6 +410,23 @@ def generate_full_diff(file1, file2, ignore_ws=False, out=None, term_width=None)
 
     return has_diff
 
+def diverging_title(file1, file2):
+    """Build a '<left> <-> <right>' title showing paths from their first differing
+    directory onward, instead of just the basenames (which collide when two files
+    share a name but live in different directories)."""
+    abs1, abs2 = os.path.abspath(file1), os.path.abspath(file2)
+    try:
+        common = os.path.commonpath([abs1, abs2])
+    except ValueError:
+        common = None
+    if common and common != abs1 and common != abs2:
+        left = os.path.relpath(abs1, common)
+        right = os.path.relpath(abs2, common)
+    else:
+        left = os.path.basename(file1)
+        right = os.path.basename(file2)
+    return f"{left} <-> {right}"
+
 def read_key(fd):
     """Read a key or escape sequence from fd; returns bytes."""
     c = os.read(fd, 1)
@@ -725,7 +742,7 @@ def main():
                 buf = io.StringIO()
                 has_diff = generate_full_diff(files[0], files[1], ignore_ws=ignore_ws, out=buf)
                 run_viewer(buf.getvalue().splitlines(),
-                           title=f"{os.path.basename(files[0])} <-> {os.path.basename(files[1])}",
+                           title=diverging_title(files[0], files[1]),
                            regenerate=_regen_full)
                 sys.exit(1 if has_diff else 0)
             else:
@@ -748,7 +765,7 @@ def main():
                 buf = io.StringIO()
                 process_diff(iter(raw_diff), buf, ignore_ws=ignore_ws)
                 run_viewer(buf.getvalue().splitlines(),
-                           title=f"{os.path.basename(files[0])} <-> {os.path.basename(files[1])}",
+                           title=diverging_title(files[0], files[1]),
                            regenerate=_regen_diff)
                 sys.exit(rc)
             else:
