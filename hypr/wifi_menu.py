@@ -27,6 +27,8 @@ CLASS = "wifi-menu"
 MAX_NETWORKS = 10
 CONNECT_TIMEOUT = 15  # seconds; bounds nmcli's worst-case hang on a bad attempt
 SCRIPT_PATH = os.path.abspath(__file__)
+LOAD_DOT_INTERVAL = 1.0  # seconds between "Loading networks" ellipsis ticks
+LOAD_DOT_MAX = 3  # cycles 0..LOAD_DOT_MAX dots, then wraps
 
 # Matches wifi_menu_launch.sh's placeholder size logic conceptually:
 # header + blank spacer + bottom padding, around however many network
@@ -62,13 +64,22 @@ def get_networks():
             signal_i = int(signal)
         except ValueError:
             signal_i = 0
+        connected = in_use.strip() == "*"
         existing = by_ssid.get(ssid)
-        if existing is None or signal_i > existing["signal"]:
+        # Prefer whichever entry is actually connected over raw signal
+        # strength: hotel/mesh Wi-Fi often broadcasts the same SSID from
+        # several APs, and the one you're on isn't necessarily the
+        # strongest — picking by signal alone could silently replace the
+        # connected entry with an unconnected one of the same name,
+        # dropping the "connected" flag entirely.
+        if existing is None or (connected and not existing["connected"]) or (
+            connected == existing["connected"] and signal_i > existing["signal"]
+        ):
             by_ssid[ssid] = {
                 "ssid": ssid,
                 "signal": signal_i,
                 "secured": security.strip() != "",
-                "connected": in_use.strip() == "*",
+                "connected": connected,
             }
 
     networks = sorted(by_ssid.values(), key=lambda n: (not n["connected"], -n["signal"]))
@@ -144,6 +155,9 @@ def main(stdscr, close_event, own_addr, preloaded, restore_value):
     row_start = 2
     hover = None
 
+    load_started = None  # time.time() loading kicked off, for the "Loading networks" ellipsis animation
+    load_dots = 0
+
     if preloaded is not None:
         # Respawned by an earlier instance once it knew the real network
         # count (see below) — already sized correctly, nothing to load.
@@ -152,7 +166,7 @@ def main(stdscr, close_event, own_addr, preloaded, restore_value):
         networks_ready = None
     else:
         stdscr.addstr(0, 1, "Wi-Fi Networks", curses.A_BOLD)
-        stdscr.addstr(row_start, 1, "Loading networks...", curses.A_DIM)
+        stdscr.addstr(row_start, 1, "Loading networks", curses.A_DIM)
         stdscr.refresh()
         # nmcli's scan can take a few seconds — run it in the background
         # so the getch() loop below keeps polling close_event the whole
@@ -161,6 +175,7 @@ def main(stdscr, close_event, own_addr, preloaded, restore_value):
         networks_ready = queue.Queue()
         threading.Thread(target=lambda: networks_ready.put(get_networks()), daemon=True).start()
         networks = None
+        load_started = time.time()
 
     def finish(ssid, row):
         refreshed = get_networks()
@@ -189,7 +204,20 @@ def main(stdscr, close_event, own_addr, preloaded, restore_value):
             try:
                 networks = networks_ready.get_nowait()
             except queue.Empty:
-                pass
+                dots = int((time.time() - load_started) / LOAD_DOT_INTERVAL) % (LOAD_DOT_MAX + 1)
+                if dots != load_dots:
+                    load_dots = dots
+                    try:
+                        # clrtoeol first: dots wrap from LOAD_DOT_MAX back to
+                        # 0, and that's a shorter string than what's already
+                        # on screen — a plain addstr would leave stale
+                        # trailing dots from the longer previous frame.
+                        stdscr.move(row_start, 1)
+                        stdscr.clrtoeol()
+                        stdscr.addstr(row_start, 1, "Loading networks" + "." * load_dots, curses.A_DIM)
+                        stdscr.refresh()
+                    except curses.error:
+                        pass
             else:
                 rows = max(MIN_ROWS, min(MAX_ROWS, ROW_OVERHEAD + max(len(networks), 1)))
                 if rows != MIN_ROWS and own_addr:

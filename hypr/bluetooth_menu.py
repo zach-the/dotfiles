@@ -33,18 +33,24 @@ import popup_launch
 
 CLASS = "bluetooth-menu"
 ACTION_TIMEOUT = 15  # seconds; bounds a connect/disconnect attempt
-SCAN_DURATION = 5  # seconds; how long a "Search" click scans for nearby devices
+SCAN_DURATION = 12  # seconds; how long a "Search" click scans for nearby devices
 MAX_AVAILABLE = 10  # cap on discovered-but-unpaired devices shown, same idea as wifi_menu.py's MAX_NETWORKS
 SEARCH_LABEL = "Search"
 SCRIPT_PATH = os.path.abspath(__file__)
+SEARCH_DOT_INTERVAL = 1.0  # seconds between "Searching" ellipsis ticks
+SEARCH_DOT_MAX = 3  # cycles 0..SEARCH_DOT_MAX dots, then wraps
 
 # Matches bluetooth_menu_launch.sh's placeholder size logic — must stay in
 # sync with the constants of the same name there, since --count's output
 # (fed through that same formula) is what sizes the popup at launch, while
 # these are used to decide whether a post-search respawn needs to happen.
+# ROW_OVERHEAD budgets 4 non-content rows: the header, a blank spacer
+# before content, a blank spacer before the footer, and the footer line
+# itself — draw()'s footer_row lands exactly on window height (one past
+# the last valid row index) if this is short by even one.
 MIN_ROWS = 4
 MAX_ROWS = 15
-ROW_OVERHEAD = 3
+ROW_OVERHEAD = 4
 
 
 def is_powered():
@@ -94,21 +100,51 @@ def get_devices():
 
     # Excludes devices that haven't broadcast a real name: bluetoothctl
     # falls back to the address itself (dashed) as the alias for those,
-    # which isn't useful to pick out of a list.
+    # which isn't useful to pick out of a list. Also excludes bare-digit
+    # names: ambient BLE beacons/trackers nearby (fitness bands, etc.)
+    # advertise short numeric names, and in a noisy area there can be
+    # dozens of them — sorting alphabetically before the MAX_AVAILABLE
+    # cap would otherwise bury real devices (e.g. "MX Anywhere 2S")
+    # under a pile of "909", "1009", "1010", ... entries.
     available = [
         d for d in all_devices
-        if d["mac"] not in paired_macs and d["name"] != d["mac"].replace(":", "-")
+        if d["mac"] not in paired_macs
+        and d["name"] != d["mac"].replace(":", "-")
+        and not d["name"].isdigit()
     ]
     available.sort(key=lambda d: d["name"])
     return paired, available[:MAX_AVAILABLE]
 
 
-def start_toggle(mac, connected):
-    """Kick off a connect/disconnect in the background and return the Popen
-    handle to poll. Runs detached (own session, no inherited stdio) so
-    bluetoothctl keeps running to completion even if the popup window
-    closes — e.g. the mouse moving off it — while it's still in flight."""
-    cmd = ["bluetoothctl", "--timeout", str(ACTION_TIMEOUT), "disconnect" if connected else "connect", mac]
+def start_toggle(mac, connected, kind):
+    """Kick off a pair/connect/disconnect in the background and return the
+    Popen handle to poll. Runs detached (own session, no inherited stdio)
+    so bluetoothctl keeps running to completion even if the popup window
+    closes — e.g. the mouse moving off it — while it's still in flight.
+
+    A device that isn't paired yet (kind == "available") gets `pair`, not
+    `connect`: per bluetoothctl's own man page, `pair` bonds, trusts, AND
+    connects as one flow, while `connect` just opens the ATT link and lets
+    profile drivers (hog-lib, deviceinfo, ...) start probing GATT
+    characteristics immediately — without necessarily finishing SMP
+    bonding first. That produced exactly the failure mode seen live on
+    this box: bluetoothd reporting Connected: yes but Paired/Bonded: no,
+    with every characteristic read failing ("Unlikely Error") since the
+    link was never actually encrypted. `pair` must never be used on an
+    already-paired device though — the man page warns it removes the
+    existing pairing first — so a "known" row still gets connect/disconnect.
+
+    Either way this relies on bluetooth_agent.sh (autostarted by Hyprland)
+    already holding a NoInputNoOutput default agent registered for the
+    whole session — pairing requires one to be selected, and a one-shot
+    invocation exits (dropping any agent it registered itself) the instant
+    its single command resolves, typically before an async confirmation
+    request would even arrive."""
+    if kind == "available":
+        verb = "pair"
+    else:
+        verb = "disconnect" if connected else "connect"
+    cmd = ["bluetoothctl", "--timeout", str(ACTION_TIMEOUT), verb, mac]
     return subprocess.Popen(
         cmd,
         stdin=subprocess.DEVNULL,
@@ -130,6 +166,27 @@ def start_scan():
         stderr=subprocess.DEVNULL,
         start_new_session=True,
     )
+
+
+def device_path(mac):
+    return "/org/bluez/hci0/dev_" + mac.replace(":", "_")
+
+
+def rename_device(mac, alias):
+    """set-alias only operates on bluetoothctl's own "current device"
+    state (and per testing, only works at all when that device is
+    currently connected — "No device connected" otherwise), which a
+    one-shot invocation has no clean way to establish. Alias is just a
+    local BlueZ property, so setting it directly over D-Bus sidesteps
+    that entirely."""
+    subprocess.run(
+        ["busctl", "set-property", "org.bluez", device_path(mac), "org.bluez.Device1", "Alias", "s", alias],
+        capture_output=True, check=False,
+    )
+
+
+def forget_device(mac):
+    subprocess.run(["bluetoothctl", "remove", mac], capture_output=True, check=False)
 
 
 def total_rows(paired, available):
@@ -216,6 +273,79 @@ def _find_mac(items, mac):
     return next((i for i, d in enumerate(items) if d["mac"] == mac), None)
 
 
+DEVICE_MENU_OPTIONS = ["Rename", "Forget"]
+
+
+def device_menu(stdscr, device, close_event):
+    """Blocking right-click context menu for a paired device. Returns
+    "rename", "forget", or None if dismissed (Escape, or clicking
+    anywhere that isn't one of the two options) — mirrors
+    wifi_menu.py's prompt_password() as a modal that takes over the
+    whole popup for its duration."""
+    stdscr.timeout(100)
+    hover = None
+    max_col = max(curses.COLS - 2, 1)
+    while not close_event.is_set():
+        stdscr.erase()
+        stdscr.addstr(0, 1, device["name"][:max_col], curses.A_BOLD)
+        for i, label in enumerate(DEVICE_MENU_OPTIONS):
+            popup_common.draw_row(stdscr, 2 + i, 1, "", label, hover == i, max_col)
+        stdscr.addstr(2 + len(DEVICE_MENU_OPTIONS) + 1, 1, "esc or click outside to cancel"[:max_col], curses.A_DIM)
+        stdscr.refresh()
+
+        key = stdscr.getch()
+        if key == 27:
+            return None
+        if key != curses.KEY_MOUSE:
+            continue
+        try:
+            _, mx, my, _, bstate = curses.getmouse()
+        except curses.error:
+            continue
+        row = my - 2
+        new_hover = row if 0 <= row < len(DEVICE_MENU_OPTIONS) else None
+        if new_hover != hover:
+            hover = new_hover
+        clicked = bstate & (curses.BUTTON1_CLICKED | curses.BUTTON1_PRESSED | curses.BUTTON1_RELEASED)
+        if clicked:
+            return DEVICE_MENU_OPTIONS[hover].lower() if hover is not None else None
+    return None
+
+
+def prompt_rename(stdscr, current_name, close_event):
+    """Blocking (but close_event-aware) alias entry, pre-filled with the
+    device's current name — same idiom as wifi_menu.py's
+    prompt_password(). Returns the entered string, or None if
+    cancelled/dismissed/left unchanged and empty."""
+    curses.curs_set(1)
+    stdscr.timeout(100)
+    buf = current_name
+    max_col = max(curses.COLS - 3, 1)
+    try:
+        while not close_event.is_set():
+            stdscr.erase()
+            stdscr.addstr(0, 1, "Rename device"[:max_col], curses.A_BOLD)
+            stdscr.addstr(2, 1, ("> " + buf)[:max_col])
+            stdscr.addstr(4, 1, "enter to save . esc to cancel"[:max_col], curses.A_DIM)
+            stdscr.refresh()
+
+            key = stdscr.getch()
+            if key == -1:
+                continue
+            if key == 27:
+                return None
+            elif key in (curses.KEY_ENTER, 10, 13):
+                new_name = buf.strip()
+                return new_name if new_name and new_name != current_name else None
+            elif key in (curses.KEY_BACKSPACE, 127, 8):
+                buf = buf[:-1]
+            elif 32 <= key < 127:
+                buf += chr(key)
+        return None
+    finally:
+        curses.curs_set(0)
+
+
 def main(stdscr, close_event, own_addr, preloaded=None, restore_value="1"):
     curses.curs_set(0)
     curses.mousemask(curses.ALL_MOUSE_EVENTS | curses.REPORT_MOUSE_POSITION)
@@ -238,6 +368,8 @@ def main(stdscr, close_event, own_addr, preloaded=None, restore_value="1"):
     hover = None
     pending = None  # {"proc", "mac", "kind"} while a connect/disconnect runs in the background
     scanning = None  # Popen while a Search scan runs in the background
+    scan_started = None  # time.time() a scan kicked off, for the "Searching" ellipsis animation
+    scan_dots = 0
 
     draw(stdscr, devices, available, hover, powered)
     while not close_event.is_set():
@@ -245,15 +377,20 @@ def main(stdscr, close_event, own_addr, preloaded=None, restore_value="1"):
 
         # Runs every iteration (stdscr.timeout(100) guarantees one even
         # without mouse activity) rather than blocking on the subprocess,
-        # so hover/close_event stay responsive while a connect/disconnect
-        # is in flight.
+        # so hover/close_event, and the "Searching" ellipsis, stay
+        # responsive while a scan or a connect/disconnect is in flight.
+        if scanning is not None and pending is None:
+            dots = int((time.time() - scan_started) / SEARCH_DOT_INTERVAL) % (SEARCH_DOT_MAX + 1)
+            if dots != scan_dots:
+                scan_dots = dots
+                draw(stdscr, devices, available, hover, powered, "Searching" + "." * scan_dots)
+
         if pending is not None and pending["proc"].poll() is not None:
             ok = pending["proc"].returncode == 0
             subprocess.run(["pkill", "-RTMIN+9", "waybar"], capture_output=True, check=False)
-            if ok and pending["kind"] == "available":
-                # Newly paired — trust it so future reconnects don't need
-                # another search/confirm dance.
-                subprocess.run(["bluetoothctl", "trust", pending["mac"]], capture_output=True, check=False)
+            # No separate trust step needed here — for kind == "available"
+            # the pending action was `pair`, which already trusts as part
+            # of its bond+trust+connect flow.
             devices, available = get_devices()
             idx = _find_mac(devices, pending["mac"])
             if idx is not None:
@@ -269,34 +406,40 @@ def main(stdscr, close_event, own_addr, preloaded=None, restore_value="1"):
 
         if scanning is not None and scanning.poll() is not None:
             scanning = None
-            devices, available = get_devices()
-            new_rows = clamp_rows(total_rows(devices, available))
-            if new_rows != current_rows and own_addr:
-                win = next((c for c in popup_launch.hyprctl_json("clients") if c["address"] == own_addr), None)
-                if win:
-                    with tempfile.NamedTemporaryFile(
-                        mode="w", suffix=".json", prefix="bluetooth_menu_", delete=False
-                    ) as f:
-                        json.dump([devices, available], f)
-                        tmp_path = f.name
-                    anchor_x, anchor_y = win["at"]
-                    new_addr = popup_launch.respawn(
-                        CLASS, SCRIPT_PATH,
-                        ["--devices-file", tmp_path, "--restore-follow-mouse", restore_value],
-                        new_rows, anchor_x, anchor_y,
-                    )
-                    if new_addr:
-                        subprocess.run(
-                            ["hyprctl", "dispatch", "closewindow", f"address:{own_addr}"],
-                            capture_output=True, check=False,
+            # If a connect/disconnect is mid-flight, its "hover" is a
+            # (kind, index) pair into the *current* devices/available lists —
+            # refreshing those lists now could shift what that index points
+            # at. Just drop the finished-scan marker and let the
+            # pending-completion branch above do the refresh once it's done.
+            if pending is None:
+                devices, available = get_devices()
+                new_rows = clamp_rows(total_rows(devices, available))
+                if new_rows != current_rows and own_addr:
+                    win = next((c for c in popup_launch.hyprctl_json("clients") if c["address"] == own_addr), None)
+                    if win:
+                        with tempfile.NamedTemporaryFile(
+                            mode="w", suffix=".json", prefix="bluetooth_menu_", delete=False
+                        ) as f:
+                            json.dump([devices, available], f)
+                            tmp_path = f.name
+                        anchor_x, anchor_y = win["at"]
+                        new_addr = popup_launch.respawn(
+                            CLASS, SCRIPT_PATH,
+                            ["--devices-file", tmp_path, "--restore-follow-mouse", restore_value],
+                            new_rows, anchor_x, anchor_y,
                         )
-                        return True  # handoff: the new instance owns follow_mouse restore now
-                    try:
-                        os.remove(tmp_path)
-                    except OSError:
-                        pass
-            hover = None
-            draw(stdscr, devices, available, hover, powered)
+                        if new_addr:
+                            subprocess.run(
+                                ["hyprctl", "dispatch", "closewindow", f"address:{own_addr}"],
+                                capture_output=True, check=False,
+                            )
+                            return True  # handoff: the new instance owns follow_mouse restore now
+                        try:
+                            os.remove(tmp_path)
+                        except OSError:
+                            pass
+                hover = None
+                draw(stdscr, devices, available, hover, powered)
 
         if key != curses.KEY_MOUSE:
             continue
@@ -315,17 +458,48 @@ def main(stdscr, close_event, own_addr, preloaded=None, restore_value="1"):
         else:
             new_hover = hit_test(row, devices, available)
 
-        if pending is None and scanning is None and new_hover != hover:
+        # A background scan no longer locks the rest of the popup — only a
+        # pending connect/disconnect does (it owns the single `pending` slot
+        # and its hover/status), so known and available rows stay clickable
+        # while "Search" is still running.
+        if pending is None and new_hover != hover:
             hover = new_hover
-            draw(stdscr, devices, available, hover, powered)
+            status = ("Searching" + "." * scan_dots) if scanning is not None else None
+            draw(stdscr, devices, available, hover, powered, status)
+
+        right_clicked = bstate & (curses.BUTTON3_CLICKED | curses.BUTTON3_PRESSED | curses.BUTTON3_RELEASED)
+        if right_clicked and pending is None and powered:
+            target = hit_test(row, devices, available)
+            if target is not None and target[0] == "known":
+                d = devices[target[1]]
+                action = device_menu(stdscr, d, close_event)
+                if action == "forget":
+                    forget_device(d["mac"])
+                    subprocess.run(["pkill", "-RTMIN+9", "waybar"], capture_output=True, check=False)
+                    devices, available = get_devices()
+                    hover = None
+                elif action == "rename":
+                    new_name = prompt_rename(stdscr, d["name"], close_event)
+                    if new_name:
+                        rename_device(d["mac"], new_name)
+                    devices, available = get_devices()
+                    idx = _find_mac(devices, d["mac"])
+                    hover = ("known", idx) if idx is not None else None
+                else:
+                    hover = target
+                draw(stdscr, devices, available, hover, powered)
+            continue
 
         clicked = bstate & (curses.BUTTON1_CLICKED | curses.BUTTON1_PRESSED | curses.BUTTON1_RELEASED)
-        if not clicked or pending is not None or scanning is not None:
+        if not clicked or pending is not None:
             continue
 
         if over_search:
-            scanning = start_scan()
-            draw(stdscr, devices, available, hover, powered, "Searching...")
+            if scanning is None:
+                scanning = start_scan()
+                scan_started = time.time()
+                scan_dots = 0
+                draw(stdscr, devices, available, hover, powered, "Searching")
             continue
 
         if not powered:
@@ -344,9 +518,12 @@ def main(stdscr, close_event, own_addr, preloaded=None, restore_value="1"):
             kind, i = target
             d = (devices if kind == "known" else available)[i]
             connected = d.get("connected", False)
-            verb = "Disconnecting from" if connected else "Connecting to"
+            if kind == "available":
+                verb = "Pairing with"
+            else:
+                verb = "Disconnecting from" if connected else "Connecting to"
             draw(stdscr, devices, available, target, powered, f"{verb} {d['name']}...")
-            pending = {"proc": start_toggle(d["mac"], connected), "mac": d["mac"], "kind": kind}
+            pending = {"proc": start_toggle(d["mac"], connected, kind), "mac": d["mac"], "kind": kind}
     return False
 
 

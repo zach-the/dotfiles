@@ -15,7 +15,7 @@ import popup_launch
 
 MIN_ROWS = 4
 MAX_ROWS = 15
-ROW_OVERHEAD = 3
+ROW_OVERHEAD = 4  # must match bluetooth_menu.py's constant of the same name
 
 SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bluetooth_menu.py")
 
