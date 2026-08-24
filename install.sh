@@ -38,6 +38,7 @@ linux_only_configs=(
 mac_only_configs=(
   "Hammerspoon"      "$DOTFILES/hammerspoon-init.lua"         "$HOME/.hammerspoon/init.lua"
   "Karabiner"        "$DOTFILES/karabiner"                    "$HOME/.config/karabiner"
+  "JankyBorders"     "$DOTFILES/borders/bordersrc"            "$HOME/.config/borders/bordersrc"
 )
 
 # Build the active config list based on OS

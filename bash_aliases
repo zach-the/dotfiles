@@ -92,7 +92,8 @@ tm() {
     fi
 }
 
-# safe nvim (any file over 50mb will automatically use less/zless)
+# safe nvim (any file over 200mb uses a stripped-down nvim; over 1.5gb uses less/zless)
+# nvs/nvr are aliases to this function, so they inherit the same behavior.
 nv() {
     # 1. No arguments? Just open nvim.
     if [ "$#" -eq 0 ]; then
@@ -100,12 +101,17 @@ nv() {
         return
     fi
 
-    local limit_mb=100
-    local limit_bytes=$((limit_mb * 1024 * 1024))
-    local too_large=false
+    local normal_limit_mb=200
+    local hard_limit_mb=1536 # 1.5gb
+    local normal_limit_bytes=$((normal_limit_mb * 1024 * 1024))
+    local hard_limit_bytes=$((hard_limit_mb * 1024 * 1024))
+
+    local max_size_bytes=0
+    local any_medium=false
+    local any_large=false
     local file_report=""
-    
-    # Variables to cache single-file data so we don't recalculate in Step 4
+
+    # Variables to cache single-file data so we don't recalculate later
     local single_human_size=""
     local single_is_gz=false
 
@@ -135,32 +141,37 @@ nv() {
                 printf "%.1f%s", size, unit[i]
             }')
 
-            # Cache for Step 4 (only matters if 1 file is passed)
+            # Cache for later (only matters if 1 file is passed)
             single_human_size="$size_human"
             single_is_gz="$is_gz"
 
-            # Safety check: ensure size_bytes is a number before comparing
-            if [ "${size_bytes:-0}" -gt "$limit_bytes" ]; then
-                too_large=true
+            if [ "${size_bytes:-0}" -gt "${max_size_bytes:-0}" ]; then
+                max_size_bytes="$size_bytes"
+            fi
+
+            if [ "${size_bytes:-0}" -gt "$hard_limit_bytes" ]; then
+                any_large=true
                 local label=$([ "$is_gz" = true ] && echo "uncompressed " || echo "")
-                file_report+="\e[31m-> $file ($size_human ${label})[OVER LIMIT]\e[0m\n"
+                file_report+="\e[31m-> $file ($size_human ${label})[OVER ${hard_limit_mb}MB]\e[0m\n"
+            elif [ "${size_bytes:-0}" -gt "$normal_limit_bytes" ]; then
+                any_medium=true
+                local label=$([ "$is_gz" = true ] && echo "uncompressed " || echo "")
+                file_report+="\e[33m-> $file ($size_human ${label})[OVER ${normal_limit_mb}MB]\e[0m\n"
             else
                 file_report+="   $file ($size_human)\n"
             fi
         fi
     done
 
-    # 3. Multi-file Logic: Abort if any file is > limit
-    if [ "$#" -gt 1 ] && [ "$too_large" = true ]; then
-        echo -e "\e[31mMulti-file open aborted. One or more files exceed ${limit_mb}MB:\e[0m\n"
-        echo -e "$file_report"
-        return 1
-    fi
+    # 3. Any file over the hard limit: bail out to less/zless (multi-file too large to reason about)
+    if [ "$any_large" = true ]; then
+        if [ "$#" -gt 1 ]; then
+            echo -e "\e[31mMulti-file open aborted. One or more files exceed ${hard_limit_mb}MB:\e[0m\n"
+            echo -e "$file_report"
+            return 1
+        fi
 
-    # 4. Single-file Logic: Auto-switch to less/zless
-    if [ "$#" -eq 1 ] && [ "$too_large" = true ]; then
         echo -e "\e[31mFile is too large for Neovim ($single_human_size).\e[0m"
-        
         if [ "$single_is_gz" = true ]; then
             echo "Opening with 'zless' in 1 seconds..."
             sleep 1
@@ -170,6 +181,42 @@ nv() {
             sleep 1
             less "$1"
         fi
+        return
+    fi
+
+    # 4. Medium files (200mb-1.5gb): check available RAM before using the stripped-down nvim
+    if [ "$any_medium" = true ]; then
+        if command -v free >/dev/null 2>&1; then
+            # nvim needs roughly 2x a file's size in RAM to load it comfortably
+            local needed_bytes=$((max_size_bytes * 2))
+            local avail_bytes
+            avail_bytes=$(free -b | awk '/^Mem:/ {print $7}')
+
+            if [ -n "$avail_bytes" ] && [ "$avail_bytes" -lt "$needed_bytes" ]; then
+                echo -e "\e[31mNot enough free RAM to safely open this in Neovim:\e[0m"
+                free -h
+                echo -e "$file_report"
+
+                if [ "$#" -eq 1 ]; then
+                    if [ "$single_is_gz" = true ]; then
+                        echo "Opening with 'zless' in 1 seconds..."
+                        sleep 1
+                        zless "$1"
+                    else
+                        echo "Opening with 'less' in 1 seconds..."
+                        sleep 1
+                        less "$1"
+                    fi
+                else
+                    echo "Open these individually with 'less' instead."
+                fi
+                return
+            fi
+        fi
+
+        echo -e "\e[33mLarge file(s) detected, opening with a stripped-down Neovim:\e[0m"
+        echo -e "$file_report"
+        command nvim --clean -n -c "syntax off | set nonumber nonrelativenumber | filetype off" "$@"
         return
     fi
 

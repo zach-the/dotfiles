@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Mirrors the border look from hypr/colors.conf + hypr/hyprland.conf:
+#   active:   gradient rgba(33ccffcc) -> rgba(00ff9988), 45deg
+#   inactive: rgba(595959aa)
+#   rounding: 10 (decoration.rounding) -> style=round
+
+options=(
+  style=round
+  width=5.0
+  hidpi=on
+  active_color="gradient(top_left=0xcc33ccff,bottom_right=0x8800ff99)"
+  inactive_color=0xaa595959
+)
+
+borders "${options[@]}"
