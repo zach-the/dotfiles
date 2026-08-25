@@ -64,7 +64,7 @@ tm() {
     local display
     display=$(printf '%s\n' "$sessions" | sed 's/^[0-9][0-9]*$/session #&/')
 
-    choice=$(printf "%s\n%s" "$display" "$new_label" | fzf --cycle --prompt="tmux> ")
+    choice=$(printf "%s\n%s" "$display" "$new_label" | fzf --prompt="tmux> ")
     [[ -z "$choice" ]] && return
 
     if [[ "$choice" == "$new_label" ]]; then
@@ -227,7 +227,7 @@ nv() {
 
 # better fzf alias
 fzf() {
-    command fzf --height=40% --layout=reverse --border --margin=2% --bind "ctrl-j:down,ctrl-k:up" "$@"
+    command fzf --height=40% --layout=reverse --border --margin=2% --cycle --bind "ctrl-j:down,ctrl-k:up" "$@"
 }
 
 # --- Helper function ---

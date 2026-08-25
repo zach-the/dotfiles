@@ -15,7 +15,7 @@ fi
 
 cur_session="${win%%:*}"
 sessions=$(tmux list-sessions -F '#{session_name}' | grep -vE '^.+-[0-9]{10}$' | grep -v "^${cur_session}$")
-dst=$(printf '%s\n%s' "+ new session" "$sessions" | fzf-tmux -p 60%,40% -- --reverse --prompt="Move window to: ")
+dst=$(printf '%s\n%s' "+ new session" "$sessions" | fzf-tmux -p 60%,40% -- --reverse --cycle --prompt="Move window to: ")
 
 if [ "$dst" = "+ new session" ]; then
     tmux command-prompt -p "New session name: " "run-shell \"~/dotfiles/tmux/tmux-move-window.sh '$win' --create '%%'\""

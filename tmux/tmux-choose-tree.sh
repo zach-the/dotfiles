@@ -17,7 +17,7 @@ tmux list-windows -a -F '#{session_name}	#{session_name}:#{window_index}	#{windo
     | awk -F'\t' '$1 != prev { print $1 "\t\t── " $1 " ──" } { print; prev = $1 }' > "$list_file"
 
 sel=$(fzf-tmux -p 70%,60% -- \
-    --reverse --delimiter=$'\t' --with-nth=3 \
+    --reverse --cycle --delimiter=$'\t' --with-nth=3 \
     --header 'enter: switch    J/K: jump session    j/k: window' \
     --prompt 'window> ' \
     --bind 'start:pos(2)' \
