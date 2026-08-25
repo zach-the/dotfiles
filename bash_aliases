@@ -64,7 +64,7 @@ tm() {
     local display
     display=$(printf '%s\n' "$sessions" | sed 's/^[0-9][0-9]*$/session #&/')
 
-    choice=$(printf "%s\n%s" "$display" "$new_label" | fzf --prompt="tmux> ")
+    choice=$(printf "%s\n%s" "$display" "$new_label" | fzf --cycle --prompt="tmux> ")
     [[ -z "$choice" ]] && return
 
     if [[ "$choice" == "$new_label" ]]; then
