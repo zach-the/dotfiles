@@ -8,7 +8,7 @@
   "margin-right": 8,
   "margin-bottom": -10, // should always be opposite of gaps_out in hyprland.conf
 
-  "modules-left": ["clock", "custom/mode"],
+  "modules-left": ["clock", "custom/mode", "custom/window"],
   "modules-center": ["hyprland/workspaces"],
   "modules-right": ["custom/volume", "custom/bluetooth", "network", "backlight", "custom/battery"], //tray was here, but i removed it. look into optimizing that and figurig out system76-power later
 
@@ -58,6 +58,13 @@
     "interval": "once",
     "signal": 8,
     "on-click": "~/.config/hypr/mode_toggle.sh",
+    "tooltip": false
+  },
+
+  "custom/window": {
+    "exec": "~/.config/hypr/focused_app.sh",
+    "interval": "once",
+    "signal": 11,
     "tooltip": false
   },
 

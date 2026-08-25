@@ -39,6 +39,7 @@ window#waybar {
 #network,
 #custom-volume,
 #custom-mode,
+#custom-window,
 #custom-bluetooth,
 #tray {
     padding: 0 12px;
@@ -47,6 +48,11 @@ window#waybar {
 
 #custom-mode {
     color: @pink; /* Neon Pink — stands out as a mode indicator */
+    font-weight: bold;
+}
+
+#custom-window {
+    color: @green; /* Neon Green — focused app name, next to the mode indicator */
     font-weight: bold;
 }
 
