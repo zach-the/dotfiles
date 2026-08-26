@@ -8,7 +8,7 @@
   "margin-right": 8,
   "margin-bottom": -10, // should always be opposite of gaps_out in hyprland.conf
 
-  "modules-left": ["clock", "custom/mode", "custom/window"],
+  "modules-left": ["clock", "custom/mode", "hyprland/language", "custom/window"],
   "modules-center": ["hyprland/workspaces"],
   "modules-right": ["custom/volume", "custom/bluetooth", "network", "backlight", "custom/battery"], //tray was here, but i removed it. look into optimizing that and figurig out system76-power later
 
@@ -66,6 +66,13 @@
     "interval": "once",
     "signal": 11,
     "tooltip": false
+  },
+
+  "hyprland/language": {
+    "format": "{}",
+    "format-en": "EN",
+    "format-ka": "GE",
+    "keyboard-name": "at-translated-set-2-keyboard" // Optional: specify if you have multiple input devices
   },
 
   "custom/bluetooth": {
