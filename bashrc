@@ -158,7 +158,7 @@ export EDITOR='nvim'
 export VISUAL='nvim'
 
 [ -f ~/.bash_aliases ] && source ~/.bash_aliases
-    
+
 [ -f ~/.fzf.bash ] && source ~/.fzf.bash
 
 [ -f /home/zb900042/.zachs_toolbox_sandbox_aliases ] && source /home/zb900042/.zachs_toolbox_sandbox_aliases

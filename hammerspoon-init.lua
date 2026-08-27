@@ -825,7 +825,10 @@ hs.hotkey.bind({"ctrl", "shift"}, "K", function() startScroll(BASE_SPEED) end, s
 -- Terminal and Browser
 hs.hotkey.bind(hyper, "T", launchWezterm)
 hs.hotkey.bind(hyper, "N", launchChrome)
-hs.hotkey.bind(hyper, "M", function() hs.application.launchOrFocus("Safari") end)
+hs.hotkey.bind(hyper, "M", function()
+  hs.osascript.applescript('tell application "Safari" to make new document')
+  hs.application.launchOrFocus("Safari")
+end)
 
 -- Block cmd+h everywhere except TigerVNC
 local stopCmdH = hs.hotkey.new({"cmd"}, "h", function() end)

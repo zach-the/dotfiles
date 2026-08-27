@@ -32,6 +32,7 @@ alias zd='~/dotfiles/bin/zd -vw'
 alias audio-combine='~/dotfiles/bin/audio-combine'
 alias pp='realpath'
 alias rs='rsync -aHAX --info=progress2'
+alias print_block='pyfiglet -f blocky -w $(tput cols)'
 
 # tmux session manager/attaching
 tm() {
@@ -298,4 +299,128 @@ nvf() {
     local files
     files=$(fzf --multi) || return
     nv -O $(echo "$files")
+}
+
+# --- Show a big pyfiglet banner, centered in the window, held until 'q' is pressed ---
+# Positional args are joined into one message and auto word-wrapped (with a blank
+# line inserted at each wrap point) to fit the terminal; multiple args can also be
+# used to force a paragraph break, e.g. banner "FIGURE OUT" "HYPERSCALE".
+_banner_render_width() {
+    local out row maxw=0
+    out=$(pyfiglet -f blocky -j left -w 4096 "$1" | sed 's/[[:space:]]*$//')
+    while IFS= read -r row; do
+        (( ${#row} > maxw )) && maxw=${#row}
+    done <<< "$out"
+    echo "$maxw"
+}
+
+_banner_wrap() {
+    local text="$1" cols="$2"
+    local -a words=($text)
+    local current="" candidate w word
+    for word in "${words[@]}"; do
+        candidate="${current:+$current }$word"
+        w=$(_banner_render_width "$candidate")
+        if [[ -z "$current" || "$w" -le "$cols" ]]; then
+            current="$candidate"
+        else
+            printf '%s\n' "$current"
+            current="$word"
+        fi
+    done
+    [[ -n "$current" ]] && printf '%s\n' "$current"
+}
+
+banner() {
+    local justify="c"
+    local paragraphs=()
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --alignment)
+                case "$2" in
+                    l|c|r) justify="$2" ;;
+                    *) echo "banner: --alignment must be l, c, or r" >&2; return 1 ;;
+                esac
+                shift 2
+                ;;
+            *)
+                paragraphs+=("$1")
+                shift
+                ;;
+        esac
+    done
+    if [[ ${#paragraphs[@]} -eq 0 ]]; then
+        echo "banner: no message given" >&2
+        return 1
+    fi
+
+    local cols rows
+    cols=$(tput cols)
+    rows=$(tput lines)
+
+    # Word-wrap each paragraph to fit the terminal width; every resulting line
+    # (whether from a forced paragraph break or an automatic wrap) gets a blank
+    # line between it and the next.
+    local -a lines=()
+    local para wrapped
+    for para in "${paragraphs[@]}"; do
+        while IFS= read -r wrapped; do
+            lines+=("$wrapped")
+        done < <(_banner_wrap "$para" "$cols")
+    done
+
+    # Render each line, trimming trailing whitespace pyfiglet pads each row out to.
+    local -a blocks=() widths=() heights=()
+    local line block row maxw w h
+    for line in "${lines[@]}"; do
+        block=$(pyfiglet -f blocky -j left -w "$cols" "$line" | sed 's/[[:space:]]*$//')
+        blocks+=("$block")
+        maxw=0
+        h=0
+        while IFS= read -r row; do
+            w=${#row}
+            (( w > maxw )) && maxw=$w
+            (( h++ ))
+        done <<< "$block"
+        widths+=("$maxw")
+        heights+=("$h")
+    done
+
+    # Group width/height: the bounding box that will be centered as a whole,
+    # with individual lines then justified to its left/right/center edge.
+    local group_width=0 total_height=0
+    for w in "${widths[@]}"; do (( w > group_width )) && group_width=$w; done
+    for h in "${heights[@]}"; do (( total_height += h )); done
+    (( total_height += ${#lines[@]} - 1 ))  # blank line between banner lines
+
+    local left_pad=$(( (cols - group_width) / 2 ))
+    (( left_pad < 0 )) && left_pad=0
+    local top_pad=$(( (rows - total_height) / 2 ))
+    (( top_pad < 0 )) && top_pad=0
+
+    clear
+    for (( i=0; i<top_pad; i++ )); do echo; done
+
+    local i n=${#lines[@]} pad
+    for (( i=0; i<n; i++ )); do
+        block="${blocks[$i]}"
+        w="${widths[$i]}"
+        case "$justify" in
+            c) pad=$(( (cols - w) / 2 )) ;;
+            l) pad=$left_pad ;;
+            r) pad=$(( left_pad + group_width - w )) ;;
+        esac
+        (( pad < 0 )) && pad=0
+        while IFS= read -r row; do
+            printf '%*s%s\n' "$pad" "" "$row"
+        done <<< "$block"
+        (( i < n - 1 )) && echo
+    done
+
+    local key
+    while true; do
+        read -n 1 -s -r key
+        [[ "$key" == "q" ]] && break
+    done
+    clear
 }
