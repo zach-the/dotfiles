@@ -37,6 +37,7 @@
 --   0          → reload Hammerspoon config
 --   4 5 6      → sixths: upper-left / upper-middle / upper-right
 --   7 8 9      → sixths: lower-left / lower-middle / lower-right
+--   DELETE     → lock screen
 --
 --   FREE: 1 2 3, R, B, V
 
@@ -828,6 +829,11 @@ hs.hotkey.bind(hyper, "N", launchChrome)
 hs.hotkey.bind(hyper, "M", function()
   hs.osascript.applescript('tell application "Safari" to make new document')
   hs.application.launchOrFocus("Safari")
+end)
+
+-- Lock screen
+hs.hotkey.bind(hyper, "delete", function()           -- Lock Screen
+  hs.caffeinate.lockScreen()
 end)
 
 -- Block cmd+h everywhere except TigerVNC

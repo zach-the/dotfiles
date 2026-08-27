@@ -38,6 +38,34 @@
                         ]
                     },
                     {
+                        "description": "Hyper + Backspace to Lock (F6)",
+                        "manipulators": [
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "delete_or_backspace",
+                                    "modifiers": {
+                                        "mandatory": [
+                                            "left_command",
+                                            "left_control",
+                                            "left_option",
+                                            "left_shift"
+                                        ],
+                                        "optional": [
+                                            "any"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "consumer_key_code": "al_terminal_lock_or_screensaver",
+                                        "hold_down_milliseconds": 1200
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
                         "description": "Double Left Shift to Caps Lock",
                         "manipulators": [
                             {
