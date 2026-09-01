@@ -56,10 +56,17 @@
                                         ]
                                     }
                                 },
-                                "to": [
+                                "parameters": {
+                                    "basic.to_if_held_down_threshold_milliseconds": 600
+                                },
+                                "to_if_held_down": [
                                     {
-                                        "consumer_key_code": "al_terminal_lock_or_screensaver",
-                                        "hold_down_milliseconds": 1200
+                                        "consumer_key_code": "al_terminal_lock_or_screensaver"
+                                    }
+                                ],
+                                "to_if_alone": [
+                                    {
+                                        "key_code": "delete_or_backspace"
                                     }
                                 ]
                             }

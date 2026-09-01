@@ -115,12 +115,8 @@ config.keys = {
   { key = 'w', mods = 'SUPER', action = act.CloseCurrentPane { confirm = false } },
   { key = 't', mods = 'SUPER', action = act.SpawnTab 'CurrentPaneDomain' }, 
   
-  -- Pop out and pop in tabs
-  -- "Pop out" current tab to a new window
-  { key = 'd', mods = 'CTRL|SHIFT', action = wezterm.action_callback(function(win, pane)
-    pane:move_to_new_window()
-  end) },
-  -- "Pop in" a tab from another window into the current one
+  -- Pop in a tab from another window into the current one
+  -- (Ctrl+Shift+D freed up for tmux copy-mode scroll-down)
   { key = 'i', mods = 'CTRL|SHIFT', action = act.PaneSelect { mode = 'MoveToNewTab' } },
   
   -- Vim Keybinds for Navigation (replaced by tmux)

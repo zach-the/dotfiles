@@ -32,6 +32,7 @@
 --   J K        → bottom-left / bottom-right quarter
 --   Z X C      → half-split (context-aware: portrait vs. landscape)
 --   N M        → launch Chrome / launch Safari
+--   V          → restore all minimized windows (skips hidden apps)
 --   RETURN     → fullscreen
 --   - =        → resize smaller / larger
 --   0          → reload Hammerspoon config
@@ -39,7 +40,7 @@
 --   7 8 9      → sixths: lower-left / lower-middle / lower-right
 --   DELETE     → lock screen
 --
---   FREE: 1 2 3, R, B, V
+--   FREE: 1 2 3, R, B
 
 -- =====================================================================
 -- INSTRUCTIONS
@@ -323,20 +324,20 @@ end
 -- WINDOW MOVEMENT
 -- =====================================================================
 
--- Unminimize All Windows
+-- Unminimize All Windows (skips windows belonging to hidden apps)
 local function unMinimizeAll()
     local windows = hs.window.allWindows()
     local count = 0
 
     for _, win in ipairs(windows) do
-        if win:isMinimized() then
+        local app = win:application()
+        if win:isMinimized() and not (app and app:isHidden()) then
             win:unminimize()
             count = count + 1
         end
     end
 
-    if count > 0 then
-    else
+    if count == 0 then
         hs.alert.show("No minimized windows found")
     end
 end
@@ -788,6 +789,7 @@ hs.hotkey.bind(hyper, "9", sixth(1, 2))             -- Lower Right
 hs.hotkey.bind(hyper, "F", maximize)                -- Maximize
 hs.hotkey.bind(hyper, "G", center)                  -- Center
 hs.hotkey.bind(hyper, "Q", minimizeFocused)         -- Minimize
+hs.hotkey.bind(hyper, "V", unMinimizeAll)           -- Restore All Minimized
 hs.hotkey.bind(hyper, "return", fullscreen)         -- Fullscreen
 
 hs.hotkey.bind(hyper, "-", resize("smaller"))       -- Make Smaller

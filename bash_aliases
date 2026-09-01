@@ -307,7 +307,7 @@ nvf() {
 # used to force a paragraph break, e.g. banner "FIGURE OUT" "HYPERSCALE".
 _banner_render_width() {
     local out row maxw=0
-    out=$(pyfiglet -f blocky -j left -w 4096 "$1" | sed 's/[[:space:]]*$//')
+    out=$(pyfiglet -f blocky -j left -w 4096 "${1// /   }" | sed 's/[[:space:]]*$//')
     while IFS= read -r row; do
         (( ${#row} > maxw )) && maxw=${#row}
     done <<< "$out"
@@ -358,22 +358,26 @@ banner() {
     cols=$(tput cols)
     rows=$(tput lines)
 
-    # Word-wrap each paragraph to fit the terminal width; every resulting line
-    # (whether from a forced paragraph break or an automatic wrap) gets a blank
-    # line between it and the next.
-    local -a lines=()
-    local para wrapped
+    # Word-wrap each paragraph to fit the terminal width. Wrapped lines that
+    # came from the same paragraph stay tight together (one blank line
+    # between them); separate paragraph arguments become distinct groups
+    # whose vertical spacing gets computed further down.
+    local -a lines=() group_counts=()
+    local para wrapped count
     for para in "${paragraphs[@]}"; do
+        count=0
         while IFS= read -r wrapped; do
             lines+=("$wrapped")
+            (( count++ ))
         done < <(_banner_wrap "$para" "$cols")
+        group_counts+=("$count")
     done
 
     # Render each line, trimming trailing whitespace pyfiglet pads each row out to.
     local -a blocks=() widths=() heights=()
     local line block row maxw w h
     for line in "${lines[@]}"; do
-        block=$(pyfiglet -f blocky -j left -w "$cols" "$line" | sed 's/[[:space:]]*$//')
+        block=$(pyfiglet -f blocky -j left -w "$cols" "${line// /   }" | sed 's/[[:space:]]*$//')
         blocks+=("$block")
         maxw=0
         h=0
@@ -386,36 +390,77 @@ banner() {
         heights+=("$h")
     done
 
-    # Group width/height: the bounding box that will be centered as a whole,
-    # with individual lines then justified to its left/right/center edge.
-    local group_width=0 total_height=0
+    # Group width: the bounding box used to justify every line consistently.
+    local group_width=0
     for w in "${widths[@]}"; do (( w > group_width )) && group_width=$w; done
-    for h in "${heights[@]}"; do (( total_height += h )); done
-    (( total_height += ${#lines[@]} - 1 ))  # blank line between banner lines
-
     local left_pad=$(( (cols - group_width) / 2 ))
     (( left_pad < 0 )) && left_pad=0
-    local top_pad=$(( (rows - total_height) / 2 ))
-    (( top_pad < 0 )) && top_pad=0
+
+    # Each paragraph's group height: its wrapped lines plus a blank line
+    # between each of them.
+    local -a group_heights=()
+    local gc idx=0 gh j
+    for gc in "${group_counts[@]}"; do
+        gh=0
+        for (( j=0; j<gc; j++ )); do
+            (( gh += heights[idx] ))
+            (( j < gc - 1 )) && (( gh++ ))
+            (( idx++ ))
+        done
+        group_heights+=("$gh")
+    done
+
+    local ngroups=${#group_heights[@]}
+    local total_content_height=0
+    for h in "${group_heights[@]}"; do (( total_content_height += h )); done
+
+    # For a single paragraph, keep the classic centered-block behavior. For
+    # multiple separate string arguments, spread the leftover vertical space
+    # evenly before, between, and after each one (space-evenly layout).
+    local -a gaps=()
+    if (( ngroups > 1 )); then
+        local remaining=$(( rows - total_content_height ))
+        (( remaining < 0 )) && remaining=0
+        local nslots=$(( ngroups + 1 ))
+        local base=$(( remaining / nslots ))
+        local extra=$(( remaining % nslots ))
+        local s
+        for (( s=0; s<nslots; s++ )); do
+            gaps+=("$(( base + (s < extra ? 1 : 0) ))")
+        done
+    else
+        local top_pad=$(( (rows - total_content_height) / 2 ))
+        (( top_pad < 0 )) && top_pad=0
+        gaps+=("$top_pad")
+        gaps+=("$top_pad")
+    fi
 
     clear
-    for (( i=0; i<top_pad; i++ )); do echo; done
+    local i pad
+    for (( i=0; i<gaps[0]; i++ )); do echo; done
 
-    local i n=${#lines[@]} pad
-    for (( i=0; i<n; i++ )); do
-        block="${blocks[$i]}"
-        w="${widths[$i]}"
-        case "$justify" in
-            c) pad=$(( (cols - w) / 2 )) ;;
-            l) pad=$left_pad ;;
-            r) pad=$(( left_pad + group_width - w )) ;;
-        esac
-        (( pad < 0 )) && pad=0
-        while IFS= read -r row; do
-            printf '%*s%s\n' "$pad" "" "$row"
-        done <<< "$block"
-        (( i < n - 1 )) && echo
+    idx=0
+    local gi gcount
+    for (( gi=0; gi<ngroups; gi++ )); do
+        gcount=${group_counts[$gi]}
+        for (( j=0; j<gcount; j++ )); do
+            block="${blocks[$idx]}"
+            w="${widths[$idx]}"
+            case "$justify" in
+                c) pad=$(( (cols - w) / 2 )) ;;
+                l) pad=$left_pad ;;
+                r) pad=$(( left_pad + group_width - w )) ;;
+            esac
+            (( pad < 0 )) && pad=0
+            while IFS= read -r row; do
+                printf '%*s%s\n' "$pad" "" "$row"
+            done <<< "$block"
+            (( j < gcount - 1 )) && echo
+            (( idx++ ))
+        done
+        (( gi < ngroups - 1 )) && for (( i=0; i<gaps[gi+1]; i++ )); do echo; done
     done
+    (( ngroups > 1 )) && for (( i=0; i<gaps[ngroups]; i++ )); do echo; done
 
     local key
     while true; do
@@ -424,3 +469,4 @@ banner() {
     done
     clear
 }
+alias banner='banner --alignment l'
