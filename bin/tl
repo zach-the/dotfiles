@@ -6,11 +6,71 @@ import selectors
 import signal
 import re
 import fcntl
+import time
 
 _ANSI_ESC = re.compile(r'\033\[[^a-zA-Z]*[a-zA-Z]')
 _SGR = re.compile(r'\033\[([0-9;]*)m')
 _SGR_MOUSE = re.compile(rb'\033\[<(\d+);(\d+);(\d+)([Mm])')
 MAX_BUFFER = 10_000  # lines per file
+
+# --- -m (merged) mode ---
+MERGE_TAG_MAXLEN = 24     # cap on a tag's displayed length before middle-truncation
+MERGE_PRIME_MAX_S = 1.0   # hard cap on how long we wait for initial backlog to settle
+MERGE_PRIME_QUIET_S = 0.15  # ...but bail out early once nothing new arrives for this long
+
+_RED_RE = re.compile(r'\b(errors?|stop)\b', re.IGNORECASE)
+_WARN_RE = re.compile(r'\b(warn\w*)\b', re.IGNORECASE)
+_RED = '\033[1;31m'
+_YELLOW = '\033[1;33m'
+_COLOR_RESET = '\033[0m'
+
+# -c: per-file tag colors (sidebar tag only -- never the top header bar).
+# Cycles if there are more files than colors.
+_TAG_PALETTE = ['\033[1;32m', '\033[1;34m', '\033[1;35m']  # green, blue, purple
+
+# Divider between a merged line's tag and its text -- one space of padding
+# on each side of the bar.
+MERGE_DIVIDER = ' │ '
+
+def colorize_keywords(text):
+    """Wrap 'error'/'errors'/'stop' in red and 'warn'/'warning'/etc. in
+    yellow, case-insensitively. Applied to every tailed line (both plain and
+    -m merged mode) so these stand out without having to grep for them."""
+    text = _RED_RE.sub(lambda m: f'{_RED}{m.group(0)}{_COLOR_RESET}', text)
+    text = _WARN_RE.sub(lambda m: f'{_YELLOW}{m.group(0)}{_COLOR_RESET}', text)
+    return text
+
+def truncate_middle(s, maxlen):
+    """Shorten s to at most maxlen chars by cutting out its middle and
+    splicing in a single ellipsis -- keeps both a recognizable prefix and
+    suffix (e.g. distinguishing extensions/suffixes on similarly-named
+    files), unlike truncating off one end."""
+    if maxlen < 3 or len(s) <= maxlen:
+        return s
+    keep = maxlen - 1  # minus the ellipsis character itself
+    left = (keep + 1) // 2
+    right = keep - left
+    return s[:left] + '…' + (s[-right:] if right > 0 else '')
+
+def distinguishing_tags(names):
+    """When every name shares a common prefix and/or suffix (e.g. the same
+    base tag, differing only by '.err' vs '.out'), strip that shared part
+    off and use just the differing middle as each one's tag instead of the
+    full name -- 'TAG.1.err'/'TAG.1.out' become 'err'/'out'. Falls back to
+    the full names whenever stripping would be degenerate (fewer than 2
+    names, an empty result, or a collision between two results)."""
+    if len(names) < 2:
+        return list(names)
+    prefix_len = len(os.path.commonprefix(names))
+    suffix_len = len(os.path.commonprefix([n[::-1] for n in names]))
+    # Don't let the prefix and suffix overlap within the shortest name.
+    shortest = min(len(n) for n in names)
+    if prefix_len + suffix_len > shortest:
+        suffix_len = max(0, shortest - prefix_len)
+    trimmed = [n[prefix_len: len(n) - suffix_len] for n in names]
+    if all(trimmed) and len(set(trimmed)) == len(trimmed):
+        return trimmed
+    return list(names)
 
 def _visible_len(s):
     return len(_ANSI_ESC.sub('', s))
@@ -172,16 +232,21 @@ def read_key(fd):
             fcntl.fcntl(fd, fcntl.F_SETFL, flags)
     return c
 
-def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_widths):
+def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_widths, blank_fill=None):
     """
     Render the TUI. Returns updated view_tops.
     col_widths: list of content widths per column (not counting │ dividers).
+    blank_fill: per-column text to show on rows past a column's last buffered
+    line (default: blank). Used by -m merged mode to keep its tag-column
+    divider bar continuous down rows with no content yet.
     """
     n = len(files)
+    if blank_fill is None:
+        blank_fill = [""] * n
     if width < n * 5:
         sys.stdout.write(f'\033[H Terminal too small: {width}x{height}\033[K')
         sys.stdout.flush()
-        return view_tops
+        return view_tops, False, []
 
     content_lines = height - 1  # one row for the header
 
@@ -210,18 +275,24 @@ def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_width
     sys.stdout.write('\033[H')
     out = []
 
-    # Header row: each column gets its own filename + scroll indicator
+    # Header row: each column gets its own filename + scroll indicator.
+    # behinds is tracked regardless of follow_mode (not just in the branch
+    # that displays it) since the caller also needs it to know whether a
+    # manual scroll has reached the very bottom.
     header = ""
+    behinds = []
     for i, f in enumerate(files):
         is_last = i == n - 1
         cw = col_widths[i]
         name = f" {os.path.basename(f)} "
 
+        wi = wrapped[i]
+        behind = max(0, len(wi) - (new_tops[i] + content_lines))
+        behinds.append(behind)
+
         if follow_mode:
             ind = " LIVE "
         else:
-            wi = wrapped[i]
-            behind = max(0, len(wi) - (new_tops[i] + content_lines))
             ind = f" -{behind}L " if behind > 0 else " END "
 
         avail = cw - _visible_len(ind) - 1
@@ -242,7 +313,7 @@ def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_width
             w = wrapped[i]
             cw = col_widths[i]
             idx = new_tops[i] + y
-            line = w[idx] if idx < len(w) else ""
+            line = w[idx] if idx < len(w) else blank_fill[i]
             is_last = i == n - 1
             if not is_last:
                 row += _ljust_visible(line, cw) + '\033[0m│'
@@ -255,7 +326,18 @@ def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_width
         if i < len(out) - 1:
             sys.stdout.write('\n')
     sys.stdout.flush()
-    return new_tops
+    # at_bottom: true once every column has caught up to its own end -- lets
+    # the caller auto-resume follow mode when a manual scroll reaches the
+    # bottom, instead of leaving it stuck showing "END" forever.
+    at_bottom = all(b == 0 for b in behinds)
+    # last_frame: this frame's header + content rows with trailing blank
+    # rows trimmed off (there's no old content left to overwrite once this
+    # gets replayed onto the primary screen on exit, so padding out to the
+    # full pane height would just dump empty lines into the shell scrollback).
+    last_frame = list(out)
+    while len(last_frame) > 1 and _ANSI_ESC.sub('', last_frame[-1]).replace('│', '').strip() == '':
+        last_frame.pop()
+    return new_tops, at_bottom, last_frame
 
 
 def main():
@@ -264,6 +346,8 @@ def main():
     n_lines = height
     n_lines_given = False
     files = []
+    merged = False
+    tag_colors = False
 
     i = 0
     while i < len(args):
@@ -275,6 +359,10 @@ def main():
             i += 2
         elif args[i].startswith('-n') and args[i][2:].isdigit():
             n_lines = int(args[i][2:]); n_lines_given = True; i += 1
+        elif args[i] == '-m':
+            merged = True; i += 1
+        elif args[i] == '-c':
+            tag_colors = True; i += 1
         elif args[i].startswith('-') and args[i][1:].isdigit():
             n_lines = int(args[i][1:]); n_lines_given = True; i += 1
         else:
@@ -283,7 +371,35 @@ def main():
     if not files:
         sys.exit(0)
 
-    col_widths = compute_col_widths(width, len(files))
+    # -m unifies every tailed file into one scrolling pane -- a single
+    # pseudo-"file" as far as rendering/scrolling/paging are concerned, so
+    # the rest of the TUI (draw_screen, key handling) doesn't need to know
+    # the difference. n_display is that pane count: 1 when merged, else one
+    # real column per file.
+    n_display = 1 if merged else len(files)
+
+    # Per-file tag shown at the start of each merged line. If every filename
+    # shares a common prefix/suffix (e.g. same base name, differing only by
+    # .err/.out), the tag is just the differing part -- otherwise the full
+    # basename. Either way it's then truncated in the middle (not off one
+    # end, so a distinguishing suffix survives) and padded to a shared width
+    # so text starts in a consistent column. The top header bar always shows
+    # the full, untruncated names regardless -- merge_header_label, built
+    # separately below, is never based on these.
+    basenames = [os.path.basename(f) for f in files]
+    tag_sources = distinguishing_tags(basenames)
+    merge_tags = [truncate_middle(t, MERGE_TAG_MAXLEN) for t in tag_sources]
+    merge_tag_width = max((len(t) for t in merge_tags), default=0)
+    merge_header_label = ", ".join(basenames)
+
+    def format_merge_prefix(fi):
+        tag_text = merge_tags[fi].ljust(merge_tag_width)
+        if tag_colors:
+            color = _TAG_PALETTE[fi % len(_TAG_PALETTE)]
+            tag_text = f"{color}{tag_text}{_COLOR_RESET}"
+        return tag_text + MERGE_DIVIDER
+
+    col_widths = compute_col_widths(width, n_display)
     div_fracs = [d / width for d in get_divider_cols(col_widths)]
 
     # Enter alternate screen, hide cursor, enable mouse (button+motion, SGR encoding)
@@ -298,7 +414,7 @@ def main():
 
     running = True
     follow_mode = True          # True = live tail; False = frozen at view_tops
-    view_tops = [0] * len(files)
+    view_tops = [0] * n_display
     dragging_divider = None     # index of divider currently being dragged
 
     def _quit(sig, frame):
@@ -315,12 +431,13 @@ def main():
         width, height = get_terminal_size()
         if not n_lines_given:
             n_lines = height
-        col_widths = fracs_to_col_widths(div_fracs, width, len(files))
+        col_widths = fracs_to_col_widths(div_fracs, width, n_display)
         needs_redraw = True
 
     signal.signal(signal.SIGWINCH, _resize)
 
     procs, sel = [], selectors.DefaultSelector()
+    last_frame = []  # last drawn frame, left visible in the finally block on exit
 
     try:
         if sys.stdin.isatty():
@@ -336,12 +453,53 @@ def main():
             sel.register(p.stdout, selectors.EVENT_READ, data=i)
             procs.append(p)
 
-        buffers = [[] for _ in files]
+        buffers = [[]] if merged else [[] for _ in files]
+        display_files = [merge_header_label] if merged else files
+
+        if merged:
+            # Each file's initial `tail -n` backlog lands almost immediately;
+            # give them a brief, quiescence-bounded window to arrive fully
+            # before merging, so we can order whole per-file backlogs by
+            # size (longer content first) instead of arbitrary arrival order.
+            # Ongoing live output afterward is just interleaved as it comes.
+            initial_lines = [[] for _ in files]
+            prime_deadline = time.time() + MERGE_PRIME_MAX_S
+            quiet_since = time.time()
+            while time.time() < prime_deadline:
+                got_any = False
+                for key, _ in sel.select(timeout=0.05):
+                    if key.data == 'stdin':
+                        continue
+                    fi = key.data
+                    try:
+                        while True:
+                            line = procs[fi].stdout.readline()
+                            if not line:
+                                break
+                            initial_lines[fi].append(colorize_keywords(line.rstrip('\n')))
+                            got_any = True
+                    except (IOError, OSError):
+                        pass
+                if got_any:
+                    quiet_since = time.time()
+                elif time.time() - quiet_since > MERGE_PRIME_QUIET_S:
+                    break
+            for fi in sorted(range(len(files)), key=lambda idx: len(initial_lines[idx]), reverse=True):
+                for text in initial_lines[fi]:
+                    buffers[0].append(format_merge_prefix(fi) + text)
 
         while running:
             if needs_redraw:
-                view_tops = draw_screen(files, buffers, width, height, follow_mode, view_tops, col_widths)
+                view_tops, at_bottom, last_frame = draw_screen(
+                    display_files, buffers, width, height, follow_mode, view_tops, col_widths,
+                )
                 needs_redraw = False
+                # Reaching the bottom via a manual scroll (j/d/f/...) resumes
+                # live-follow instead of leaving the view stuck showing "END"
+                # until 'G' is pressed explicitly.
+                if not follow_mode and at_bottom:
+                    follow_mode = True
+                    needs_redraw = True
 
             for key, _ in sel.select(timeout=0.1):
                 if key.data == 'stdin':
@@ -364,7 +522,7 @@ def main():
                                 # Left drag: move split, cascading into neighbors if needed
                                 div_cols = get_divider_cols(col_widths)
                                 new_div_cols = drag_divider(dragging_divider, col, div_cols, width)
-                                col_widths = dividers_to_widths(new_div_cols, width, len(files))
+                                col_widths = dividers_to_widths(new_div_cols, width, n_display)
                                 div_fracs = [d / width for d in new_div_cols]
                                 needs_redraw = True
                             elif not pressed:
@@ -409,7 +567,7 @@ def main():
 
                         elif raw == b'g':  # g: go to top of history
                             follow_mode = False
-                            view_tops = [0] * len(files)
+                            view_tops = [0] * n_display
                             needs_redraw = True
 
                     except (IOError, OSError):
@@ -422,12 +580,18 @@ def main():
                         line = procs[fi].stdout.readline()
                         if not line:
                             break
-                        buffers[fi].append(line.rstrip('\n'))
-                        if len(buffers[fi]) > MAX_BUFFER:
-                            drop = len(buffers[fi]) - MAX_BUFFER
-                            buffers[fi] = buffers[fi][-MAX_BUFFER:]
-                            if not follow_mode and fi < len(view_tops):
-                                view_tops[fi] = max(0, view_tops[fi] - drop)
+                        text = colorize_keywords(line.rstrip('\n'))
+                        if merged:
+                            text = format_merge_prefix(fi) + text
+                            target = 0
+                        else:
+                            target = fi
+                        buffers[target].append(text)
+                        if len(buffers[target]) > MAX_BUFFER:
+                            drop = len(buffers[target]) - MAX_BUFFER
+                            buffers[target] = buffers[target][-MAX_BUFFER:]
+                            if not follow_mode and target < len(view_tops):
+                                view_tops[target] = max(0, view_tops[target] - drop)
                         needs_redraw = True
                 except (IOError, OSError):
                     pass
@@ -436,8 +600,15 @@ def main():
         if old_termios:
             import termios
             termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, old_termios)
-        # Disable mouse, restore screen, show cursor
-        sys.stdout.write('\033[?1002l\033[?1006l\033[?1049l\033[?25h')
+        # Disable mouse, leave the alternate screen (back to whatever's on
+        # the primary buffer), then replay the last drawn frame onto it --
+        # otherwise leaving alt-screen would just silently discard it and
+        # restore whatever was there before tl started, instead of leaving
+        # the final view visible in the shell's own scrollback.
+        sys.stdout.write('\033[?1002l\033[?1006l\033[?1049l')
+        if last_frame:
+            sys.stdout.write('\n'.join(last_frame) + '\n')
+        sys.stdout.write('\033[?25h')
         sys.stdout.flush()
         for p in procs:
             p.terminate()
