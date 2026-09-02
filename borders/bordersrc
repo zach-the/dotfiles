@@ -1,16 +1,18 @@
 #!/bin/bash
 
-# Mirrors the border look from hypr/colors.conf + hypr/hyprland.conf:
-#   active:   gradient rgba(33ccffcc) -> rgba(00ff9988), 45deg
-#   inactive: rgba(595959aa)
+# Matches tmux's active pane border color (@pink, from
+# palettes/very-dark.toml -> tmux/tmux-colors.conf: pane-active-border-style)
+# so the macOS focused-window border and tmux's dividing lines agree.
+#   active:   @pink   #ff007f
+#   inactive: @grey   #787c99
 #   rounding: 10 (decoration.rounding) -> style=round
 
 options=(
   style=round
   width=5.0
   hidpi=on
-  active_color="gradient(top_left=0xcc33ccff,bottom_right=0x8800ff99)"
-  inactive_color=0xaa595959
+  active_color=0xffff007f
+  inactive_color=0xaa787c99
 )
 
 borders "${options[@]}"
