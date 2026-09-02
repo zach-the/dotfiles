@@ -722,12 +722,16 @@ updateSpacesMenubar()
 
 -- Instant update whenever the active space changes anywhere (hotkey,
 -- trackpad swipe, Mission Control click, etc) instead of waiting on a poll.
-local spacesWatcher = hs.spaces.watcher.new(updateSpacesMenubar)
+-- Deliberately global (no `local`) so they're rooted in _G and don't get
+-- garbage collected once the top-level chunk finishes running -- a bare
+-- top-level local here is nobody's upvalue, so Hammerspoon silently GCs it
+-- and the timer/watcher stop firing after the first run.
+spacesWatcher = hs.spaces.watcher.new(updateSpacesMenubar)
 spacesWatcher:start()
 
 -- Fallback poll: catches the one case the watcher above can't, moving the
 -- mouse to a different display without changing any space.
-local spacesMenubarTimer = hs.timer.doEvery(0.3, updateSpacesMenubar)
+spacesMenubarTimer = hs.timer.doEvery(0.3, updateSpacesMenubar)
 
 --==========================================--
 --  _  __          _     _           _      --
