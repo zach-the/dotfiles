@@ -79,6 +79,23 @@ local function moveMouseToWindow(win)
     end
 end
 
+-- Pure single-axis match: H/L only ever compares X position, J/K only ever
+-- compares Y position. No cone/dominant-axis check against the other axis,
+-- so a window doesn't get skipped just because it's also offset vertically
+-- (for H/L) or horizontally (for J/K).
+local function directionalMatch(deltaX, deltaY, direction)
+    if direction == "West" then
+        if deltaX < 0 then return true, math.abs(deltaX) end
+    elseif direction == "East" then
+        if deltaX > 0 then return true, math.abs(deltaX) end
+    elseif direction == "North" then
+        if deltaY < 0 then return true, math.abs(deltaY) end
+    elseif direction == "South" then
+        if deltaY > 0 then return true, math.abs(deltaY) end
+    end
+    return false, nil
+end
+
 local function smartFocus(direction)
     local win = hs.window.focusedWindow()
     -- Safety check: If a tab closed and focus is "lost" to the OS, try to grab the frontmost app's window
@@ -125,59 +142,45 @@ local function smartFocus(direction)
         end
     end
 
+    -- J/K (vertical) stay on the current monitor only; H/L (horizontal) can
+    -- cross to adjacent monitors, matching the physical left-to-right layout.
+    local verticalOnly = (direction == "North" or direction == "South")
+
     for _, w in ipairs(allWindows) do
         if w:isVisible() and w:isStandard() then
-            local f = w:frame()
-            local c = {x = f.x + f.w/2, y = f.y + f.h/2}
+            if not verticalOnly or w:screen():id() == winScreen:id() then
+                local f = w:frame()
+                local c = {x = f.x + f.w/2, y = f.y + f.h/2}
 
-            -- Calculate deltas
-            local deltaX = c.x - winCenter.x
-            local deltaY = c.y - winCenter.y
+                -- Calculate deltas
+                local deltaX = c.x - winCenter.x
+                local deltaY = c.y - winCenter.y
 
-            local isCandidate = false
+                local isCandidate, distance = directionalMatch(deltaX, deltaY, direction)
 
-            -- Geometric "Cone" Check
-            -- We ensure the window is mostly in the target direction (avoids diagonals)
-            if direction == "West" then
-                if deltaX < 0 and math.abs(deltaX) > math.abs(deltaY) then isCandidate = true end
-            elseif direction == "East" then
-                if deltaX > 0 and math.abs(deltaX) > math.abs(deltaY) then isCandidate = true end
-            elseif direction == "North" then
-                if deltaY < 0 and math.abs(deltaY) > math.abs(deltaX) then isCandidate = true end
-            elseif direction == "South" then
-                if deltaY > 0 and math.abs(deltaY) > math.abs(deltaX) then isCandidate = true end
-            end
-
-            if isCandidate then
-                local distance = deltaX^2 + deltaY^2
-                table.insert(candidates, {window = w, dist = distance})
+                if isCandidate then
+                    table.insert(candidates, {window = w, dist = distance})
+                end
             end
         end
     end
 
-    -- Also add empty screens as virtual candidates
-    for _, screen in ipairs(hs.screen.allScreens()) do
-        if screen:id() ~= winScreen:id() and not screensWithWindows[screen:id()] then
-            local sf = screen:frame()
-            local sc = {x = sf.x + sf.w/2, y = sf.y + sf.h/2}
-            local deltaX = sc.x - winCenter.x
-            local deltaY = sc.y - winCenter.y
+    -- Also add empty screens as virtual candidates (H/L only — J/K never
+    -- leaves the current monitor, so there's no "empty screen" to hop to)
+    if not verticalOnly then
+        for _, screen in ipairs(hs.screen.allScreens()) do
+            if screen:id() ~= winScreen:id() and not screensWithWindows[screen:id()] then
+                local sf = screen:frame()
+                local sc = {x = sf.x + sf.w/2, y = sf.y + sf.h/2}
+                local deltaX = sc.x - winCenter.x
+                local deltaY = sc.y - winCenter.y
 
-            local isCandidate = false
-            if direction == "West" then
-                if deltaX < 0 and math.abs(deltaX) > math.abs(deltaY) then isCandidate = true end
-            elseif direction == "East" then
-                if deltaX > 0 and math.abs(deltaX) > math.abs(deltaY) then isCandidate = true end
-            elseif direction == "North" then
-                if deltaY < 0 and math.abs(deltaY) > math.abs(deltaX) then isCandidate = true end
-            elseif direction == "South" then
-                if deltaY > 0 and math.abs(deltaY) > math.abs(deltaX) then isCandidate = true end
-            end
+                local isCandidate, distance = directionalMatch(deltaX, deltaY, direction)
 
-            if isCandidate then
-                local distance = deltaX^2 + deltaY^2
-                -- virtual candidate: no window field, just a point to move the mouse to
-                table.insert(candidates, {point = sc, dist = distance})
+                if isCandidate then
+                    -- virtual candidate: no window field, just a point to move the mouse to
+                    table.insert(candidates, {point = sc, dist = distance})
+                end
             end
         end
     end
@@ -643,86 +646,88 @@ local function stopScroll()
 end
 
 -- =====================================================================
--- FAST MULTI-MONITOR SPACE SWITCHING (Primary -> Externals -> Built-in)
+-- FAST MULTI-MONITOR SPACE SWITCHING (yabai-backed, per-display, no wrap)
 -- =====================================================================
+-- Previously this sent ctrl+<mission-control index>, computed from a
+-- Hammerspoon-side guess at global space ordering. That guess could drift
+-- from reality (yabai/macOS re-numbering), and because ctrl+N targets a
+-- space by *global* number rather than "the next space on this display",
+-- a stale guess could end up switching the wrong monitor entirely.
+-- yabai's `--display mouse` queries are always live, so there's nothing
+-- to drift: this asks "what are the spaces on the screen under my mouse,
+-- right now" every time, then tells yabai to focus that exact space.
 
-local function getMacOSScreenOrder()
-    local screens = hs.screen.allScreens()
-    local primary = hs.screen.primaryScreen()
+local YABAI = "/opt/homebrew/bin/yabai"
 
-    local orderedScreens = { primary }
-    local externals = {}
-    local builtIns = {}
-
-    -- Separate the secondary screens into Externals and Built-ins
-    for _, screen in ipairs(screens) do
-        if screen:id() ~= primary:id() then
-            -- We identify the laptop screen by its standard macOS naming convention
-            if string.match(screen:name(), "Built%-in") then
-                table.insert(builtIns, screen)
-            else
-                table.insert(externals, screen)
-            end
-        end
-    end
-
-    -- Sort multiple externals geometrically (just in case you add a 3rd external monitor later)
-    table.sort(externals, function(a, b) return a:frame().x < b:frame().x end)
-
-    -- Construct the final list: Primary -> Externals -> Built-ins
-    for _, screen in ipairs(externals) do table.insert(orderedScreens, screen) end
-    for _, screen in ipairs(builtIns) do table.insert(orderedScreens, screen) end
-
-    return orderedScreens
-end
-
--- =====================================================================
--- THE SWITCHING LOGIC (Hard Boundaries, No Wrap-Around)
--- =====================================================================
+-- Forward-declared so switchSpace's closure captures this local (not a
+-- stray global) even though hs.menubar.new() runs further down the file.
+local spacesMenubar
 
 local function switchSpace(direction)
-    local focusedScreen = hs.mouse.getCurrentScreen()
-    local orderedScreens = getMacOSScreenOrder()
-    local activeSpace = hs.spaces.activeSpaceOnScreen(focusedScreen)
-    local localSpaces = hs.spaces.spacesForScreen(focusedScreen)
+    local output, ok = hs.execute(YABAI .. " -m query --spaces --display mouse")
+    if not ok or not output or output == "" then return end
 
-    local globalSpaces = {}
-    for _, screen in ipairs(orderedScreens) do
-        local screenSpaces = hs.spaces.spacesForScreen(screen)
-        if screenSpaces then
-            for _, spaceID in ipairs(screenSpaces) do
-                table.insert(globalSpaces, spaceID)
-            end
-        end
-    end
+    local success, spaces = pcall(hs.json.decode, output)
+    if not success or not spaces then return end
 
-    local localIndex = nil
-    for i, spaceID in ipairs(localSpaces) do
-        if spaceID == activeSpace then
-            localIndex = i
+    local currentIndex = nil
+    for i, s in ipairs(spaces) do
+        if s["is-visible"] then
+            currentIndex = i
             break
         end
     end
-    if not localIndex then return end
+    if not currentIndex then return end
 
-    local targetLocalIndex = localIndex + (direction == "next" and 1 or -1)
+    local targetIndex = currentIndex + (direction == "next" and 1 or -1)
 
-    -- Hard Wall
-    if targetLocalIndex < 1 or targetLocalIndex > #localSpaces then return end
+    -- Hard Wall: no wrap-around past this display's own spaces
+    if targetIndex < 1 or targetIndex > #spaces then return end
 
-    local targetSpaceID = localSpaces[targetLocalIndex]
-    local targetGlobalIndex = nil
-    for i, spaceID in ipairs(globalSpaces) do
-        if spaceID == targetSpaceID then
-            targetGlobalIndex = i
-            break
-        end
-    end
-
-    if targetGlobalIndex and targetGlobalIndex <= 9 then
-        hs.eventtap.keyStroke({"ctrl"}, tostring(targetGlobalIndex))
+    local targetSpace = spaces[targetIndex]
+    hs.execute(YABAI .. " -m space --focus " .. tostring(targetSpace.index))
+    -- We already know exactly which space we just switched to, so set it
+    -- directly instead of re-querying yabai (which can race the still-in-
+    -- progress space transition and read back the stale, pre-switch space).
+    if spacesMenubar then
+        spacesMenubar:setTitle(tostring(targetSpace.index))
     end
 end
+
+-- =====================================================================
+-- MENU BAR SPACE INDICATOR
+-- =====================================================================
+-- Shows the active space index of whichever display the mouse is
+-- currently on, e.g. "7"
+
+spacesMenubar = hs.menubar.new()
+
+function updateSpacesMenubar()
+    if not spacesMenubar then return end
+
+    local output, ok = hs.execute(YABAI .. " -m query --spaces --display mouse")
+    if not ok or not output or output == "" then return end
+    local success, spaces = pcall(hs.json.decode, output)
+    if not success or not spaces then return end
+
+    for _, s in ipairs(spaces) do
+        if s["is-visible"] then
+            spacesMenubar:setTitle(tostring(s.index))
+            return
+        end
+    end
+end
+
+updateSpacesMenubar()
+
+-- Instant update whenever the active space changes anywhere (hotkey,
+-- trackpad swipe, Mission Control click, etc) instead of waiting on a poll.
+local spacesWatcher = hs.spaces.watcher.new(updateSpacesMenubar)
+spacesWatcher:start()
+
+-- Fallback poll: catches the one case the watcher above can't, moving the
+-- mouse to a different display without changing any space.
+local spacesMenubarTimer = hs.timer.doEvery(0.3, updateSpacesMenubar)
 
 --==========================================--
 --  _  __          _     _           _      --

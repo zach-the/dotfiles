@@ -39,6 +39,7 @@ mac_only_configs=(
   "Hammerspoon"      "$DOTFILES/hammerspoon-init.lua"         "$HOME/.hammerspoon/init.lua"
   "Karabiner"        "$DOTFILES/karabiner"                    "$HOME/.config/karabiner"
   "JankyBorders"     "$DOTFILES/borders/bordersrc"            "$HOME/.config/borders/bordersrc"
+  "Yabai"            "$DOTFILES/yabai/yabairc"                "$HOME/.config/yabai/yabairc"
 )
 
 # Build the active config list based on OS

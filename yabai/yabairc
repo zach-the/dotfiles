@@ -1,0 +1,35 @@
+#!/usr/bin/env sh
+
+# yabai -m signal --add event=dock_did_restart action="sudo yabai --load-sa"
+# sudo yabai --load-sa
+
+# Space-switching only for now: keep yabai out of window management/tiling
+# entirely so it doesn't change anything besides the hyper+H/L space hop.
+# (Older bsp/tiling config kept below, commented, in case we opt into it later.)
+yabai -m config layout float
+yabai -m config mouse_follows_focus off
+yabai -m config focus_follows_mouse off
+
+# don't manage any windows at all
+yabai -m rule --add app=".*" manage=off
+
+# yabai -m config layout bsp
+#
+# yabai -m config top_padding    5
+# yabai -m config bottom_padding 5
+# yabai -m config left_padding   5
+# yabai -m config right_padding  5
+# yabai -m config window_gap     5
+#
+# yabai -m config mouse_follows_focus          yes
+# yabai -m config focus_follows_mouse          yes
+# yabai -m config window_placement             second_child
+# yabai -m config window_topmost               off
+# yabai -m config window_shadow                on
+# yabai -m config window_opacity               off
+#
+# # don't manage some system apps
+# yabai -m rule --add app="^System Settings$" manage=off
+# yabai -m rule --add app="^Finder$" manage=off
+
+echo "yabai config loaded.."
