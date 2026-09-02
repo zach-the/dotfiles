@@ -483,6 +483,9 @@ end
 -- LAUNCH CHROME
 -- =====================================================================
 
+-- Shared default size for Chrome/Safari windows spawned via Hyper+N / Hyper+M
+local BROWSER_WIN_W, BROWSER_WIN_H = 1000, 700
+
 local function launchChrome()
     -- Snapshot existing Chrome windows so we can identify the new one later
     local existingIds = {}
@@ -495,22 +498,23 @@ local function launchChrome()
 
     local targetScreen = hs.mouse.getCurrentScreen()
     local f = targetScreen:frame()
-    -- AppleScript bounds are {left, top, right, bottom}
-    local left   = math.floor(f.x)
-    local top    = math.floor(f.y)
-    local right  = math.floor(f.x + f.w)
-    local bottom = math.floor(f.y + f.h)
+
+    -- Fixed window size, centered on the screen under the mouse
+    local left   = math.floor(f.x + (f.w - BROWSER_WIN_W) / 2)
+    local top    = math.floor(f.y + (f.h - BROWSER_WIN_H) / 2)
+    local right  = left + BROWSER_WIN_W
+    local bottom = top + BROWSER_WIN_H
 
     if not chromeApp then
         -- Chrome isn't running: open in background without stealing focus
         hs.task.new("/usr/bin/open", nil, {"-g", "-a", "Google Chrome"}):start()
     else
-        -- Create the window and immediately position it on the target screen so it
-        -- never visually appears on the wrong monitor before being moved.
+        -- Chrome supports setting bounds as a creation property, so the window
+        -- spawns directly at the target size/position instead of appearing at
+        -- a default size and then being resized.
         hs.osascript.applescript(string.format([[
             tell application "Google Chrome"
-                set newWin to make new window
-                set bounds of newWin to {%d, %d, %d, %d}
+                make new window with properties {bounds:{%d, %d, %d, %d}}
             end tell
         ]], left, top, right, bottom))
     end
@@ -526,6 +530,32 @@ local function launchChrome()
             end
         end
     end)
+end
+
+-- =====================================================================
+-- LAUNCH SAFARI
+-- =====================================================================
+
+local function launchSafari()
+    local targetScreen = hs.mouse.getCurrentScreen()
+    local f = targetScreen:frame()
+    local left   = math.floor(f.x + (f.w - BROWSER_WIN_W) / 2)
+    local top    = math.floor(f.y + (f.h - BROWSER_WIN_H) / 2)
+    local right  = left + BROWSER_WIN_W
+    local bottom = top + BROWSER_WIN_H
+
+    -- Safari's scripting dictionary has no "make new window with properties
+    -- {bounds:...}" (only `document`, not `window`, is creatable), so unlike
+    -- Chrome this can't set the size at creation time in one step. Setting
+    -- bounds immediately after, in the same synchronous script, is the
+    -- closest equivalent -- there's no separate Hammerspoon-side resize/race.
+    hs.osascript.applescript(string.format([[
+        tell application "Safari"
+            make new document
+            activate
+            set bounds of window 1 to {%d, %d, %d, %d}
+        end tell
+    ]], left, top, right, bottom))
 end
 
 -- =====================================================================
@@ -837,10 +867,7 @@ hs.hotkey.bind({"ctrl", "shift"}, "K", function() startScroll(BASE_SPEED) end, s
 -- Terminal and Browser
 hs.hotkey.bind(hyper, "T", launchWezterm)
 hs.hotkey.bind(hyper, "N", launchChrome)
-hs.hotkey.bind(hyper, "M", function()
-  hs.osascript.applescript('tell application "Safari" to make new document')
-  hs.application.launchOrFocus("Safari")
-end)
+hs.hotkey.bind(hyper, "M", launchSafari)
 
 -- Lock screen
 hs.hotkey.bind(hyper, "delete", function()           -- Lock Screen
