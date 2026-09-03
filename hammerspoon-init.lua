@@ -724,6 +724,42 @@ local function switchSpace(direction)
     end
 end
 
+-- Moves the focused window to the next/prev space on its OWN display only
+-- (mirrors switchSpace's display-scoped query so this can't accidentally
+-- hop the window to a space on a different monitor).
+local function moveWindowToSpace(direction)
+    local winOutput, winOk = hs.execute(YABAI .. " -m query --windows --window")
+    if not winOk or not winOutput or winOutput == "" then return end
+    local winSuccess, win = pcall(hs.json.decode, winOutput)
+    if not winSuccess or not win then return end
+
+    local spacesOutput, spacesOk = hs.execute(YABAI .. " -m query --spaces --display " .. tostring(win.display))
+    if not spacesOk or not spacesOutput or spacesOutput == "" then return end
+    local spacesSuccess, spaces = pcall(hs.json.decode, spacesOutput)
+    if not spacesSuccess or not spaces then return end
+
+    local currentIndex = nil
+    for i, s in ipairs(spaces) do
+        if s.index == win.space then
+            currentIndex = i
+            break
+        end
+    end
+    if not currentIndex then return end
+
+    local targetIndex = currentIndex + (direction == "next" and 1 or -1)
+
+    -- Hard Wall: no wrap-around past this display's own spaces
+    if targetIndex < 1 or targetIndex > #spaces then return end
+
+    local targetSpace = spaces[targetIndex]
+    hs.execute(YABAI .. " -m window --space " .. tostring(targetSpace.index))
+    hs.execute(YABAI .. " -m space --focus " .. tostring(targetSpace.index))
+    if spacesMenubar then
+        spacesMenubar:setTitle(tostring(targetSpace.index))
+    end
+end
+
 -- =====================================================================
 -- MENU BAR SPACE INDICATOR
 -- =====================================================================
@@ -777,6 +813,10 @@ hs.hotkey.bind(hyper, "H", function() switchSpace("prev") end)
 hs.hotkey.bind(hyper, "L", function() switchSpace("next") end)
 hs.hotkey.bind(hyper, "Left", function() switchSpace("prev") end)
 hs.hotkey.bind(hyper, "Right", function() switchSpace("next") end)
+
+-- Move focused window to prev/next space on its own monitor (and follow it there)
+hs.hotkey.bind({"ctrl", "alt"}, "h", function() moveWindowToSpace("prev") end)
+hs.hotkey.bind({"ctrl", "alt"}, "l", function() moveWindowToSpace("next") end)
 
 -- Halves (portrait monitor: horizontal splits; landscape: vertical splits)
 hs.hotkey.bind(hyper, "Z", function()
