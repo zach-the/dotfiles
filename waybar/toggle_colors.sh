@@ -4,7 +4,9 @@
 # scheme (colors-mono.css), by flipping the colors.css symlink both
 # style.css (@import) and the custom/battery + custom/volume scripts
 # (hardcoded COLORS_CSS path) read through. That symlink target is the
-# single variable that decides which scheme is active.
+# single variable that decides which scheme is active. (The battery gauge
+# icon itself is palette-independent -- generate_battery_icons.py always
+# draws white-on-transparent -- only the "Battery: N%" text label retints.)
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LINK="$DIR/colors.css"
 CURRENT="$(readlink "$LINK" 2>/dev/null)"

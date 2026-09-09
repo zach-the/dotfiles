@@ -470,3 +470,7 @@ banner() {
     clear
 }
 alias banner='banner --alignment l'
+# --- Plex Media Server control ---
+alias plex-kill='sudo systemctl stop plexmediaserver'
+alias plex-start='sudo systemctl start plexmediaserver'
+alias plex-restart='sudo systemctl restart plexmediaserver'

@@ -1,8 +1,15 @@
 @import 'colors.css';
+@import 'battery-icons-generated.css';
+@import 'wifi-icons-generated.css';
+@import 'bluetooth-icons-generated.css';
+@import 'backlight-icons-generated.css';
+@import 'volume-icons-generated.css';
+@import 'language-icons-generated.css';
+@import 'mode-icons-generated.css';
 
 * {
-    font-family: "JetBrains Mono", "Font Awesome 6 Free";
-    font-size: 12px;
+    font-family: "SF Pro", "JetBrains Mono", "Font Awesome 6 Free";
+    font-size: 13px;
     border: none;
     border-radius: 0;
     min-height: 0;
@@ -19,7 +26,11 @@ window#waybar {
 
 #workspaces button {
     padding: 0 8px;
-    color: @fg-dim; /* Dimmed inactive state */
+    /* Same grey as the unfilled portion of the volume/wifi rings: white at
+       DIM_OPACITY (see generate_wifi_icons.py / generate_volume_icons.py),
+       not the palette's @fg-dim, so inactive workspaces read as the same
+       "dimmed" as everything else in the bar. */
+    color: rgba(255, 255, 255, 0.3);
     background: transparent;
     transition: all 0.2s ease-in-out;
 }
@@ -34,26 +45,10 @@ window#waybar {
 }
 
 #clock,
-#backlight,
-#custom-battery,
-#network,
-#custom-volume,
-#custom-mode,
-#custom-window,
 #custom-bluetooth,
 #tray {
     padding: 0 12px;
     color: @fg;
-}
-
-#custom-mode {
-    color: @pink; /* Neon Pink — stands out as a mode indicator */
-    font-weight: bold;
-}
-
-#custom-window {
-    color: @green; /* Neon Green — focused app name, next to the mode indicator */
-    font-weight: bold;
 }
 
 #clock {
@@ -61,25 +56,67 @@ window#waybar {
     font-weight: bold;
 }
 
-#backlight {
-    color: @orange; /* Neon Orange */
+/* Icon-only indicators, right side: tight padding on both sides -- there's
+   no text after the icon needing breathing room, so the 12px right padding
+   above (meant for text-bearing modules) just made the gaps between icons
+   much wider than they needed to be. */
+#custom-battery,
+#custom-wifi,
+#custom-bluetooth,
+#custom-backlight,
+#custom-volume,
+#custom-language,
+#custom-mode {
+    padding-right: 4px;
 }
 
-#network {
-    color: @purple; /* Neon Purple */
+#custom-battery {
+    padding-left: 38px;
+    background-repeat: no-repeat;
+    background-position: 4px center;
+    background-size: 32px 15px;
 }
 
-#network.disconnected,
-#network.disabled {
-    color: @fg-muted; /* Grey when no Wi-Fi connection, or radio off */
+#custom-wifi {
+    padding-left: 23px;
+    background-repeat: no-repeat;
+    background-position: 4px center;
+    background-size: 18px 13px;
 }
 
 #custom-bluetooth {
-    color: @blue; /* Neon Blue */
+    padding-left: 20px;
+    background-repeat: no-repeat;
+    background-position: 4px center;
+    background-size: 15px 15px;
 }
 
-#custom-bluetooth.off {
-    color: @fg-muted; /* Grey when Bluetooth is powered off */
+#custom-backlight {
+    padding-left: 20px;
+    background-repeat: no-repeat;
+    background-position: 4px center;
+    background-size: 15px 15px;
+}
+
+#custom-volume {
+    padding-left: 24px;
+    background-repeat: no-repeat;
+    background-position: 4px center;
+    background-size: 19px 15px;
+}
+
+#custom-language {
+    padding-left: 23px;
+    background-repeat: no-repeat;
+    background-position: 4px center;
+    background-size: 15px 15px;
+}
+
+#custom-mode {
+    padding-left: 27px;
+    background-repeat: no-repeat;
+    background-position: 4px center;
+    background-size: 19px 19px;
 }
 
 #tray {

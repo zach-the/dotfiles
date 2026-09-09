@@ -1,45 +1,24 @@
 #!/usr/bin/env python3
-"""Waybar custom/battery module: reports capacity via upower and colors
-the label along a green -> yellow -> red curve, mixed in OKLab so the
-gradient stays perceptually smooth instead of drifting through the
-muddy tones a plain sRGB lerp produces between unrelated hues.
+"""Waybar custom/battery module: reports capacity via upower.
 
-Color stops come from waybar/colors.css, a symlink toggled by
-waybar/toggle_colors.sh between the active palette (colors-neon.css,
-generated from palettes/*.toml by generate_colors.py) and a plain
-white scheme (colors-mono.css) — so switching palettes, or toggling
-mono mode, retints the battery gradient automatically:
-  100% -> green   (@green)
-   30% -> yellow  (@yellow), full strength
-   20% -> orange  (@orange), full strength
-   10% -> red     (@pink), full strength from here to 0%
-While charging, the level isn't urgent regardless of percentage, so
-the color is pinned to green.
+Icon-only -- the percent and charge state select a "<prefix>-N-<state>"
+class, which waybar/battery-icons-generated.css maps to the matching
+pre-rendered gauge in waybar/icons/battery/ (see generate_battery_icons.py).
+Hover the module for exact time-to-empty/full via the tooltip.
+
+generate_battery_icons.py renders two parallel sets of gauges -- "pct" ones
+with the percentage knocked out inside the fill, and "plain" ones that are
+just the outline+fill with no digit. Clicking the module
+(battery_toggle.sh) toggles which set this script picks its class prefix
+from, tracked by whether SHOW_PCT_FILE exists.
 """
 import json
-import os
 import re
 import subprocess
-import sys
 from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from color_gradient import gradient_color
+SHOW_PCT_FILE = Path.home() / ".config" / "hypr" / "battery_show_pct"
 
-COLORS_CSS = Path(__file__).resolve().parent.parent / "waybar" / "colors.css"
-
-
-def load_palette_colors():
-    text = COLORS_CSS.read_text()
-    colors = dict(re.findall(r"@define-color\s+([\w-]+)\s+(#[0-9a-fA-F]{6})", text))
-    return colors["green"], colors["yellow"], colors["orange"], colors["pink"]
-
-
-def battery_color(pct, green, yellow, orange, red):
-    return gradient_color(pct, [(0, red), (10, red), (20, orange), (30, yellow), (100, green)])
-
-
-# --- upower ---
 
 def upower_info():
     devices = subprocess.check_output(["upower", "-e"]).decode().splitlines()
@@ -65,15 +44,12 @@ def parse(info):
 def main():
     info = upower_info()
     if info is None:
-        print(json.dumps({"text": "Battery: N/A"}))
+        # A single space, not "" -- waybar hides a custom module outright if
+        # its text is truly empty.
+        print(json.dumps({"text": " ", "tooltip": "Battery: N/A"}))
         return
 
     pct, charging, state, time_to, power = parse(info)
-    green, yellow, orange, red = load_palette_colors()
-    color = green if charging else battery_color(pct, green, yellow, orange, red)
-
-    label = "Charging" if charging else "Battery"
-    text = f"<span foreground='{color}'>{label}: {pct}%</span>"
 
     if time_to and power:
         tooltip = f"{time_to} — {power}W"
@@ -82,10 +58,17 @@ def main():
     else:
         tooltip = state.replace("-", " ").capitalize()
 
+    # Exact percent, matching the pre-rendered icon set in icons/battery/
+    # (see generate_battery_icons.py) -- the class name picks which
+    # background-image CSS rule in battery-icons-generated.css applies.
+    pct_clamped = min(100, max(0, pct))
+    state_class = "charging" if charging else "discharging"
+    prefix = "pct" if SHOW_PCT_FILE.exists() else "plain"
+
     print(json.dumps({
-        "text": text,
+        "text": " ",  # icon-only; waybar hides the module if text is truly empty
         "tooltip": tooltip,
-        "class": "charging" if charging else "discharging",
+        "class": f"{prefix}-{pct_clamped}-{state_class}",
         "percentage": pct,
     }))
 

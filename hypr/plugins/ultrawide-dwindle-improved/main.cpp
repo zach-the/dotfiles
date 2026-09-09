@@ -14,6 +14,7 @@
 #include <memory>
 #include <optional>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 using namespace Layout;
@@ -40,6 +41,9 @@ struct SDwindleNode {
 
     // Split the leaf holding `cur` into an internal node. If newFirst, newT goes on the
     // top/left and cur goes on the bottom/right; otherwise cur is top/left, newT bottom/right.
+    // The split orientation is decided once, here, from cur's box at the moment of the
+    // split — not recomputed later from the box shape (see layout()), so resizing a
+    // column/split wide or tall never flips it between stacked and side-by-side on its own.
     bool insertNext(const SP<ITarget>& cur, const SP<ITarget>& newT, bool newFirst = false) {
         if (isLeaf()) {
             if (target != cur) return false;
@@ -48,6 +52,8 @@ struct SDwindleNode {
             auto newLeaf    = std::make_unique<SDwindleNode>();
             newLeaf->target = newT;
             target          = nullptr;
+            auto curBox     = cur->position();
+            splitV          = curBox.w > curBox.h;
             if (newFirst) {
                 first  = std::move(newLeaf);
                 second = std::move(oldLeaf);
@@ -82,6 +88,23 @@ struct SDwindleNode {
         return r ? r : second->findParentOf(t);
     }
 
+    // Builds the chain of ancestors from `t`'s immediate parent up to the
+    // root, nearest first. Each entry records whether `t` descends through
+    // that ancestor's `first` child (true) or `second` child (false).
+    bool buildPath(const SP<ITarget>& t, std::vector<std::pair<SDwindleNode*, bool>>& path) {
+        if (isLeaf())
+            return target == t;
+        if (first->buildPath(t, path)) {
+            path.emplace_back(this, true);
+            return true;
+        }
+        if (second->buildPath(t, path)) {
+            path.emplace_back(this, false);
+            return true;
+        }
+        return false;
+    }
+
     void swapTargets(const SP<ITarget>& a, const SP<ITarget>& b) {
         if (isLeaf()) {
             if      (target == a) target = b;
@@ -98,7 +121,10 @@ struct SDwindleNode {
             target->warpPositionSize();
             return;
         }
-        splitV = box.w > box.h;
+        // splitV is fixed at creation time (see insertNext/appendToEnd), not
+        // recomputed from the box here — so a column/split's orientation
+        // never flips on its own just because a resize made it wider or
+        // taller than it started.
         CBox fBox, sBox;
         if (splitV) {
             double w = box.w * ratio;
@@ -120,7 +146,9 @@ static void appendToEnd(std::unique_ptr<SDwindleNode>& node, const SP<ITarget>& 
         oldLeaf->target = node->target;
         auto newLeaf    = std::make_unique<SDwindleNode>();
         newLeaf->target = newT;
+        auto curBox     = node->target->position();
         node->target    = nullptr;
+        node->splitV    = curBox.w > curBox.h;
         node->first     = std::move(oldLeaf);
         node->second    = std::move(newLeaf);
         return;
@@ -241,11 +269,48 @@ class CUltrawideImprovedAlgorithm final : public ITiledAlgorithm {
 
         if (!isUltrawide(workArea)) {
             if (!m_dwindleRoot) return;
-            auto* node = m_dwindleRoot->findParentOf(target);
-            if (!node) return;
-            double ref  = node->splitV ? workArea.w : workArea.h;
-            double d    = node->splitV ? delta.x : delta.y;
-            node->ratio = std::clamp((float)(node->ratio + d / ref * 2.0), 0.1f, 0.9f);
+
+            // The immediate parent only accounts for one axis (whichever
+            // orientation it happens to split on) — a corner drag needs
+            // both, so walk the full ancestor chain and resolve each axis
+            // against whichever ancestor actually owns that boundary.
+            std::vector<std::pair<SDwindleNode*, bool>> path;
+            if (!m_dwindleRoot->buildPath(target, path)) return;
+
+            // For a real corner, only the ancestor whose boundary sits on
+            // the dragged side should move — e.g. dragging the window's
+            // left edge should only adjust an ancestor where our chain is
+            // the *second* (right-hand) child, since that ancestor's ratio
+            // boundary is exactly that edge. With no real corner
+            // (CORNER_NONE, e.g. a keybind-driven resize) either side is
+            // accepted and we just take the nearest matching ancestor.
+            bool none       = corner == CORNER_NONE;
+            bool leftDrag   = corner == CORNER_TOPLEFT || corner == CORNER_BOTTOMLEFT;
+            bool rightDrag  = corner == CORNER_TOPRIGHT || corner == CORNER_BOTTOMRIGHT;
+            bool topDrag    = corner == CORNER_TOPLEFT || corner == CORNER_TOPRIGHT;
+            bool bottomDrag = corner == CORNER_BOTTOMLEFT || corner == CORNER_BOTTOMRIGHT;
+
+            auto resizeAlongAxis = [&](bool wantSplitV, double d, double outerDim, bool wantFirstSide, bool wantSecondSide) {
+                for (auto& [node, isFirst] : path) {
+                    if (node->splitV != wantSplitV) continue;
+                    if (!((isFirst && wantFirstSide) || (!isFirst && wantSecondSide))) continue;
+                    node->ratio = std::clamp((float)(node->ratio + d / outerDim * 2.0), 0.1f, 0.9f);
+                    return;
+                }
+            };
+
+            // Vertical-split (left/right) ancestors resolve delta.x: our
+            // side is `first` (left) when dragging the right edge,
+            // `second` (right) when dragging the left edge.
+            if (delta.x != 0.0)
+                resizeAlongAxis(true, delta.x, workArea.w, none || rightDrag, none || leftDrag);
+
+            // Horizontal-split (top/bottom) ancestors resolve delta.y: our
+            // side is `first` (top) when dragging the bottom edge,
+            // `second` (bottom) when dragging the top edge.
+            if (delta.y != 0.0)
+                resizeAlongAxis(false, delta.y, workArea.h, none || bottomDrag, none || topDrag);
+
             recalculate();
             return;
         }
@@ -269,7 +334,10 @@ class CUltrawideImprovedAlgorithm final : public ITiledAlgorithm {
                     break;
             }
 
-            if (adjustRight && col + 1 < m_numCols) {
+            bool hasLeft  = col - 1 >= 0;
+            bool hasRight = col + 1 < m_numCols;
+
+            if (adjustRight && hasRight) {
                 float combined = m_colWidths[col] + m_colWidths[col + 1];
                 float newThis  = std::clamp(
                     (float)(m_colWidths[col] + delta.x / workArea.w),
@@ -277,10 +345,34 @@ class CUltrawideImprovedAlgorithm final : public ITiledAlgorithm {
                     (1.0f - MIN_COL_FRAC) * combined);
                 m_colWidths[col + 1] = combined - newThis;
                 m_colWidths[col]     = newThis;
-            } else if (adjustLeft && col - 1 >= 0) {
+            } else if (adjustLeft && hasLeft) {
                 float combined = m_colWidths[col - 1] + m_colWidths[col];
                 float newThis  = std::clamp(
                     (float)(m_colWidths[col] - delta.x / workArea.w),
+                    MIN_COL_FRAC * combined,
+                    (1.0f - MIN_COL_FRAC) * combined);
+                m_colWidths[col - 1] = combined - newThis;
+                m_colWidths[col]     = newThis;
+            } else if (adjustLeft && hasRight) {
+                // Leftmost column: its left edge is pinned to the screen
+                // edge and can't move, so a top/bottom-left corner drag
+                // has no left boundary to act on. Fall back to the
+                // column's right boundary instead, keeping the same
+                // sign convention (shrink this column on positive
+                // delta.x) a real left-edge drag would have.
+                float combined = m_colWidths[col] + m_colWidths[col + 1];
+                float newThis  = std::clamp(
+                    (float)(m_colWidths[col] - delta.x / workArea.w),
+                    MIN_COL_FRAC * combined,
+                    (1.0f - MIN_COL_FRAC) * combined);
+                m_colWidths[col + 1] = combined - newThis;
+                m_colWidths[col]     = newThis;
+            } else if (adjustRight && hasLeft) {
+                // Rightmost column: symmetric fallback against its left
+                // neighbor, since its own right edge is the screen edge.
+                float combined = m_colWidths[col - 1] + m_colWidths[col];
+                float newThis  = std::clamp(
+                    (float)(m_colWidths[col] + delta.x / workArea.w),
                     MIN_COL_FRAC * combined,
                     (1.0f - MIN_COL_FRAC) * combined);
                 m_colWidths[col - 1] = combined - newThis;

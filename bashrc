@@ -203,3 +203,20 @@ else
 fi
 export PATH=$HOME/.npm-global/bin:$PATH
 
+
+# --- Minecraft server (Java + Geyser Bedrock proxy) ---
+minecraft-server-start() {
+    sudo tailscale up && \
+    sudo systemctl start minecraft geyser && \
+    sleep 3 && \
+    echo "Minecraft server + Geyser running." && \
+    echo "Connect from the Minecraft mobile app to: $(tailscale ip -4 2>/dev/null):19132"
+}
+minecraft-server-stop() {
+    sudo systemctl stop geyser minecraft && \
+    sudo tailscale down
+}
+minecraft-server-status() {
+    systemctl status minecraft geyser --no-pager
+}
+# --- end Minecraft server ---

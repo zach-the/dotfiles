@@ -8,3 +8,5 @@ if [ "$(nmcli radio wifi)" = "enabled" ]; then
 else
     nmcli radio wifi on
 fi
+
+pkill -RTMIN+12 waybar # refresh custom/wifi's signal-tier glyph immediately

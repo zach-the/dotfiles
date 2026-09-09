@@ -1,0 +1,80 @@
+/* Chrome for popup_daemon.py's popups. Written against
+   waybar/colors.css's @define-color palette (loaded first by
+   popup_daemon.py so these names resolve) so toggle_colors.sh's
+   neon/mono swap applies here automatically. Reloaded on every show(),
+   so a colors toggle takes effect on the next open with no daemon
+   restart. */
+
+window.popup-audio,
+window.popup-wifi,
+window.popup-bluetooth {
+    /* Same white-at-30%-opacity used for the wifi/volume rings' dimmed
+       track and the workspace buttons' inactive state (see
+       generate_wifi_icons.py/generate_volume_icons.py's DIM_OPACITY and
+       style.css's #workspaces button comment). */
+    background-color: rgba(255, 255, 255, 0.3);
+    border-radius: 10px;
+    color: @fg;
+}
+
+window.popup-audio .popup-header,
+window.popup-wifi .popup-header,
+window.popup-bluetooth .popup-header {
+    font-weight: bold;
+    padding: 2px 4px 4px 4px;
+}
+
+window.popup-audio .popup-subheader,
+window.popup-wifi .popup-subheader,
+window.popup-bluetooth .popup-subheader {
+    font-size: 0.85em;
+    opacity: 0.8;
+    padding: 2px 4px 4px 0;
+}
+
+window.popup-audio list,
+window.popup-wifi list,
+window.popup-bluetooth list {
+    background-color: transparent;
+    color: @fg;
+}
+
+window.popup-audio row,
+window.popup-wifi row,
+window.popup-bluetooth row {
+    background-color: transparent;
+    border-radius: 6px;
+}
+
+window.popup-audio row:hover,
+window.popup-wifi row:hover,
+window.popup-bluetooth row:hover {
+    background-color: alpha(@pink, 0.2);
+}
+
+window.popup-audio check,
+window.popup-audio label,
+window.popup-wifi check,
+window.popup-wifi label,
+window.popup-bluetooth check,
+window.popup-bluetooth label {
+    color: @fg;
+}
+
+window.popup-wifi entry,
+window.popup-bluetooth entry {
+    margin: 2px 4px;
+}
+
+window.popup-bluetooth button {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    color: @fg;
+    padding: 4px 6px;
+}
+
+window.popup-bluetooth button:hover {
+    background-color: alpha(@pink, 0.2);
+    border-radius: 6px;
+}

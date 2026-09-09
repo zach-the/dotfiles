@@ -1,13 +1,16 @@
 #!/bin/bash
-# Waybar custom/bluetooth module exec: prints "Bluetooth: Off/On/Connected"
-# plus a CSS class (i3blocks-style output: text\ntooltip\nclass — the
-# default custom-module format, since no return-type is set in
-# config.jsonc) so style.css can grey out the "off" state.
+# Waybar custom/bluetooth module exec: icon-only (i3blocks-style output:
+# text\ntooltip\nclass — the default custom-module format, since no
+# return-type is set in config.jsonc). The class picks which of
+# bluetooth-icons-generated.css's background-images applies; the former
+# "Bluetooth: Off/On/Connected" text now lives in the tooltip instead.
 if ! bluetoothctl show | grep -q "Powered: yes"; then
-    text="Bluetooth: Off"; class="off"
+    tooltip="Bluetooth: Off"; class="off"
 elif bluetoothctl devices Connected | grep -q .; then
-    text="Bluetooth: Connected"; class="connected"
+    tooltip="Bluetooth: Connected"; class="connected"
 else
-    text="Bluetooth: On"; class="on"
+    tooltip="Bluetooth: On"; class="on"
 fi
-printf '%s\n\n%s\n' "$text" "$class"
+# A single space, not "" -- waybar hides a custom module outright if its
+# text is truly empty.
+printf ' \n%s\n%s\n' "$tooltip" "$class"

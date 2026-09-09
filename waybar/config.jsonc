@@ -8,94 +8,88 @@
   "margin-right": 8,
   "margin-bottom": -10, // should always be opposite of gaps_out in hyprland.conf
 
-  "modules-left": ["clock", "custom/mode", "hyprland/language", "custom/window"],
-  "modules-center": ["hyprland/workspaces"],
-  "modules-right": ["custom/volume", "custom/bluetooth", "network", "backlight", "custom/battery"], //tray was here, but i removed it. look into optimizing that and figurig out system76-power later
+  "modules-left": ["hyprland/workspaces"],
+  "modules-center": ["clock"],
+  "modules-right": ["custom/language", "custom/mode", "custom/volume", "custom/bluetooth", "custom/backlight", "custom/wifi", "custom/battery"], //tray was here, but i removed it. look into optimizing that and figurig out system76-power later
 
   "hyprland/workspaces": {
     "format": "{icon}",
     "on-click": "activate",
     "format-icons": {
       "default": "●"
-    },
-    "persistent-workspaces": {
-      "eDP-1": [1, 2, 3, 4, 5],
-      "*": [6, 7, 8, 9, 10]
     }
+    // No persistent-workspaces pinning: each monitor starts with just the
+    // one workspace Hyprland gives it by default, and ws_nav.sh
+    // (hyper+L/H) grows a monitor's own block by 1 each time instead of
+    // pre-declaring a fixed set.
   },
 
-  "backlight": {
-    "device": "intel_backlight", // Replace with your GPU (e.g., "amdgpu_bl0") if it doesn't work
-    "format": "Screen: {percent}%",
-    "on-scroll-up": "brightnessctl set 1%+",
-    "on-scroll-down": "brightnessctl set 1%-",
-    "tooltip": false
+  "custom/backlight": {
+    "exec": "~/.config/hypr/backlight_level.py",
+    "return-type": "json",
+    "interval": 5,
+    "signal": 13,
+    "on-scroll-up": "brightnessctl -e4 -n2 set 10%+; pkill -RTMIN+13 waybar",
+    "on-scroll-down": "brightnessctl -e4 -n2 set 10%-; pkill -RTMIN+13 waybar"
   },
 
   "clock": {
-    "format": " {:%A, %B %d %H:%M}",
+    //"format": "<span text_transform='uppercase'> {:%A, %B %d %H:%M}</span>",
+    "format": "{:%A, %B %d %H:%M}",
     "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>"
   },
 
   "custom/battery": {
     "exec": "~/.config/hypr/battery_color.py",
     "return-type": "json",
-    "interval": 30
+    "interval": 30,
+    "signal": 14,
+    "on-click": "~/.config/hypr/battery_toggle.sh"
   },
 
-  "network": {
-    "format-wifi": "WiFi: {essid} ({signalStrength}%)",
-    "format-ethernet": "LAN: {ipaddr}",
-    "format-disconnected": "No Network",
-    "format-disabled": "WiFi: Off",
-    "tooltip-format": "{ifname}: {ipaddr}\n{gwaddr} — {bandwidthUpBits} up / {bandwidthDownBits} down",
-    "on-click": "~/.config/hypr/wifi_menu_launch.sh",
+  "custom/wifi": {
+    "exec": "~/.config/hypr/wifi_signal.py",
+    "return-type": "json",
+    "interval": 5,
+    "signal": 12,
+    "on-click": "~/.config/hypr/popup_client.py toggle wifi",
     "on-click-right": "~/.config/hypr/wifi_toggle.sh"
   },
 
   "custom/mode": {
-    "exec": "cat ~/.config/hypr/mode_state 2>/dev/null || echo TILE",
+    "exec": "~/.config/hypr/mode_status.sh",
     "interval": "once",
     "signal": 8,
-    "on-click": "~/.config/hypr/mode_toggle.sh",
-    "tooltip": false
+    "on-click": "~/.config/hypr/mode_toggle.sh"
   },
 
-  "custom/window": {
-    "exec": "~/.config/hypr/focused_app.sh",
-    "interval": "once",
+  "custom/language": {
+    "exec": "~/.config/hypr/keyboard_layout.py",
+    "return-type": "json",
+    "interval": 5,
     "signal": 11,
-    "tooltip": false
-  },
-
-  "hyprland/language": {
-    "format": "{}",
-    "format-en": "EN",
-    "format-ka": "GE",
-    "keyboard-name": "at-translated-set-2-keyboard" // Optional: specify if you have multiple input devices
+    "on-click": "hyprctl switchxkblayout all next; pkill -RTMIN+11 waybar"
   },
 
   "custom/bluetooth": {
     "exec": "~/.config/hypr/bluetooth_status.sh",
     "interval": 5,
     "signal": 9,
-    "on-click": "~/.config/hypr/bluetooth_menu_launch.sh",
-    "on-click-right": "~/.config/hypr/bluetooth_toggle.sh",
-    "tooltip": false
+    "on-click": "~/.config/hypr/popup_client.py toggle bluetooth",
+    "on-click-right": "~/.config/hypr/bluetooth_toggle.sh"
   },
 
   "custom/volume": {
     "exec": "~/.config/hypr/volume_color.py",
     "return-type": "json",
-    "interval": 1,
+    "interval": 30,
     "signal": 10,
-    "on-click": "~/.config/hypr/audio_menu_launch.sh",
+    "on-click": "~/.config/hypr/popup_client.py toggle audio",
     "on-click-middle": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle; ~/.config/hypr/volume_refresh.sh",
     "on-click-right": "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle; ~/.config/hypr/volume_refresh.sh",
-    "on-scroll-up": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 1%+ --limit 1.5; ~/.config/hypr/volume_refresh.sh",
-    "on-scroll-down": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 1%-; ~/.config/hypr/volume_refresh.sh",
-    "smooth-scrolling-threshold": 0.2,
-    "tooltip": false
+    "on-scroll-up": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 10%+ --limit 1.5; ~/.config/hypr/volume_refresh.sh",
+    "on-scroll-down": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 10%-; ~/.config/hypr/volume_refresh.sh",
+    "smooth-scrolling-threshold": 0.2
   },
 
   "tray": {
