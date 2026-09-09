@@ -79,15 +79,6 @@ struct SDwindleNode {
         return remove(self->first, t) || remove(self->second, t);
     }
 
-    SDwindleNode* findParentOf(const SP<ITarget>& t) {
-        if (isLeaf()) return nullptr;
-        if ((first->isLeaf()  && first->target  == t) ||
-            (second->isLeaf() && second->target == t))
-            return this;
-        auto* r = first->findParentOf(t);
-        return r ? r : second->findParentOf(t);
-    }
-
     // Builds the chain of ancestors from `t`'s immediate parent up to the
     // root, nearest first. Each entry records whether `t` descends through
     // that ancestor's `first` child (true) or `second` child (false).
@@ -167,6 +158,68 @@ static bool computeNewFirst(const SP<ITarget>& nearest) {
         return mousePos.x < box.x + box.w * 0.5; // vertical split → compare X
     else
         return mousePos.y < box.y + box.h * 0.5; // horizontal split → compare Y
+}
+
+// Walks `path` (nearest-ancestor-first, from SDwindleNode::buildPath) for the
+// first node whose split orientation matches `wantSplitV`, on the side
+// implied by wantFirstSide/wantSecondSide, and nudges its ratio by `d` pixels
+// against `outerDim` (the pixel size, along this axis, of the box being
+// subdivided). Returns whether a matching ancestor was found and adjusted.
+static bool resizeAlongPath(std::vector<std::pair<SDwindleNode*, bool>>& path, bool wantSplitV, double d, double outerDim, bool wantFirstSide,
+                             bool wantSecondSide) {
+    for (auto& [node, isFirst] : path) {
+        if (node->splitV != wantSplitV) continue;
+        if (!((isFirst && wantFirstSide) || (!isFirst && wantSecondSide))) continue;
+        node->ratio = std::clamp((float)(node->ratio + d / outerDim * 2.0), 0.1f, 0.9f);
+        return true;
+    }
+    return false;
+}
+
+// What a resize drag should affect, recovered from where the grab actually
+// sits on the window rather than from Hyprland's own corner classification.
+// Hyprland's mouse-resize dispatch has no "pure edge" concept at all — every
+// grab is classified into one of the 4 diagonal quadrants (see
+// DragController::dragBegin upstream), even a grab dead-center on an edge —
+// so relying on that corner alone means ordinary hand jitter during a
+// straight up/down (or left/right) drag leaks a spurious resize into the
+// other axis. Instead, for a real mouse drag (corner != CORNER_NONE, so the
+// live cursor position is meaningfully placed on this window), we measure
+// how close the grab point is to each edge: only near-corner grabs (near an
+// edge on BOTH axes) enable both axes; a grab near just one pair of edges
+// enables only that axis, matching ordinary tiling-WM edge/corner semantics.
+// For a programmatic resize (CORNER_NONE, e.g. a keybind), there's no
+// meaningful grab point at all, so both axes stay enabled and side
+// preference falls back to the delta's own sign, matching prior behavior.
+struct SGrabZone {
+    bool allowHorizontal = true, allowVertical = true;
+    bool preferLeft = false, preferRight = false, preferTop = false, preferBottom = false;
+};
+
+static SGrabZone computeGrabZone(const SP<ITarget>& target, eRectCorner corner, const Vector2D& delta) {
+    static constexpr double EDGE_ZONE = 0.2; // fraction of each dimension counted as "near that edge"
+
+    SGrabZone zone;
+    if (corner == CORNER_NONE) {
+        zone.preferRight  = delta.x > 0;
+        zone.preferLeft   = !zone.preferRight;
+        zone.preferBottom = delta.y > 0;
+        zone.preferTop    = !zone.preferBottom;
+        return zone;
+    }
+
+    auto   box   = target->position();
+    auto   mouse = g_pInputManager->getMouseCoordsInternal();
+    double fx    = box.w > 0.0 ? (mouse.x - box.x) / box.w : 0.5;
+    double fy    = box.h > 0.0 ? (mouse.y - box.y) / box.h : 0.5;
+
+    zone.preferLeft      = fx < EDGE_ZONE;
+    zone.preferRight     = fx > 1.0 - EDGE_ZONE;
+    zone.preferTop       = fy < EDGE_ZONE;
+    zone.preferBottom    = fy > 1.0 - EDGE_ZONE;
+    zone.allowHorizontal = zone.preferLeft || zone.preferRight;
+    zone.allowVertical   = zone.preferTop || zone.preferBottom;
+    return zone;
 }
 
 class CUltrawideImprovedAlgorithm final : public ITiledAlgorithm {
@@ -277,39 +330,19 @@ class CUltrawideImprovedAlgorithm final : public ITiledAlgorithm {
             std::vector<std::pair<SDwindleNode*, bool>> path;
             if (!m_dwindleRoot->buildPath(target, path)) return;
 
-            // For a real corner, only the ancestor whose boundary sits on
-            // the dragged side should move — e.g. dragging the window's
-            // left edge should only adjust an ancestor where our chain is
-            // the *second* (right-hand) child, since that ancestor's ratio
-            // boundary is exactly that edge. With no real corner
-            // (CORNER_NONE, e.g. a keybind-driven resize) either side is
-            // accepted and we just take the nearest matching ancestor.
-            bool none       = corner == CORNER_NONE;
-            bool leftDrag   = corner == CORNER_TOPLEFT || corner == CORNER_BOTTOMLEFT;
-            bool rightDrag  = corner == CORNER_TOPRIGHT || corner == CORNER_BOTTOMRIGHT;
-            bool topDrag    = corner == CORNER_TOPLEFT || corner == CORNER_TOPRIGHT;
-            bool bottomDrag = corner == CORNER_BOTTOMLEFT || corner == CORNER_BOTTOMRIGHT;
-
-            auto resizeAlongAxis = [&](bool wantSplitV, double d, double outerDim, bool wantFirstSide, bool wantSecondSide) {
-                for (auto& [node, isFirst] : path) {
-                    if (node->splitV != wantSplitV) continue;
-                    if (!((isFirst && wantFirstSide) || (!isFirst && wantSecondSide))) continue;
-                    node->ratio = std::clamp((float)(node->ratio + d / outerDim * 2.0), 0.1f, 0.9f);
-                    return;
-                }
-            };
+            auto zone = computeGrabZone(target, corner, delta);
 
             // Vertical-split (left/right) ancestors resolve delta.x: our
             // side is `first` (left) when dragging the right edge,
             // `second` (right) when dragging the left edge.
-            if (delta.x != 0.0)
-                resizeAlongAxis(true, delta.x, workArea.w, none || rightDrag, none || leftDrag);
+            if (delta.x != 0.0 && zone.allowHorizontal)
+                resizeAlongPath(path, true, delta.x, workArea.w, zone.preferRight, zone.preferLeft);
 
             // Horizontal-split (top/bottom) ancestors resolve delta.y: our
             // side is `first` (top) when dragging the bottom edge,
             // `second` (bottom) when dragging the top edge.
-            if (delta.y != 0.0)
-                resizeAlongAxis(false, delta.y, workArea.h, none || bottomDrag, none || topDrag);
+            if (delta.y != 0.0 && zone.allowVertical)
+                resizeAlongPath(path, false, delta.y, workArea.h, zone.preferBottom, zone.preferTop);
 
             recalculate();
             return;
@@ -319,20 +352,21 @@ class CUltrawideImprovedAlgorithm final : public ITiledAlgorithm {
         if (colIt == m_colAssignment.end()) return;
         int col = colIt->second;
 
-        // Column boundary resize (delta.x).
-        if (delta.x != 0.0 && m_numCols > 1) {
-            bool adjustRight = false;
-            bool adjustLeft  = false;
-            switch (corner) {
-                case CORNER_TOPRIGHT:
-                case CORNER_BOTTOMRIGHT: adjustRight = true; break;
-                case CORNER_TOPLEFT:
-                case CORNER_BOTTOMLEFT:  adjustLeft  = true; break;
-                default:
-                    if (delta.x > 0) adjustRight = true;
-                    else             adjustLeft  = true;
-                    break;
-            }
+        auto zone   = computeGrabZone(target, corner, delta);
+        auto colBox = computeColBox(workArea, col);
+
+        std::vector<std::pair<SDwindleNode*, bool>> path;
+        if (m_colRoots[col])
+            m_colRoots[col]->buildPath(target, path);
+
+        // Horizontal: an internal left/right split within this column (e.g.
+        // two windows side by side in the same column) owns this boundary
+        // if one exists on the dragged side; only if there's no such split
+        // does this edge belong to the outer inter-column boundary instead.
+        if (delta.x != 0.0 && zone.allowHorizontal &&
+            !resizeAlongPath(path, true, delta.x, colBox.w, zone.preferRight, zone.preferLeft) && m_numCols > 1) {
+            bool adjustRight = zone.preferRight;
+            bool adjustLeft  = zone.preferLeft;
 
             bool hasLeft  = col - 1 >= 0;
             bool hasRight = col + 1 < m_numCols;
@@ -380,16 +414,14 @@ class CUltrawideImprovedAlgorithm final : public ITiledAlgorithm {
             }
         }
 
-        // Intra-column dwindle resize (delta.y).
-        if (delta.y != 0.0 && m_colRoots[col]) {
-            auto* node = m_colRoots[col]->findParentOf(target);
-            if (node && !node->splitV) {
-                CBox colBox = computeColBox(workArea, col);
-                node->ratio = std::clamp(
-                    (float)(node->ratio + delta.y / colBox.h * 2.0),
-                    0.1f, 0.9f);
-            }
-        }
+        // Intra-column dwindle resize (delta.y). Walks the full ancestor
+        // chain within the column, not just the immediate parent — e.g. two
+        // windows side by side share a left/right split as their immediate
+        // parent, so the top/bottom boundary against a window below them
+        // (or above) sits one level further up and would otherwise never be
+        // found.
+        if (delta.y != 0.0 && zone.allowVertical)
+            resizeAlongPath(path, false, delta.y, colBox.h, zone.preferBottom, zone.preferTop);
 
         recalculate();
     }

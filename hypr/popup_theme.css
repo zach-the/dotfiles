@@ -8,11 +8,14 @@
 window.popup-audio,
 window.popup-wifi,
 window.popup-bluetooth {
-    /* Same white-at-30%-opacity used for the wifi/volume rings' dimmed
-       track and the workspace buttons' inactive state (see
-       generate_wifi_icons.py/generate_volume_icons.py's DIM_OPACITY and
-       style.css's #workspaces button comment). */
-    background-color: rgba(255, 255, 255, 0.3);
+    /* Solid, opaque version of the wifi/volume rings' dimmed-track grey
+       (white at 30% opacity -- see generate_wifi_icons.py/
+       generate_volume_icons.py's DIM_OPACITY) -- i.e. what that grey
+       looks like painted over black, computed once here rather than
+       left translucent so the popup reads as a consistent solid grey
+       instead of tinting with whatever wallpaper/window happens to be
+       behind it. */
+    background-color: #4d4d4d;
     border-radius: 10px;
     color: @fg;
 }
@@ -52,11 +55,8 @@ window.popup-bluetooth row:hover {
     background-color: alpha(@pink, 0.2);
 }
 
-window.popup-audio check,
 window.popup-audio label,
-window.popup-wifi check,
 window.popup-wifi label,
-window.popup-bluetooth check,
 window.popup-bluetooth label {
     color: @fg;
 }
@@ -64,6 +64,11 @@ window.popup-bluetooth label {
 window.popup-wifi entry,
 window.popup-bluetooth entry {
     margin: 2px 4px;
+}
+
+window.popup-wifi .lock-icon {
+    font-family: "JetBrainsMono Nerd Font Mono";
+    opacity: 0.8;
 }
 
 window.popup-bluetooth button {
@@ -77,4 +82,66 @@ window.popup-bluetooth button {
 window.popup-bluetooth button:hover {
     background-color: alpha(@pink, 0.2);
     border-radius: 6px;
+}
+
+/* Modern flat switch (Multi-Output toggle): a plain pill instead of
+   GTK3's default beveled/gradient skeuomorphic switch. */
+window.popup-audio switch {
+    background-color: rgba(255, 255, 255, 0.2);
+    background-image: none;
+    border: none;
+    border-radius: 999px;
+    box-shadow: none;
+    min-width: 38px;
+    min-height: 20px;
+    transition: background-color 0.15s ease;
+}
+
+window.popup-audio switch:checked {
+    background-color: @pink;
+}
+
+window.popup-audio switch slider {
+    background-color: #ffffff;
+    background-image: none;
+    border: none;
+    border-radius: 999px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+    min-width: 16px;
+    min-height: 16px;
+    margin: 2px;
+}
+
+/* Modern flat slider (per-output volume, Multi-Output mode): a thin
+   accent-filled track and a plain circular thumb instead of GTK3's
+   default beveled trough/handle. */
+window.popup-audio scale {
+    min-height: 16px;
+    padding: 0;
+}
+
+window.popup-audio scale trough {
+    background-color: rgba(255, 255, 255, 0.2);
+    background-image: none;
+    border: none;
+    border-radius: 999px;
+    min-height: 4px;
+}
+
+window.popup-audio scale highlight {
+    background-color: @pink;
+    background-image: none;
+    border: none;
+    border-radius: 999px;
+    min-height: 4px;
+}
+
+window.popup-audio scale slider {
+    background-color: #ffffff;
+    background-image: none;
+    border: none;
+    border-radius: 999px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+    min-width: 14px;
+    min-height: 14px;
 }

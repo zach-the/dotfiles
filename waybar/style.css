@@ -71,10 +71,10 @@ window#waybar {
 }
 
 #custom-battery {
-    padding-left: 38px;
+    padding-left: 46px;
     background-repeat: no-repeat;
     background-position: 4px center;
-    background-size: 32px 15px;
+    background-size: 40px 17px;
 }
 
 #custom-wifi {

@@ -104,17 +104,36 @@ class PopupTarget:
 TARGETS = {}
 
 
+_css_providers = {}
+
+
 def _load_css():
+    """Called on every show() (not just once at startup) so a
+    toggle_colors.sh swap takes effect on the next open with no daemon
+    restart. Must remove each path's previous provider before adding a
+    fresh one -- naively re-adding a brand new provider on every call
+    without ever removing the old one leaked one CssProvider per show()
+    for the daemon's whole lifetime, and a long-running daemon that's
+    been toggled open/closed many times accumulates enough stacked
+    providers to visibly corrupt rendering (confirmed: a fully opaque
+    background-color came out badly blended with the desktop behind
+    after ~50+ accumulated providers, fixed instantly by a fresh
+    restart -- this dict-based swap is what keeps that from
+    recurring)."""
     screen = Gdk.Screen.get_default()
     for path in (WAYBAR_COLORS_CSS, POPUP_THEME_CSS):
         if not os.path.exists(path):
             continue
+        old = _css_providers.get(path)
+        if old is not None:
+            Gtk.StyleContext.remove_provider_for_screen(screen, old)
         provider = Gtk.CssProvider()
         try:
             provider.load_from_path(path)
         except GLib.Error:
             continue
         Gtk.StyleContext.add_provider_for_screen(screen, provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        _css_providers[path] = provider
 
 
 # --- IPC socket server -------------------------------------------------

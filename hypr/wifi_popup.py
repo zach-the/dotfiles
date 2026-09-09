@@ -67,7 +67,11 @@ def _make_network_row(net):
     box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
     box.set_border_width(6)
     marker = Gtk.Label(label="●" if net["connected"] else "○")
-    lock = Gtk.Label(label="🔒" if net["secured"] else "  ")
+    # A Nerd Font glyph rather than the 🔒 emoji, which renders in color
+    # (yellow) via the system emoji font instead of matching the rest
+    # of this monochrome UI.
+    lock = Gtk.Label(label="" if net["secured"] else "  ")
+    lock.get_style_context().add_class("lock-icon")
     name = Gtk.Label(label=net["ssid"], xalign=0)
     box.pack_start(marker, False, False, 0)
     box.pack_start(lock, False, False, 0)

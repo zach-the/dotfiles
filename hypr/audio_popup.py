@@ -96,16 +96,23 @@ def _make_single_row(sink):
 
 
 def _on_row_activated(_listbox, row, window):
-    if window._switch.get_active():
-        return  # Multi-Output rows handle their own clicks via checkboxes
     if not hasattr(row, "sink_id"):
+        return
+    if window._switch.get_active():
+        sink_id = row.sink_id
+        if sink_id in window._checked:
+            window._checked.discard(sink_id)
+        else:
+            window._checked.add(sink_id)
+        refresh(window)
+        _schedule_combine_apply(window)
         return
     audio_source.set_default(row.sink_id)
     refresh(window)
     GLib.timeout_add(CLOSE_DELAY_MS, lambda: window.hide() or False)
 
 
-# --- Multi-Output (checkbox + slider) rows --------------------------------
+# --- Multi-Output (toggle marker + slider) rows ---------------------------
 
 def _schedule_slider_apply(window, sink_id, value):
     pending = window._slider_debounce.pop(sink_id, None)
@@ -134,27 +141,25 @@ def _on_scale_released(_scale, _event, window):
     return False
 
 
-def _on_check_toggled(check, window, sink_id):
-    if check.get_active():
-        window._checked.add(sink_id)
-    else:
-        window._checked.discard(sink_id)
-    refresh(window)
-    _schedule_combine_apply(window)
-
-
 def _make_multi_row(sink, window, checked):
+    # Same ●/○ marker as the single-output rows -- clicking anywhere on
+    # the row (handled by _on_row_activated above) toggles it in/out of
+    # window._checked instead of exclusively selecting it. Plain GTK
+    # checkboxes were tried here first and looked dated next to the
+    # rest of this UI; this reuses the existing visual language instead
+    # of fighting GTK3's default checkbox indicator styling.
     row = Gtk.ListBoxRow()
-    row.set_activatable(False)
     row.sink_id = sink["id"]
 
     outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-    outer.set_border_width(6)
 
-    check = Gtk.CheckButton(label=sink["name"])
-    check.set_active(checked)
-    check.connect("toggled", _on_check_toggled, window, sink["id"])
-    outer.pack_start(check, False, False, 0)
+    top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+    top.set_border_width(6)
+    marker = Gtk.Label(label="●" if checked else "○")
+    name = Gtk.Label(label=sink["name"], xalign=0)
+    top.pack_start(marker, False, False, 0)
+    top.pack_start(name, True, True, 0)
+    outer.pack_start(top, False, False, 0)
 
     if checked:
         scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, VOLUME_MAX, 1)
