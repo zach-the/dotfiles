@@ -47,7 +47,20 @@ PACTL_DEBOUNCE_MS = 150
 # short grace period, cancelled if focus/pointer comes back to the
 # popup in time, absorbs that without needing to touch the global
 # follow_mouse setting itself.
+#
+# Dismissal is driven by focus-out-event, leave-notify-event, AND a
+# periodic pointer-position poll (PopupTarget._poll_pointer): on an
+# empty workspace, moving the pointer off the popup has nothing else
+# for the compositor to hand keyboard focus to, so focus-out-event
+# never fires -- confirmed empirically that, at least in this setup,
+# leave-notify-event isn't fully reliable there either once the
+# pointer's over bare compositor background with no other surface
+# present. The poll is a compositor-agnostic safety net that can't be
+# fooled by either: it just reads the real pointer position. The event
+# handlers still give snappier dismissal in the normal case (another
+# window to cross into) where they do fire correctly.
 DISMISS_GRACE_MS = 750
+POINTER_POLL_MS = 300
 
 
 class PopupTarget:
@@ -55,24 +68,38 @@ class PopupTarget:
         self.name = name
         self.refresh = refresh
         self.window = build()
+        self.window.add_events(Gdk.EventMask.ENTER_NOTIFY_MASK | Gdk.EventMask.LEAVE_NOTIFY_MASK)
         self.window.connect("hide", self._on_hidden)
-        self.window.connect("focus-out-event", self._on_focus_out)
-        self.window.connect("focus-in-event", self._on_focus_in)
-        self.window.connect("enter-notify-event", self._on_focus_in)
+        self.window.connect("focus-out-event", self._on_lost)
+        self.window.connect("focus-in-event", self._on_gained)
+        self.window.connect("leave-notify-event", self._on_lost)
+        self.window.connect("enter-notify-event", self._on_gained)
         self._visible = False
         self._hide_source = None
+        self._poll_source = None
 
     def _on_hidden(self, _window):
         self._visible = False
 
-    def _on_focus_out(self, _window, _event):
-        self._cancel_pending_hide()
-        self._hide_source = GLib.timeout_add(DISMISS_GRACE_MS, self._grace_expired)
+    def _on_lost(self, _window, event):
+        # focus-out-event has no "detail" field; leave-notify-event does,
+        # and NOTIFY_INFERIOR means the pointer only moved onto a child
+        # widget *within* this same window (e.g. from one row to
+        # another) -- not an actual exit, so ignore those.
+        if event.type == Gdk.EventType.LEAVE_NOTIFY and event.detail == Gdk.NotifyType.INFERIOR:
+            return False
+        self._schedule_hide()
         return False
 
-    def _on_focus_in(self, _window, _event):
+    def _on_gained(self, _window, event):
+        if event.type == Gdk.EventType.ENTER_NOTIFY and event.detail == Gdk.NotifyType.INFERIOR:
+            return False
         self._cancel_pending_hide()
         return False
+
+    def _schedule_hide(self):
+        if self._hide_source is None:
+            self._hide_source = GLib.timeout_add(DISMISS_GRACE_MS, self._grace_expired)
 
     def _grace_expired(self):
         self._hide_source = None
@@ -84,6 +111,56 @@ class PopupTarget:
             GLib.source_remove(self._hide_source)
             self._hide_source = None
 
+    def _poll_pointer(self):
+        """Fallback for _on_lost/_on_gained: on an empty workspace (no
+        other window for keyboard focus to go to, and apparently
+        sometimes no reliable leave-notify-event either -- confirmed
+        empirically, not just theorized -- once the pointer's crossed
+        onto bare compositor background with nothing else present),
+        neither event can be trusted to fire at all, which would leave
+        the popup stuck open forever with only the event-driven path.
+
+        This can't use GDK's own get_device_position(): under Wayland a
+        client only learns the pointer's position via motion events on
+        its *own* surfaces, so once the pointer leaves ours we simply
+        stop hearing about it at all -- querying afterward just replays
+        the last position we were told, forever, since Wayland gives
+        clients no protocol for asking "where is it now" once they've
+        lost it (confirmed empirically: the query kept reporting the
+        old in-bounds position long after the pointer had genuinely
+        moved elsewhere). Asking the compositor itself instead
+        (`hyprctl cursorpos`) sidesteps that entirely, since Hyprland
+        tracks the pointer globally regardless of which surface (if
+        any) currently has it. `hyprctl -j layers` gives this popup's
+        own on-screen rectangle to test that position against, since
+        GTK doesn't know the compositor-assigned layer-shell position
+        either. Runs at a coarser interval than DISMISS_GRACE_MS purely
+        as a safety net; the event handlers above still give snappier
+        dismissal when they do fire correctly."""
+        if not self._visible:
+            self._poll_source = None
+            return False
+        try:
+            pos_out = subprocess.run(["hyprctl", "cursorpos"], capture_output=True, check=True, text=True).stdout
+            cx, cy = (int(v.strip()) for v in pos_out.split(","))
+            layers = json.loads(subprocess.run(["hyprctl", "-j", "layers"], capture_output=True, check=True, text=True).stdout)
+        except Exception:
+            return True  # transient failure; try again next tick rather than force-closing
+
+        rect = next(
+            (s for mon in layers.values() for lvl in mon["levels"].values() for s in lvl if s.get("namespace") == "popup-daemon"),
+            None,
+        )
+        if rect is None:
+            return True
+
+        inside = rect["x"] <= cx < rect["x"] + rect["w"] and rect["y"] <= cy < rect["y"] + rect["h"]
+        if inside:
+            self._cancel_pending_hide()
+        else:
+            self._schedule_hide()
+        return True
+
     def show(self):
         for other in TARGETS.values():
             if other is not self and other._visible:
@@ -92,6 +169,8 @@ class PopupTarget:
         self.refresh(self.window)
         self.window.show_all()
         self._visible = True
+        if self._poll_source is None:
+            self._poll_source = GLib.timeout_add(POINTER_POLL_MS, self._poll_pointer)
 
     def hide(self):
         self._cancel_pending_hide()

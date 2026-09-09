@@ -27,7 +27,7 @@ cur_mon_idx=$(jq -r '.[] | select(.focused == true) | .id' <<< "$mon_json")
 active=$(hyprctl activewindow -j)
 
 has_neighbor=false
-if [ "$active" != "null" ]; then
+if jq -e 'type == "object" and has("at")' <<< "$active" > /dev/null; then
     cur_ws=$(jq -r '.workspace.id' <<< "$active")
     cur_cx=$(jq -r '.at[0] + .size[0]/2' <<< "$active")
     cur_cy=$(jq -r '.at[1] + .size[1]/2' <<< "$active")

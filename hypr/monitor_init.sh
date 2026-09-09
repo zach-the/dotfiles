@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
-# Assigns the correct 5-workspace group to each monitor when it connects.
-# eDP-1 always gets 1-5; external monitors get sequential groups (6-10,
-# 11-15, ...) ordered by X then Y position.
+# Assigns the starting workspace to each monitor when it connects, using
+# the SAME numbering scheme as ws_nav.sh: one continuous, uncapped block
+# of 100 IDs per monitor (eDP-1 -> 1-99, 1st external -> 101-199, ...).
+# Only the block's first workspace is claimed here -- ws_nav.sh (hyper+L/H)
+# grows the rest lazily as the user navigates. Claiming a whole fixed-size
+# range up front (as this script used to, with a different block size than
+# ws_nav.sh) risks grabbing a workspace ID that already legitimately
+# belongs to another monitor, since eDP-1's block has no upper cap.
 
-assign_workspaces() {
+BLOCK=100
+
+assign_workspace() {
     local monitor="$1"
     local index
 
@@ -21,27 +28,33 @@ assign_workspaces() {
 
     [[ -z "$index" || "$index" == "null" ]] && return
 
-    local base=$(( index * 5 ))
-    local batch=""
-    for i in 1 2 3 4 5; do
-        local ws=$(( base + i ))
-        batch+="dispatch moveworkspacetomonitor $ws $monitor ; "
-    done
-    # Strip trailing separator and send as one atomic batch
-    hyprctl --batch "${batch% ; }"
+    local ws=$(( index * BLOCK + 1 ))
+
+    if hyprctl workspaces -j | jq -e --argjson ws "$ws" 'any(.[]; .id == $ws)' > /dev/null; then
+        # Workspace already exists somewhere -- just reassign it.
+        hyprctl dispatch moveworkspacetomonitor "$ws" "$monitor" 2>/dev/null
+    else
+        # Workspace doesn't exist yet, so moveworkspacetomonitor is a no-op.
+        # dispatch workspace creates it, but always on the CURRENTLY
+        # focused monitor -- so hop over to the target monitor, create it
+        # there, then hop back to avoid stealing focus.
+        local prev_mon
+        prev_mon=$(hyprctl activeworkspace -j | jq -r '.monitor')
+        hyprctl --batch "dispatch focusmonitor $monitor ; dispatch workspace $ws ; dispatch focusmonitor $prev_mon"
+    fi
 }
 
-# Assign workspaces for all monitors already connected at startup
+# Assign starting workspace for all monitors already connected at startup
 hyprctl monitors -j | jq -r '.[].name' | while read -r mon; do
-    assign_workspaces "$mon"
+    assign_workspace "$mon"
 done
 
 # Listen for new monitor connections and assign on the fly
-socket="/tmp/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock"
+socket="$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock"
 socat - "UNIX-CONNECT:$socket" | while IFS= read -r line; do
     if [[ "$line" == monitoradded* ]]; then
         monitor="${line#monitoradded>>}"
         sleep 0.3  # let Hyprland finish initializing the new monitor
-        assign_workspaces "$monitor"
+        assign_workspace "$monitor"
     fi
 done

@@ -273,6 +273,9 @@ def _on_window_key_press(window, event):
 # --- Shared ---------------------------------------------------------------
 
 def refresh(window):
+    # See audio_popup.py's refresh() for why this is recomputed on every
+    # show() instead of only once in build().
+    _apply_margins(window)
     window._stack.set_visible_child_name("list")
     window._powered = bluetooth_source.is_powered()
     window._search_button.set_visible(window._powered)

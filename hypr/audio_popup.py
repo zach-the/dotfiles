@@ -226,6 +226,17 @@ def _on_switch_toggled(switch, _pspec, window):
 # --- Shared ---------------------------------------------------------------
 
 def refresh(window):
+    # Recomputed on every show(), not just once in build(): if this
+    # target happens to be the first one built at daemon startup, it
+    # can race waybar's own exclusive-zone registration (both start via
+    # hyprland.conf's exec-once around the same time) and bake in a
+    # stale/zero top margin from before waybar had reported its real
+    # height -- confirmed as the cause of the audio popup landing over
+    # the bar while wifi/bluetooth (built moments later, after waybar
+    # had settled) landed correctly. Recomputing here also makes this
+    # self-healing if the bar's height ever changes later.
+    _apply_margins(window)
+
     listbox = window._listbox
     for child in listbox.get_children():
         listbox.remove(child)

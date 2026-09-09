@@ -22,8 +22,8 @@ PIDFILE="$RUNDIR/hypr_scroll.pid"
 TAPFILE="$RUNDIR/hypr_scroll_tap"
 LOOP="$(dirname "$(readlink -f "$0")")/scroll_loop.py"
 
-BASE_SPEED=20
-REPEAT_TAP_SPEED=100
+BASE_SPEED=13
+REPEAT_TAP_SPEED=17
 TAP_WINDOW=0.2
 TERMINAL_DIVISOR=2
 # Window classes that scroll by whole lines rather than pixels.

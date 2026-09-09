@@ -164,16 +164,48 @@ static bool computeNewFirst(const SP<ITarget>& nearest) {
 // first node whose split orientation matches `wantSplitV`, on the side
 // implied by wantFirstSide/wantSecondSide, and nudges its ratio by `d` pixels
 // against `outerDim` (the pixel size, along this axis, of the box being
-// subdivided). Returns whether a matching ancestor was found and adjusted.
+// subdivided) — a 1:1 pixel-to-boundary mapping, since `ratio` here is a
+// plain [0,1] fraction (0.5 = 50/50), not vanilla Hyprland dwindle's [0,2]
+// scale, so unlike vanilla's own resize math this needs no extra ×2 factor.
+// Returns whether a matching ancestor was found and adjusted.
 static bool resizeAlongPath(std::vector<std::pair<SDwindleNode*, bool>>& path, bool wantSplitV, double d, double outerDim, bool wantFirstSide,
                              bool wantSecondSide) {
     for (auto& [node, isFirst] : path) {
         if (node->splitV != wantSplitV) continue;
         if (!((isFirst && wantFirstSide) || (!isFirst && wantSecondSide))) continue;
-        node->ratio = std::clamp((float)(node->ratio + d / outerDim * 2.0), 0.1f, 0.9f);
+        node->ratio = std::clamp((float)(node->ratio + d / outerDim), 0.1f, 0.9f);
         return true;
     }
     return false;
+}
+
+// A node's ratio is only ever a fraction of its CURRENT parent box, so when
+// something outside the tree entirely (e.g. an inter-column boundary) changes
+// that box's size from `oldDim` to `newDim`, every descendant boundary's
+// absolute pixel position implicitly shifts too — even though its own ratio
+// never changed. This re-derives `node`'s ratio so the side NOT containing
+// the leaf being resized (targetIsFirst) keeps its exact old pixel size, and
+// the target's side absorbs the entire change instead of splitting it with
+// an untouched sibling. Returns the target side's old/new pixel size so the
+// caller can cascade this into any further-nested split toward the leaf.
+static void absorbOuterResize(SDwindleNode* node, bool targetIsFirst, double oldDim, double newDim, double& outOldTargetSide,
+                               double& outNewTargetSide) {
+    double oldFirstSize  = oldDim * node->ratio;
+    double oldSecondSize = oldDim - oldFirstSize;
+    double newFirstSize, newSecondSize;
+    if (targetIsFirst) {
+        newSecondSize    = oldSecondSize;
+        newFirstSize     = newDim - newSecondSize;
+        outOldTargetSide = oldFirstSize;
+        outNewTargetSide = newFirstSize;
+    } else {
+        newFirstSize     = oldFirstSize;
+        newSecondSize    = newDim - newFirstSize;
+        outOldTargetSide = oldSecondSize;
+        outNewTargetSide = newSecondSize;
+    }
+    if (newDim > 0.0)
+        node->ratio = std::clamp((float)(newFirstSize / newDim), 0.1f, 0.9f);
 }
 
 // What a resize drag should affect, recovered from where the grab actually
@@ -365,8 +397,9 @@ class CUltrawideImprovedAlgorithm final : public ITiledAlgorithm {
         // does this edge belong to the outer inter-column boundary instead.
         if (delta.x != 0.0 && zone.allowHorizontal &&
             !resizeAlongPath(path, true, delta.x, colBox.w, zone.preferRight, zone.preferLeft) && m_numCols > 1) {
-            bool adjustRight = zone.preferRight;
-            bool adjustLeft  = zone.preferLeft;
+            double oldColWidthPx = colBox.w;
+            bool   adjustRight   = zone.preferRight;
+            bool   adjustLeft    = zone.preferLeft;
 
             bool hasLeft  = col - 1 >= 0;
             bool hasRight = col + 1 < m_numCols;
@@ -411,6 +444,20 @@ class CUltrawideImprovedAlgorithm final : public ITiledAlgorithm {
                     (1.0f - MIN_COL_FRAC) * combined);
                 m_colWidths[col - 1] = combined - newThis;
                 m_colWidths[col]     = newThis;
+            }
+
+            // The column just changed width from something outside this
+            // column's own tree — cascade that into every internal
+            // left/right split along the path (root-to-leaf, since each
+            // one's own box depends on the one before it) so a sibling
+            // window (e.g. one beside `target` in the same column) doesn't
+            // silently shift or resize just because the column did.
+            CBox   newColBox = computeColBox(workArea, col);
+            double curOldDim = oldColWidthPx, curNewDim = newColBox.w;
+            for (auto it = path.rbegin(); it != path.rend(); ++it) {
+                auto& [node, isFirst] = *it;
+                if (node->splitV != true) continue;
+                absorbOuterResize(node, isFirst, curOldDim, curNewDim, curOldDim, curNewDim);
             }
         }
 
