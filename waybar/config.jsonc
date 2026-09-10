@@ -42,9 +42,7 @@
   "custom/battery": {
     "exec": "~/.config/hypr/battery_color.py",
     "return-type": "json",
-    "interval": 30,
-    "signal": 14,
-    "on-click": "~/.config/hypr/battery_toggle.sh"
+    "interval": 30
   },
 
   "custom/wifi": {

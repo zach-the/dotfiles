@@ -474,3 +474,8 @@ alias banner='banner --alignment l'
 alias plex-kill='sudo systemctl stop plexmediaserver'
 alias plex-start='sudo systemctl start plexmediaserver'
 alias plex-restart='sudo systemctl restart plexmediaserver'
+
+# --- Jellyfin Media Server control ---
+alias jellyfin-start='sudo systemctl start jellyfin'
+alias jellyfin-stop='sudo systemctl stop jellyfin'
+alias jellyfin-restart='sudo systemctl restart jellyfin'

@@ -83,12 +83,11 @@ case "$NEXT" in
         TILE_SNAPSHOT="$("$FLOAT_LAYOUT_SCRIPT" snapshot-tiled)"
         float_all
         echo 'windowrule = match:class ^(.*)$, float 1' > "$FLOAT_RULE_FILE"
-        # Put back whatever position/size each window had the last
-        # time we left float mode, where a match (by address) exists...
-        "$FLOAT_LAYOUT_SCRIPT" restore
-        # ...then reapply the WIDE-TILE snapshot on top, so the layout
-        # you just left always wins over any older saved float session.
-        echo "$TILE_SNAPSHOT" | "$FLOAT_LAYOUT_SCRIPT" apply
+        # For each window: if it's been manually resized/moved while in
+        # FLOAT before, restore that saved float geometry — it wins.
+        # Otherwise, apply its just-left WIDE-TILE geometry so the
+        # switch looks seamless.
+        echo "$TILE_SNAPSHOT" | "$FLOAT_LAYOUT_SCRIPT" enter
         ;;
 esac
 
