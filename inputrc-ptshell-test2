@@ -1,0 +1,7 @@
+# THROWAWAY probe 2: escapes NOT wrapped in \1..\2.
+# If rlwrap strips the contents of the invisible-region markers, the escape
+# survives here. Readline will miscount the prompt width as a side effect.
+set editing-mode vi
+set show-mode-in-prompt on
+set vi-ins-mode-string "\e[6 q(i)"
+set vi-cmd-mode-string "\e[2 q(n)"

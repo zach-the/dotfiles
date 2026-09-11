@@ -85,6 +85,7 @@ _ascii_prompt() {
     local c_lsf=$bred
     local c_gev=$cyn
     local c_block=$mag
+    local c_qagents=$bmag
     local c_pwd=$blu
     local c_git=$grn
 
@@ -106,6 +107,10 @@ _ascii_prompt() {
 
     if [[ -n "$MY_BLOCK" ]]; then
         p+="${c_block}[${MY_BLOCK}]${reset}"
+    fi
+
+    if [[ -n "$QAGENTS_SESSION" ]]; then
+        p+="${c_qagents}[QAGENTS]${reset}"
     fi
 
     if [[ -n "$GEV_CHAR_MODE" ]]; then

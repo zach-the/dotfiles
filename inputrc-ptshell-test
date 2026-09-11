@@ -1,0 +1,8 @@
+# THROWAWAY probe: same as inputrc-ptshell but with VISIBLE mode markers.
+# If the cursor switches here but not with the zero-width version, the
+# blocker is readline skipping the prompt repaint when nothing visible
+# changed -- not rlwrap, and not the readline version.
+set editing-mode vi
+set show-mode-in-prompt on
+set vi-ins-mode-string "\1\e[6 q\2(i)"
+set vi-cmd-mode-string "\1\e[2 q\2(n)"
