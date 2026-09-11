@@ -18,15 +18,23 @@ Each top-level file or directory is a config that gets symlinked into the approp
 | Hammerspoon | `hammerspoon-init.lua` | `~/.hammerspoon/init.lua` |
 | Karabiner | `karabiner/` | `~/.config/karabiner` |
 | **Linux only** | | |
+| Hyprland | `hypr/` | `~/.config/hypr` |
 | Waybar | `waybar/` | `~/.config/waybar` |
 | Rofi | `rofi-config.rasi` | `~/.config/rofi/config.rasi` |
 | Keyd | `keyd-default.conf` | `/etc/keyd/default.conf` |
 | MPV | `mpv/` | `~/.config/mpv` |
 | Synopsys PT | `synopsys_pt.setup` | `~/.synopsys_pt.setup` |
+| Mimeapps | `system/mimeapps.list` | `~/.config/mimeapps.list` |
+| Greetd | `system/greetd-config.toml` | `/etc/greetd/config.toml` |
+| Keychron udev | `system/udev-rules/70-keychron.rules` | `/etc/udev/rules.d/70-keychron.rules` |
+| Vial udev | `system/udev-rules/99-vial.rules` | `/etc/udev/rules.d/99-vial.rules` |
+| NetworkManager | `system/networkmanager-conf.d/20-connectivity.conf` | `/etc/NetworkManager/conf.d/20-connectivity.conf` |
 
 ## Setup
 
-Run `install.sh` to create all symlinks:
+**Rebuilding a whole Arch machine from scratch?** See [`system/notes.md`](system/notes.md) for the full restore order (packages → symlinks → services). It also covers everything that isn't a dotfile: enabled systemd services, custom units, hostname/locale/kernel, and known quirks.
+
+Otherwise, run `install.sh` to create all symlinks:
 
 ```bash
 ./install.sh

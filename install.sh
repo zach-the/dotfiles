@@ -27,12 +27,18 @@ universal_configs=(
 )
 
 linux_only_configs=(
+  "Hyprland"         "$DOTFILES/hypr"                         "$HOME/.config/hypr"
   "Waybar"           "$DOTFILES/waybar"                       "$HOME/.config/waybar"
   "Rofi"             "$DOTFILES/rofi-config.rasi"             "$HOME/.config/rofi/config.rasi"
   "Rofi Colors"      "$DOTFILES/rofi-colors.rasi"             "$HOME/.config/rofi/rofi-colors.rasi"
   "Keyd"             "$DOTFILES/keyd-default.conf"            "/etc/keyd/default.conf"
   "MPV"              "$DOTFILES/mpv"                          "$HOME/.config/mpv"
   "Synopsys PT"      "$DOTFILES/synopsys_pt.setup"            "$HOME/.synopsys_pt.setup"
+  "Mimeapps"         "$DOTFILES/system/mimeapps.list"         "$HOME/.config/mimeapps.list"
+  "Greetd"           "$DOTFILES/system/greetd-config.toml"    "/etc/greetd/config.toml"
+  "Keychron udev"    "$DOTFILES/system/udev-rules/70-keychron.rules"  "/etc/udev/rules.d/70-keychron.rules"
+  "Vial udev"        "$DOTFILES/system/udev-rules/99-vial.rules"      "/etc/udev/rules.d/99-vial.rules"
+  "NM connectivity"  "$DOTFILES/system/networkmanager-conf.d/20-connectivity.conf" "/etc/NetworkManager/conf.d/20-connectivity.conf"
 )
 
 mac_only_configs=(

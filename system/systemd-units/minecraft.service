@@ -1,0 +1,13 @@
+[Unit]
+Description=Minecraft Server
+After=network.target
+
+[Service]
+User=zach
+WorkingDirectory=/home/zach/mc-server
+ExecStart=/usr/bin/java -Xmx4G -Xms2G -jar server.jar nogui
+Restart=on-failure
+StandardInput=null
+
+[Install]
+WantedBy=multi-user.target

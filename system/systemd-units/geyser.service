@@ -1,0 +1,14 @@
+[Unit]
+Description=Geyser Standalone (Bedrock proxy for Minecraft)
+After=network.target minecraft.service
+Wants=minecraft.service
+
+[Service]
+User=zach
+WorkingDirectory=/home/zach/geyser
+ExecStart=/usr/bin/java -jar Geyser-Standalone.jar
+Restart=on-failure
+StandardInput=null
+
+[Install]
+WantedBy=multi-user.target
