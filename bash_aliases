@@ -30,7 +30,20 @@ alias work='autossh -M 0 -t zb900042@lvnvda8240.lvn.broadcom.net "LAUNCH_NEW_TMU
 alias color_test='for i in {0..7}; do printf "\e[48;5;${i}m  "; done; printf "\e[0m\n"; for i in {8..15}; do printf "\e[48;5;${i}m  "; done; printf "\e[0m\n"'
 alias zd='~/dotfiles/bin/zd -vw'
 alias audio-combine='~/dotfiles/bin/audio-combine'
-alias pp='realpath'
+pp() {
+    local input path
+    input=$(echo "$*" | xargs)
+    path=$(realpath "$input")
+    printf '%s' "$path"
+    if command -v pbcopy &>/dev/null; then
+        printf '%s' "$path" | pbcopy
+    elif command -v wl-copy &>/dev/null; then
+        printf '%s' "$path" | wl-copy
+    elif command -v xclip &>/dev/null; then
+        printf '%s' "$path" | xclip -selection clipboard
+    fi
+    echo
+}
 alias rs='rsync -aHAX --info=progress2'
 alias print_block='pyfiglet -f blocky -w $(tput cols)'
 
