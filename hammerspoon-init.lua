@@ -217,6 +217,7 @@ end
 
 -- Configuration
 local gap = 8
+local top_gap = 4
 hs.window.animationDuration = 0.25
 
 -- Helper Functions
@@ -277,8 +278,8 @@ local function move(x, y, w, h)
         -- 2. Vertical Gaps
         -- Top Edge (Preserving your "Flush Top" preference)
         if y == 0 then
-            f.y = f.y + 2
-            f.h = f.h - 2
+            f.y = f.y + top_gap
+            f.h = f.h - top_gap
             -- If touching top, no top gap (f.y unchanged)
             -- Only adjust height based on bottom condition
             if (y + h) >= 0.99 then
@@ -368,7 +369,24 @@ local function center()
     local win = hs.window.focusedWindow()
     if win then
         snapshot(win)
-        win:centerOnScreen()
+        -- centerOnScreen() uses fullFrame(), which includes the menu bar and dock, so
+        -- the window ends up sitting too high/overlapping it. frame() is the usable
+        -- area, but to actually match move()'s layouts (hyper+W/E/etc.) we also need
+        -- to inset by the same amounts move() uses: a 2px flush-top gap and the
+        -- normal outer `gap` on the other three edges. Otherwise a centered window
+        -- lands at a different distance from the menu bar than a moved/resized one.
+        local sf = win:screen():frame()
+        local wf = win:frame()
+        local top = sf.y + top_gap
+        local bottom = sf.y + sf.h - gap
+        local left = sf.x + gap
+        local right = sf.x + sf.w - gap
+        win:setFrame({
+            x = left + ((right - left) - wf.w) / 2,
+            y = top + ((bottom - top) - wf.h) / 2,
+            w = wf.w,
+            h = wf.h,
+        })
         moveMouseToWindow(win) -- UPDATE: Move mouse to center
     end
 end
