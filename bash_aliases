@@ -38,6 +38,8 @@ pp() {
     if command -v pbcopy &>/dev/null; then
         printf '%s' "$path" | pbcopy
     elif command -v wl-copy &>/dev/null; then
+        printf '%s' "$path" | xsel
+    elif command -v wl-copy &>/dev/null; then
         printf '%s' "$path" | wl-copy
     elif command -v xclip &>/dev/null; then
         printf '%s' "$path" | xclip -selection clipboard
