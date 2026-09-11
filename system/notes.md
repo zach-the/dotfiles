@@ -3,6 +3,10 @@
 Everything needed to rebuild the current Arch setup from scratch, aside from
 personal data/files. See the main README for what `install.sh` does.
 
+> **Using an AI agent to do this restore?** Have it read
+> [`AGENT.md`](AGENT.md) first — it's a runbook aimed specifically at that,
+> with the questions to confirm up front and how to handle failures.
+
 ## Restore order
 
 1. Install Arch (base system + network + a `zach` user).

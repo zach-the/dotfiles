@@ -32,7 +32,7 @@ Each top-level file or directory is a config that gets symlinked into the approp
 
 ## Setup
 
-**Rebuilding a whole Arch machine from scratch?** See [`system/notes.md`](system/notes.md) for the full restore order (packages → symlinks → services). It also covers everything that isn't a dotfile: enabled systemd services, custom units, hostname/locale/kernel, and known quirks.
+**Rebuilding a whole Arch machine from scratch?** See [`system/notes.md`](system/notes.md) for the full restore order (packages → symlinks → services) and everything that isn't a dotfile: enabled systemd services, custom units, hostname/locale/kernel, and known quirks. If an AI agent is doing the restore, point it at [`system/AGENT.md`](system/AGENT.md) first — it's a runbook written for that.
 
 Otherwise, run `install.sh` to create all symlinks:
 
