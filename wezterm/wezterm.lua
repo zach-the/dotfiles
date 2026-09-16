@@ -117,9 +117,33 @@ config.keys = {
   -- (Ctrl+Shift+D freed up for tmux copy-mode scroll-down)
   { key = 'i', mods = 'CTRL|SHIFT', action = act.PaneSelect { mode = 'MoveToNewTab' } },
 
-  -- Ctrl+Tab / Ctrl+Shift+Tab : cycle WezTerm tabs forward/backward
-  { key = 'Tab', mods = 'CTRL', action = act.ActivateTabRelative(1) },
-  { key = 'Tab', mods = 'CTRL|SHIFT', action = act.ActivateTabRelative(-1) },
+  -- Ctrl+Tab / Ctrl+Shift+Tab : cycle WezTerm tabs forward/backward when
+  -- there's more than one; with just a single tab, there's nothing to
+  -- cycle, so pass the raw keypress through to the pane instead, letting
+  -- tmux's own C-Tab/C-S-Tab window-cycling bindings (tmux.conf section 4)
+  -- see it.
+  {
+    key = 'Tab',
+    mods = 'CTRL',
+    action = wezterm.action_callback(function(window, pane)
+      if #window:mux_window():tabs() > 1 then
+        window:perform_action(act.ActivateTabRelative(1), pane)
+      else
+        window:perform_action(act.SendKey { key = 'Tab', mods = 'CTRL' }, pane)
+      end
+    end),
+  },
+  {
+    key = 'Tab',
+    mods = 'CTRL|SHIFT',
+    action = wezterm.action_callback(function(window, pane)
+      if #window:mux_window():tabs() > 1 then
+        window:perform_action(act.ActivateTabRelative(-1), pane)
+      else
+        window:perform_action(act.SendKey { key = 'Tab', mods = 'CTRL|SHIFT' }, pane)
+      end
+    end),
+  },
 
   -- Win(Super)+/ : split the current WezTerm pane horizontally (new pane to the right)
   { key = '/', mods = 'SUPER', action = act.SplitHorizontal { domain = 'CurrentPaneDomain' } },
