@@ -31,7 +31,7 @@
 --   H L        → prev space / next space
 --   J K        → bottom-left / bottom-right quarter
 --   Z X C      → half-split (context-aware: portrait vs. landscape)
---   N M        → launch Chrome / launch Safari
+--   N M        → launch Chrome / launch Firefox
 --   V          → restore all minimized windows (skips hidden apps)
 --   RETURN     → fullscreen
 --   - =        → resize smaller / larger
@@ -501,7 +501,7 @@ end
 -- LAUNCH CHROME
 -- =====================================================================
 
--- Shared default size for Chrome/Safari windows spawned via Hyper+N / Hyper+M
+-- Shared default size for Chrome/Firefox windows spawned via Hyper+N / Hyper+M
 local BROWSER_WIN_W, BROWSER_WIN_H = 1000, 700
 
 local function launchChrome()
@@ -551,29 +551,51 @@ local function launchChrome()
 end
 
 -- =====================================================================
--- LAUNCH SAFARI
+-- LAUNCH FIREFOX
 -- =====================================================================
 
-local function launchSafari()
-    local targetScreen = hs.mouse.getCurrentScreen()
-    local f = targetScreen:frame()
-    local left   = math.floor(f.x + (f.w - BROWSER_WIN_W) / 2)
-    local top    = math.floor(f.y + (f.h - BROWSER_WIN_H) / 2)
-    local right  = left + BROWSER_WIN_W
-    local bottom = top + BROWSER_WIN_H
+local function launchFirefox()
+    -- Snapshot existing Firefox windows so we can identify the new one later
+    local existingIds = {}
+    local ffApp = hs.application.get("Firefox")
+    if ffApp then
+        for _, w in ipairs(ffApp:allWindows()) do
+            existingIds[w:id()] = true
+        end
+    end
 
-    -- Safari's scripting dictionary has no "make new window with properties
-    -- {bounds:...}" (only `document`, not `window`, is creatable), so unlike
-    -- Chrome this can't set the size at creation time in one step. Setting
-    -- bounds immediately after, in the same synchronous script, is the
-    -- closest equivalent -- there's no separate Hammerspoon-side resize/race.
-    hs.osascript.applescript(string.format([[
-        tell application "Safari"
-            make new document
-            activate
-            set bounds of window 1 to {%d, %d, %d, %d}
-        end tell
-    ]], left, top, right, bottom))
+    -- Firefox has no usable AppleScript scripting dictionary and no -x/-y
+    -- flag, but it does accept -width/-height at launch, so the window opens
+    -- at the target size directly instead of needing a resize afterward.
+    local sizeArgs = {"-width", tostring(BROWSER_WIN_W), "-height", tostring(BROWSER_WIN_H)}
+    if not ffApp then
+        -- Firefox isn't running: open in background without stealing focus
+        local args = {"-g", "-a", "Firefox", "--args"}
+        for _, a in ipairs(sizeArgs) do table.insert(args, a) end
+        hs.task.new("/usr/bin/open", nil, args):start()
+    else
+        local args = {"-g", "-a", "Firefox", "--args", "-new-window"}
+        for _, a in ipairs(sizeArgs) do table.insert(args, a) end
+        hs.task.new("/usr/bin/open", nil, args):start()
+    end
+
+    hs.timer.doAfter(0.4, function()
+        local app = hs.application.get("Firefox")
+        if not app then return end
+
+        for _, w in ipairs(app:allWindows()) do
+            if not existingIds[w:id()] then
+                -- Only position needs setting now; size came from the CLI flags.
+                local targetScreen = hs.mouse.getCurrentScreen()
+                local f = targetScreen:frame()
+                local left = math.floor(f.x + (f.w - BROWSER_WIN_W) / 2)
+                local top  = math.floor(f.y + (f.h - BROWSER_WIN_H) / 2)
+                w:setTopLeft({x = left, y = top})
+                w:focus()
+                return
+            end
+        end
+    end)
 end
 
 -- =====================================================================
@@ -925,7 +947,7 @@ hs.hotkey.bind({"ctrl", "shift"}, "K", function() startScroll(BASE_SPEED) end, s
 -- Terminal and Browser
 hs.hotkey.bind(hyper, "T", launchWezterm)
 hs.hotkey.bind(hyper, "N", launchChrome)
-hs.hotkey.bind(hyper, "M", launchSafari)
+hs.hotkey.bind(hyper, "M", launchFirefox)
 
 -- Lock screen
 hs.hotkey.bind(hyper, "delete", function()           -- Lock Screen
