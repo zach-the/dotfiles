@@ -284,45 +284,10 @@ config.keys = {
   { key = '/', mods = 'SUPER', action = act.SplitHorizontal { domain = 'CurrentPaneDomain' } },
   -- Win(Super)+- : split the current WezTerm pane vertically (new pane below)
   { key = '-', mods = 'SUPER', action = act.SplitVertical { domain = 'CurrentPaneDomain' } },
-
-  -- Alt+/ , Alt+\ , Alt+- : split WezTerm's own pane, unless tmux is the
-  -- foreground process in it, in which case pass the raw key through so
-  -- tmux's own M-/, M-\, M-- split bindings (tmux.conf section 4) handle
-  -- it instead -- giving one keybind stack that works whichever level
-  -- (WezTerm or tmux) currently owns the splitting.
-  {
-    key = '/',
-    mods = 'ALT',
-    action = wezterm.action_callback(function(window, pane)
-      if pane_is_tmux(pane) then
-        window:perform_action(act.SendKey { key = '/', mods = 'ALT' }, pane)
-      else
-        window:perform_action(act.SplitHorizontal { domain = 'CurrentPaneDomain' }, pane)
-      end
-    end),
-  },
-  {
-    key = '\\',
-    mods = 'ALT',
-    action = wezterm.action_callback(function(window, pane)
-      if pane_is_tmux(pane) then
-        window:perform_action(act.SendKey { key = '\\', mods = 'ALT' }, pane)
-      else
-        window:perform_action(act.SplitHorizontal { domain = 'CurrentPaneDomain' }, pane)
-      end
-    end),
-  },
-  {
-    key = '-',
-    mods = 'ALT',
-    action = wezterm.action_callback(function(window, pane)
-      if pane_is_tmux(pane) then
-        window:perform_action(act.SendKey { key = '-', mods = 'ALT' }, pane)
-      else
-        window:perform_action(act.SplitVertical { domain = 'CurrentPaneDomain' }, pane)
-      end
-    end),
-  },
+  -- Alt+/, Alt+\, Alt+- are deliberately left unbound here (no WezTerm
+  -- interception) so they pass through untouched to tmux's own M-/, M-\,
+  -- M-- split bindings (tmux.conf section 4), with no collision risk
+  -- against Super+//- above.
 
   -- Alt+= : equalize WezTerm's own panes (see equalize_panes above),
   -- unless tmux is the foreground process, in which case pass the raw
