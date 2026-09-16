@@ -110,14 +110,30 @@ config.keys = {
   { key = '9', mods = 'SUPER', action = act.ActivateTab(8) },
 
   -- Kitty Tab Actions
-  { key = 'H', mods = 'SUPER', action = act.ActivateTabRelative(-1) },
-  { key = 'L', mods = 'SUPER', action = act.ActivateTabRelative(1) },
   { key = 'w', mods = 'SUPER', action = act.CloseCurrentPane { confirm = false } },
   { key = 't', mods = 'SUPER', action = act.SpawnTab 'CurrentPaneDomain' }, 
   
   -- Pop in a tab from another window into the current one
   -- (Ctrl+Shift+D freed up for tmux copy-mode scroll-down)
   { key = 'i', mods = 'CTRL|SHIFT', action = act.PaneSelect { mode = 'MoveToNewTab' } },
+
+  -- Ctrl+Tab / Ctrl+Shift+Tab : cycle WezTerm tabs forward/backward
+  { key = 'Tab', mods = 'CTRL', action = act.ActivateTabRelative(1) },
+  { key = 'Tab', mods = 'CTRL|SHIFT', action = act.ActivateTabRelative(-1) },
+
+  -- Win(Super)+/ : split the current WezTerm pane horizontally (new pane to the right)
+  { key = '/', mods = 'SUPER', action = act.SplitHorizontal { domain = 'CurrentPaneDomain' } },
+  -- Win(Super)+- : split the current WezTerm pane vertically (new pane below)
+  { key = '-', mods = 'SUPER', action = act.SplitVertical { domain = 'CurrentPaneDomain' } },
+
+  -- Win(Super)+Shift+h/j/k/l : move focus between WezTerm panes.
+  -- macOS reserves Cmd+H system-wide for "Hide Application" -- it never
+  -- reaches WezTerm -- so this uses Super+Shift rather than plain Super,
+  -- applied on both platforms for consistency.
+  { key = 'h', mods = 'SUPER|SHIFT', action = act.ActivatePaneDirection 'Left' },
+  { key = 'j', mods = 'SUPER|SHIFT', action = act.ActivatePaneDirection 'Down' },
+  { key = 'k', mods = 'SUPER|SHIFT', action = act.ActivatePaneDirection 'Up' },
+  { key = 'l', mods = 'SUPER|SHIFT', action = act.ActivatePaneDirection 'Right' },
   
   -- Vim Keybinds for Navigation (replaced by tmux)
   -- { key = 'h', mods = 'ALT', action = act.ActivatePaneDirection 'Left' },
