@@ -716,24 +716,38 @@ local function stopScroll()
 end
 
 -- =====================================================================
--- FAST MULTI-MONITOR SPACE SWITCHING (yabai-backed, per-display, no wrap)
+-- FAST MULTI-MONITOR SPACE SWITCHING (yabai when available, hs.spaces when not)
 -- =====================================================================
--- Previously this sent ctrl+<mission-control index>, computed from a
--- Hammerspoon-side guess at global space ordering. That guess could drift
--- from reality (yabai/macOS re-numbering), and because ctrl+N targets a
--- space by *global* number rather than "the next space on this display",
--- a stale guess could end up switching the wrong monitor entirely.
--- yabai's `--display mouse` queries are always live, so there's nothing
--- to drift: this asks "what are the spaces on the screen under my mouse,
--- right now" every time, then tells yabai to focus that exact space.
+-- yabai hard-requires "Displays have separate Spaces" (System Settings ->
+-- Desktop & Dock) and refuses to even start without it -- with that setting
+-- off, `yabai -m query ...` has no socket to talk to and silently no-ops.
+-- Rather than picking one implementation, both are kept: on every keypress
+-- this reads the live macOS setting (`defaults read com.apple.spaces
+-- spans-displays`) and routes to whichever implementation actually works
+-- right now, so toggling the setting in System Settings doesn't require
+-- touching this config.
 
 local YABAI = "/opt/homebrew/bin/yabai"
 
--- Forward-declared so switchSpace's closure captures this local (not a
--- stray global) even though hs.menubar.new() runs further down the file.
+-- Forward-declared so switchSpace/moveWindowToSpace's closures capture this
+-- local (not a stray global) even though hs.menubar.new() runs further down.
 local spacesMenubar
 
-local function switchSpace(direction)
+-- "spans-displays" true means spaces are shared/global across displays,
+-- i.e. "Displays have separate Spaces" is OFF -- the state yabai refuses to
+-- run in. Missing/unreadable defaults key defaults to false (separate
+-- spaces ON, yabai's normal assumption), matching the system default.
+local function separateSpacesEnabled()
+    local output = hs.execute("defaults read com.apple.spaces spans-displays 2>/dev/null")
+    local spansDisplays = output and output:match("1") ~= nil
+    return not spansDisplays
+end
+
+-- ---------------------------------------------------------------------
+-- yabai-backed implementation (requires separate-spaces ON)
+-- ---------------------------------------------------------------------
+
+local function switchSpaceYabai(direction)
     local output, ok = hs.execute(YABAI .. " -m query --spaces --display mouse")
     if not ok or not output or output == "" then return end
 
@@ -765,9 +779,9 @@ local function switchSpace(direction)
 end
 
 -- Moves the focused window to the next/prev space on its OWN display only
--- (mirrors switchSpace's display-scoped query so this can't accidentally
+-- (mirrors switchSpaceYabai's display-scoped query so this can't accidentally
 -- hop the window to a space on a different monitor).
-local function moveWindowToSpace(direction)
+local function moveWindowToSpaceYabai(direction)
     local winOutput, winOk = hs.execute(YABAI .. " -m query --windows --window")
     if not winOk or not winOutput or winOutput == "" then return end
     local winSuccess, win = pcall(hs.json.decode, winOutput)
@@ -800,17 +814,154 @@ local function moveWindowToSpace(direction)
     end
 end
 
+-- ---------------------------------------------------------------------
+-- Hammerspoon-native implementation (works with separate-spaces OFF too)
+-- ---------------------------------------------------------------------
+-- Walks hs.spaces directly and switches via ctrl+<mission-control index>
+-- (System Settings -> Keyboard -> Keyboard Shortcuts -> Mission Control ->
+-- "Switch to Desktop N" must be bound to ctrl+1..9 for this to work). The
+-- global index is a Hammerspoon-side guess at space ordering (Primary ->
+-- Externals -> Built-in) and can drift from reality if macOS re-numbers
+-- spaces, but it's what this setup ran on for years before yabai.
+
+local function getMacOSScreenOrder()
+    local screens = hs.screen.allScreens()
+    local primary = hs.screen.primaryScreen()
+
+    local orderedScreens = { primary }
+    local externals = {}
+    local builtIns = {}
+
+    -- Separate the secondary screens into Externals and Built-ins
+    for _, screen in ipairs(screens) do
+        if screen:id() ~= primary:id() then
+            -- We identify the laptop screen by its standard macOS naming convention
+            if string.match(screen:name(), "Built%-in") then
+                table.insert(builtIns, screen)
+            else
+                table.insert(externals, screen)
+            end
+        end
+    end
+
+    -- Sort multiple externals geometrically (just in case you add a 3rd external monitor later)
+    table.sort(externals, function(a, b) return a:frame().x < b:frame().x end)
+
+    -- Construct the final list: Primary -> Externals -> Built-ins
+    for _, screen in ipairs(externals) do table.insert(orderedScreens, screen) end
+    for _, screen in ipairs(builtIns) do table.insert(orderedScreens, screen) end
+
+    return orderedScreens
+end
+
+-- Given a screen and a target space ID on it, works out that space's
+-- position in the global (Primary -> Externals -> Built-in) ordering, then
+-- sends the ctrl+N Mission Control keystroke to jump to it.
+local function gotoSpaceGlobally(targetSpaceID)
+    local orderedScreens = getMacOSScreenOrder()
+    local globalSpaces = {}
+    for _, screen in ipairs(orderedScreens) do
+        local screenSpaces = hs.spaces.spacesForScreen(screen)
+        if screenSpaces then
+            for _, spaceID in ipairs(screenSpaces) do
+                table.insert(globalSpaces, spaceID)
+            end
+        end
+    end
+
+    local targetGlobalIndex = nil
+    for i, spaceID in ipairs(globalSpaces) do
+        if spaceID == targetSpaceID then
+            targetGlobalIndex = i
+            break
+        end
+    end
+
+    if targetGlobalIndex and targetGlobalIndex <= 9 then
+        hs.eventtap.keyStroke({"ctrl"}, tostring(targetGlobalIndex))
+    end
+end
+
+-- Hard Wall, no wrap-around: only moves within the current screen's own
+-- space list.
+local function switchSpaceNative(direction)
+    local focusedScreen = hs.mouse.getCurrentScreen()
+    local activeSpace = hs.spaces.activeSpaceOnScreen(focusedScreen)
+    local localSpaces = hs.spaces.spacesForScreen(focusedScreen)
+    if not localSpaces then return end
+
+    local localIndex = nil
+    for i, spaceID in ipairs(localSpaces) do
+        if spaceID == activeSpace then
+            localIndex = i
+            break
+        end
+    end
+    if not localIndex then return end
+
+    local targetLocalIndex = localIndex + (direction == "next" and 1 or -1)
+    if targetLocalIndex < 1 or targetLocalIndex > #localSpaces then return end
+
+    gotoSpaceGlobally(localSpaces[targetLocalIndex])
+end
+
+-- Moves the focused window to the next/prev space on its own screen, then
+-- follows it there.
+local function moveWindowToSpaceNative(direction)
+    local win = hs.window.focusedWindow()
+    if not win then return end
+
+    local screen = win:screen()
+    local activeSpace = hs.spaces.activeSpaceOnScreen(screen)
+    local localSpaces = hs.spaces.spacesForScreen(screen)
+    if not localSpaces then return end
+
+    local localIndex = nil
+    for i, spaceID in ipairs(localSpaces) do
+        if spaceID == activeSpace then
+            localIndex = i
+            break
+        end
+    end
+    if not localIndex then return end
+
+    local targetLocalIndex = localIndex + (direction == "next" and 1 or -1)
+    if targetLocalIndex < 1 or targetLocalIndex > #localSpaces then return end
+
+    local targetSpaceID = localSpaces[targetLocalIndex]
+    hs.spaces.moveWindowToSpace(win, targetSpaceID)
+    gotoSpaceGlobally(targetSpaceID)
+end
+
+-- ---------------------------------------------------------------------
+-- Dispatchers: pick the implementation based on the live macOS setting
+-- ---------------------------------------------------------------------
+
+local function switchSpace(direction)
+    if separateSpacesEnabled() then
+        switchSpaceYabai(direction)
+    else
+        switchSpaceNative(direction)
+    end
+end
+
+local function moveWindowToSpace(direction)
+    if separateSpacesEnabled() then
+        moveWindowToSpaceYabai(direction)
+    else
+        moveWindowToSpaceNative(direction)
+    end
+end
+
 -- =====================================================================
 -- MENU BAR SPACE INDICATOR
 -- =====================================================================
--- Shows the active space index of whichever display the mouse is
--- currently on, e.g. "7"
+-- Shows the active space's position within its own screen's/display's space
+-- list (e.g. "2"), matching what switchSpace/moveWindowToSpace step through.
 
 spacesMenubar = hs.menubar.new()
 
-function updateSpacesMenubar()
-    if not spacesMenubar then return end
-
+local function updateSpacesMenubarYabai()
     local output, ok = hs.execute(YABAI .. " -m query --spaces --display mouse")
     if not ok or not output or output == "" then return end
     local success, spaces = pcall(hs.json.decode, output)
@@ -821,6 +972,32 @@ function updateSpacesMenubar()
             spacesMenubar:setTitle(tostring(s.index))
             return
         end
+    end
+end
+
+local function updateSpacesMenubarNative()
+    local screen = hs.mouse.getCurrentScreen()
+    if not screen then return end
+
+    local activeSpace = hs.spaces.activeSpaceOnScreen(screen)
+    local localSpaces = hs.spaces.spacesForScreen(screen)
+    if not localSpaces then return end
+
+    for i, spaceID in ipairs(localSpaces) do
+        if spaceID == activeSpace then
+            spacesMenubar:setTitle(tostring(i))
+            return
+        end
+    end
+end
+
+function updateSpacesMenubar()
+    if not spacesMenubar then return end
+
+    if separateSpacesEnabled() then
+        updateSpacesMenubarYabai()
+    else
+        updateSpacesMenubarNative()
     end
 end
 
