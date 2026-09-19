@@ -16,14 +16,12 @@ expect
 firefox
 freecad
 fwupd
-ghostty
 gimp
 git
 globalprotect-openconnect
 greetd
 greetd-tuigreet
 grim
-gst-plugin-libcamera
 gst-plugin-pipewire
 gst-plugins-good
 htop
@@ -44,13 +42,9 @@ jellyfin-server
 jellyfin-web
 kdenlive
 keyd
-kicad
-kicad-library
-kicad-library-3d
 kitty
 less
 libayatana-appindicator
-libcamera
 libcamera-ipa
 libcamera-tools
 libreoffice-still
@@ -71,7 +65,6 @@ nss-mdns
 nvtop
 nwg-displays
 obs-studio
-ollama
 openssh
 pavucontrol
 pipewire-alsa
@@ -115,8 +108,6 @@ unzip
 usbmuxd
 usbutils
 uv
-v4l2loopback-dkms
-v4l2loopback-utils
 vlc
 vpl-gpu-rt
 vulkan-intel
