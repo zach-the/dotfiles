@@ -28,6 +28,8 @@ personal data/files. See the main README for what `install.sh` does.
 | `greetd-config.toml` | Greeter config — logs straight into Hyprland via `start-hyprland` |
 | `udev-rules/70-keychron.rules` | Keychron keyboard hidraw permissions (for QMK/Vial tools) |
 | `udev-rules/99-vial.rules` | Vial keyboard hidraw permissions |
+| `udev-rules/60-i2c-uaccess.rules` | User access to `/dev/i2c-*` so `ddcutil` can set external monitor brightness (`hypr/brightness.py`) |
+| `modules-load.d/i2c-dev.conf` | Load `i2c-dev` at boot (needed for `/dev/i2c-*`) |
 | `networkmanager-conf.d/20-connectivity.conf` | Custom NetworkManager connectivity-check setting |
 | `mimeapps.list` | Default application associations (Firefox for web, evince for PDF, qimgv for images, etc.) |
 

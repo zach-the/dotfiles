@@ -3,21 +3,16 @@
 generate_backlight_icons.py) that grows more rays as brightness increases.
 No percentage baked in -- the exact number lives in the tooltip.
 
-Reads brightness through brightnessctl's own -e4 exponential curve (the
-same one the scroll/XF86 key bindings in config.jsonc/hyprland.conf set
-through), rather than the raw linear percentage -- so the tooltip number
-and the tier thresholds both track what a "10%" adjustment actually felt
-like, not the linear fraction of max brightness.
+Shows the brightness of whichever monitor the mouse is on, the same one the
+scroll/XF86 bindings in config.jsonc/hyprland.conf adjust (see
+brightness.py). The built-in panel is read through brightnessctl's -e4
+exponential curve rather than the raw linear percentage, so the tooltip
+number and the tier thresholds track what a "10%" adjustment actually felt
+like. External monitors report their DDC value (cached, so this stays fast).
 """
 import json
-import subprocess
 
-
-def brightness_percent():
-    out = subprocess.check_output(["brightnessctl", "-e4", "-m"]).decode().strip()
-    # device,class,current,percent%,max -- percent here is already on the
-    # exponential curve because of -e4.
-    return int(out.split(",")[3].rstrip("%"))
+from brightness import percent as brightness_percent
 
 
 def tier_for(pct):

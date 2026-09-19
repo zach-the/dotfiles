@@ -29,8 +29,8 @@
     "return-type": "json",
     "interval": 5,
     "signal": 13,
-    "on-scroll-up": "brightnessctl -e4 -n2 set 10%+; pkill -RTMIN+13 waybar",
-    "on-scroll-down": "brightnessctl -e4 -n2 set 10%-; pkill -RTMIN+13 waybar"
+    "on-scroll-up": "~/.config/hypr/brightness.py up",
+    "on-scroll-down": "~/.config/hypr/brightness.py down"
   },
 
   "clock": {

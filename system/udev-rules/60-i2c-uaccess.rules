@@ -1,0 +1,3 @@
+# Let the logged-in user talk DDC/CI to external monitors (ddcutil), so the
+# brightness keys can drive them without root. See hypr/brightness.py.
+SUBSYSTEM=="i2c-dev", KERNEL=="i2c-[0-9]*", TAG+="uaccess"

@@ -211,8 +211,8 @@ After linking, the script optionally enables and starts the `keyd` service on Li
 | `XF86AudioLowerVolume` | Volume -5% |
 | `XF86AudioMute` | Toggle mute |
 | `XF86AudioMicMute` | Toggle mic mute |
-| `XF86MonBrightnessUp` | Brightness +5% |
-| `XF86MonBrightnessDown` | Brightness -5% |
+| `XF86MonBrightnessUp` | Brightness +10% of the monitor under the mouse (built-in via brightnessctl, external via DDC/CI) |
+| `XF86MonBrightnessDown` | Brightness -10% of the monitor under the mouse |
 | `XF86AudioNext` | Next track |
 | `XF86AudioPrev` | Previous track |
 | `XF86AudioPlay/Pause` | Play/pause |

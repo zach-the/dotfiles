@@ -38,6 +38,8 @@ linux_only_configs=(
   "Greetd"           "$DOTFILES/system/greetd-config.toml"    "/etc/greetd/config.toml"
   "Keychron udev"    "$DOTFILES/system/udev-rules/70-keychron.rules"  "/etc/udev/rules.d/70-keychron.rules"
   "Vial udev"        "$DOTFILES/system/udev-rules/99-vial.rules"      "/etc/udev/rules.d/99-vial.rules"
+  "I2C udev"         "$DOTFILES/system/udev-rules/60-i2c-uaccess.rules" "/etc/udev/rules.d/60-i2c-uaccess.rules"
+  "I2C module"       "$DOTFILES/system/modules-load.d/i2c-dev.conf"   "/etc/modules-load.d/i2c-dev.conf"
   "NM connectivity"  "$DOTFILES/system/networkmanager-conf.d/20-connectivity.conf" "/etc/NetworkManager/conf.d/20-connectivity.conf"
 )
 
