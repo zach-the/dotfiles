@@ -7,6 +7,12 @@
 # range up front (as this script used to, with a different block size than
 # ws_nav.sh) risks grabbing a workspace ID that already legitimately
 # belongs to another monitor, since eDP-1's block has no upper cap.
+#
+# On monitor removal, Hyprland re-homes the unplugged monitor's workspaces
+# (e.g. 101-104) onto a remaining monitor, but ws_nav.sh only navigates the
+# monitor's own block, so those windows become unreachable. rescue_orphans()
+# moves them into fresh workspaces at the top of the remaining monitor's
+# block, keeping windows that shared a workspace together.
 
 BLOCK=100
 
@@ -44,6 +50,50 @@ assign_workspace() {
     fi
 }
 
+# Move windows stranded on workspaces outside their monitor's block (see
+# header) into new workspaces appended to that monitor's block.
+rescue_orphans() {
+    local mons clients workspaces
+    mons=$(hyprctl monitors -j) || return
+    clients=$(hyprctl clients -j) || return
+    workspaces=$(hyprctl workspaces -j) || return
+
+    # One "<monitor> <base> <old_ws> <address>" line per stranded window,
+    # using ws_nav.sh's monitor -> block mapping. Special workspaces
+    # (id < 0) are left alone.
+    local stranded
+    mapfile -t stranded < <(jq -r --argjson mons "$mons" --argjson block "$BLOCK" '
+        ($mons | map(select(.name != "eDP-1")) | sort_by(.x, .y) | map(.name)) as $ext
+        | ($mons | map({key: (.id | tostring), value: .name}) | from_entries) as $names
+        | .[]
+        | select(.workspace.id > 0)
+        | ($names[.monitor | tostring]) as $mon
+        | select($mon != null)
+        | (if $mon == "eDP-1" then 0 else (($ext | index($mon)) + 1) end * $block) as $base
+        | select(.workspace.id <= $base or .workspace.id > $base + $block)
+        | "\($mon) \($base) \(.workspace.id) \(.address)"
+    ' <<< "$clients" | sort -k3,3n)
+
+    local -A remap next
+    local entry mon base old addr
+    for entry in "${stranded[@]}"; do
+        read -r mon base old addr <<< "$entry"
+        if [ -z "${remap[$old]}" ]; then
+            if [ -z "${next[$base]}" ]; then
+                next[$base]=$(jq -r --argjson b "$base" --argjson block "$BLOCK" \
+                    '[.[] | select(.id > $b and .id <= $b + $block) | .id] | max // $b' \
+                    <<< "$workspaces")
+            fi
+            next[$base]=$(( next[$base] + 1 ))
+            remap[$old]=${next[$base]}
+            hyprctl dispatch movetoworkspacesilent "${remap[$old]},address:$addr"
+            hyprctl dispatch moveworkspacetomonitor "${remap[$old]}" "$mon" 2>/dev/null
+        else
+            hyprctl dispatch movetoworkspacesilent "${remap[$old]},address:$addr"
+        fi
+    done
+}
+
 # Assign starting workspace for all monitors already connected at startup
 hyprctl monitors -j | jq -r '.[].name' | while read -r mon; do
     assign_workspace "$mon"
@@ -56,5 +106,10 @@ socat - "UNIX-CONNECT:$socket" | while IFS= read -r line; do
         monitor="${line#monitoradded>>}"
         sleep 0.3  # let Hyprland finish initializing the new monitor
         assign_workspace "$monitor"
+    elif [[ "$line" == "monitorremoved>>"* ]]; then
+        # lid.sh disables eDP-1 itself and relocates its windows; leave that alone.
+        [ "${line#monitorremoved>>}" == "eDP-1" ] && continue
+        sleep 0.3  # let Hyprland finish re-homing the removed monitor's workspaces
+        rescue_orphans
     fi
 done
