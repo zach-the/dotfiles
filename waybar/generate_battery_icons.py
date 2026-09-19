@@ -160,7 +160,13 @@ def battery_svg(pct, charging):
     # top of it -- same "grey track under a bright fill" idea as the
     # volume/wifi gauges, just white-at-two-opacities instead of white/grey.
     track = f'<rect x="{INNER_X}" y="{INNER_Y}" width="{INNER_W:.3f}" height="{INNER_H:.3f}" rx="{BODY_R}" fill="{WHITE}" fill-opacity="{DIM_OPACITY}"/>'
-    fill = fill_shape(INNER_X, INNER_Y, INNER_H, body_fill_w, BODY_R, f'fill="{WHITE}"')
+    if body_fill_w >= INNER_W - 1e-6:
+        # Body fully filled: use the track's own rounded rect so the right
+        # corners are rounded too, rather than fill_shape's square-right edge
+        # (which is only right while that edge is a moving boundary).
+        fill = f'<rect x="{INNER_X}" y="{INNER_Y}" width="{INNER_W:.3f}" height="{INNER_H:.3f}" rx="{BODY_R}" fill="{WHITE}"/>'
+    else:
+        fill = fill_shape(INNER_X, INNER_Y, INNER_H, body_fill_w, BODY_R, f'fill="{WHITE}"')
     nub = nub_shape(nub_fill_w)
 
     return (
