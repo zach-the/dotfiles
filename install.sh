@@ -128,6 +128,22 @@ done
 
 # --- Post-link steps for entries that need extra setup ---
 
+# Generated, gitignored files (see .gitignore): configs @import/require/source
+# these, so wezterm, waybar, hyprland, rofi, etc. error out until they exist.
+# Override the palette with e.g. PALETTE=everforest ./install.sh
+echo ""
+echo "[Colors] Generating color files (palette: ${PALETTE:-dark})"
+python3 "$DOTFILES/generate_colors.py" "${PALETTE:-dark}"
+
+if [[ "$OS" == "linux" ]]; then
+  # hyprland.conf sources this; nwg-displays (SUPER+I) overwrites it on save.
+  if [ ! -e "$DOTFILES/hypr/monitors.conf" ]; then
+    echo "# placeholder - nwg-displays (SUPER+I) overwrites this when you save a layout" \
+      > "$DOTFILES/hypr/monitors.conf"
+    echo "[Hyprland] Created placeholder hypr/monitors.conf"
+  fi
+fi
+
 echo ""
 if [ -L "/etc/keyd/default.conf" ] && [ -e "/etc/keyd/default.conf" ]; then
   read -rp "[Keyd] Enable and start keyd service? [y/N] " yn
