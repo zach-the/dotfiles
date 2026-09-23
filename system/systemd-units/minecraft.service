@@ -5,7 +5,7 @@ After=network.target
 [Service]
 User=zach
 WorkingDirectory=/home/zach/mc-server
-ExecStart=/usr/bin/java -Xmx4G -Xms2G -jar server.jar nogui
+ExecStart=/usr/lib/jvm/java-25-openjdk/bin/java -Xmx4G -Xms2G -jar server.jar nogui
 Restart=on-failure
 StandardInput=null
 

@@ -210,8 +210,35 @@ export PATH=$HOME/.npm-global/bin:$PATH
 
 
 # --- Minecraft server (Java + Geyser Bedrock proxy) ---
+minecraft-geyser-update() {
+    local dir=/home/zach/geyser jar=/home/zach/geyser/Geyser-Standalone.jar
+    local api=https://download.geysermc.org/v2/projects/geyser/versions/latest/builds/latest
+    local want have tmp
+    want=$(curl -fsSL --max-time 15 "$api" | jq -r '.downloads.standalone.sha256') || want=
+    if [ -z "$want" ] || [ "$want" = null ]; then
+        echo "Geyser update check failed (offline?); keeping current jar." >&2
+        return 0
+    fi
+    have=$(sha256sum "$jar" 2>/dev/null | cut -d' ' -f1)
+    if [ "$want" = "$have" ]; then
+        echo "Geyser is up to date."
+        return 0
+    fi
+    echo "Updating Geyser..."
+    tmp=$(mktemp) || return 1
+    if curl -fsSL -o "$tmp" "$api/downloads/standalone" \
+        && [ "$(sha256sum "$tmp" | cut -d' ' -f1)" = "$want" ]; then
+        sudo systemctl stop geyser
+        sudo cp -f "$jar" "$jar.bak" 2>/dev/null
+        sudo install -m 755 "$tmp" "$jar" && echo "Geyser updated."
+    else
+        echo "Geyser download failed or checksum mismatch; keeping current jar." >&2
+    fi
+    rm -f "$tmp"
+}
 minecraft-server-start() {
     sudo tailscale up && \
+    minecraft-geyser-update && \
     sudo systemctl start minecraft geyser && \
     sleep 3 && \
     echo "Minecraft server + Geyser running." && \

@@ -30,6 +30,7 @@ personal data/files. See the main README for what `install.sh` does.
 | `udev-rules/99-vial.rules` | Vial keyboard hidraw permissions |
 | `udev-rules/60-i2c-uaccess.rules` | User access to `/dev/i2c-*` so `ddcutil` can set external monitor brightness (`hypr/brightness.py`) |
 | `modules-load.d/i2c-dev.conf` | Load `i2c-dev` at boot (needed for `/dev/i2c-*`) |
+| `modprobe.d/webcam-late-load.conf` | Blacklist `intel_cvs`/`ov08x40`/`intel_ipu7_isys` from autoload (see quirk below) |
 | `networkmanager-conf.d/20-connectivity.conf` | Custom NetworkManager connectivity-check setting |
 | `mimeapps.list` | Default application associations (Firefox for web, evince for PDF, qimgv for images, etc.) |
 
@@ -47,6 +48,8 @@ personal data/files. See the main README for what `install.sh` does.
 - **GTK/icon theme:** `adw-gtk3` / `Adwaita` (default cursor)
 
 ## Known quirks worth knowing about before you copy these back
+
+- **Dell XPS 14 (Panther Lake) audio vs. webcam load order.** The four `cs35l56` speaker amps need a GPIO at probe time that the webcam stack (`intel_cvs`, `ov08x40`, `intel_ipu7_isys`, built from `~/.local/share/webcam-fix`, see its README) also grabs. If the camera modules win the race, the amps fail with `-EBUSY: Failed to get spk-id-gpios`, `sof_sdw` never builds a card, and PipeWire shows only "Dummy Output". Fix: `modprobe.d/webcam-late-load.conf` blacklists the three modules from autoload, and `systemd-units/webcam-late-load.service` loads them (CVS → sensor → ISYS) once `sof-soundwire` appears in `/proc/asound/cards` (60s timeout, then loads anyway). Manual recovery if it ever happens again: unload the three camera modules, rebind the amps (`echo sdw:0:2:01fa:3557:01:2 > /sys/bus/soundwire/drivers/cs35l56/bind`, likewise `:2:...:3`, `:3:...:0`, `:3:...:1`), then `echo sof_sdw > /sys/bus/platform/drivers/sof_sdw/{unbind,bind}`. Which of the three modules actually holds the pin was not isolated.
 
 - `udev-rules/70-keychron.rules` has `GROUP="$(your username)"` literally in the file — that looks like an unexpanded placeholder from wherever the rule was originally copied from, not something this project introduced. Worth fixing to your actual username (or dropping GROUP and relying on the `uaccess`/`udev-acl` tags, which already grant the logged-in user access) when you restore it.
 - `minecraft.service` / `geyser.service` reference `~/mc-server` and `~/geyser` — those directories (server jars, worlds, configs) are data and intentionally **not** backed up here, per your instructions. The service files will fail to start until you put something back in those paths.

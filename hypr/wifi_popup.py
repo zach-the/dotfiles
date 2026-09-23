@@ -58,6 +58,13 @@ def _apply_margins(window):
     GtkLayerShell.set_margin(window, GtkLayerShell.Edge.RIGHT, WIFI_ANCHOR_MARGIN_RIGHT)
 
 
+def _show_page(window, name):
+    window._stack.set_visible_child_name(name)
+    # A toplevel only grows on its own; ask for the minimum so it
+    # re-fits to the newly visible page.
+    window.resize(1, 1)
+
+
 # --- List page -------------------------------------------------------------
 
 def _make_network_row(net):
@@ -135,7 +142,7 @@ def _show_password_page(window, net):
     window._pending_net = net
     window._password_label.set_text(f"Password for {net['ssid']}")
     window._password_entry.set_text("")
-    window._stack.set_visible_child_name("password")
+    _show_page(window, "password")
     window._password_entry.grab_focus()
 
 
@@ -145,7 +152,7 @@ def _on_password_activate(entry, window):
 
 def _on_password_key(_entry, event, window):
     if event.keyval == Gdk.KEY_Escape:
-        window._stack.set_visible_child_name("list")
+        _show_page(window, "list")
         _render_list(window)
         return True
     return False
@@ -154,7 +161,7 @@ def _on_password_key(_entry, event, window):
 # --- Connecting ----------------------------------------------------------
 
 def _attempt_connect(window, net, password):
-    window._stack.set_visible_child_name("list")
+    _show_page(window, "list")
     window._status = f"Connecting to {net['ssid']}…"
     _render_list(window)
 
@@ -184,7 +191,7 @@ def refresh(window):
     # See audio_popup.py's refresh() for why this is recomputed on every
     # show() instead of only once in build().
     _apply_margins(window)
-    window._stack.set_visible_child_name("list")
+    _show_page(window, "list")
     _start_scan(window)
 
 
@@ -202,6 +209,10 @@ def build():
     _apply_margins(window)
 
     stack = Gtk.Stack()
+    # Size to the visible page only, so the password page isn't as tall
+    # as the network list.
+    stack.set_hhomogeneous(False)
+    stack.set_vhomogeneous(False)
 
     # --- list page ---
     list_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)

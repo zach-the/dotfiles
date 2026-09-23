@@ -1,0 +1,21 @@
+[Unit]
+Description=Load IPU7/OV08X40 webcam modules after the sound card is up
+Documentation=file:///home/zach/.local/share/webcam-fix/README.md
+# The webcam modules hold a GPIO the speaker amps need while probing, so they
+# must load after the amps have bound and sof-soundwire has registered.
+After=systemd-modules-load.service sound.target
+Wants=sound.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+TimeoutStartSec=120
+# Wait up to 60s for the internal card; load the camera anyway if it never shows.
+ExecStart=/bin/bash -c 'for i in $(seq 60); do grep -q sof-soundwire /proc/asound/cards && break; sleep 1; done; sleep 2'
+# Order matters: CVS first (sensor _DEP), then sensor, then the ISYS.
+ExecStart=/usr/bin/modprobe intel_cvs
+ExecStart=/usr/bin/modprobe ov08x40
+ExecStart=/usr/bin/modprobe intel_ipu7_isys
+
+[Install]
+WantedBy=multi-user.target

@@ -16,6 +16,9 @@ action=$1
 move=$2
 
 BLOCK=100
+# See monitor_init.sh: windows rescued from an unplugged monitor are logged
+# here so they can be sent back when it returns.
+RESCUE_LOG="${XDG_STATE_HOME:-$HOME/.local/state}/hypr/workspace-rescue.log"
 
 active_ws_info=$(hyprctl activeworkspace -j)
 current_mon_name=$(echo "$active_ws_info" | jq -r '.monitor')
@@ -99,6 +102,13 @@ for id in "${existing_ids[@]}"; do
         addrs=$(hyprctl clients -j | jq -r '.[] | select(.workspace.id == '"$id"') | .address')
         for addr in $addrs; do
             hyprctl dispatch movetoworkspacesilent "$want,address:$addr"
+            # Keep the rescue log pointing at the window's new workspace,
+            # otherwise it no longer matches when the monitor comes back.
+            if [ -s "$RESCUE_LOG" ]; then
+                awk -F'\t' -v OFS='\t' -v a="$addr" -v old="$id" -v new="$want" \
+                    '$5 == a && $4 == old { $4 = new } 1' "$RESCUE_LOG" > "$RESCUE_LOG.tmp" &&
+                    mv "$RESCUE_LOG.tmp" "$RESCUE_LOG"
+            fi
         done
         if [ "$id" == "$target" ]; then
             refocus=$want

@@ -41,6 +41,7 @@ linux_only_configs=(
   "I2C udev"         "$DOTFILES/system/udev-rules/60-i2c-uaccess.rules" "/etc/udev/rules.d/60-i2c-uaccess.rules"
   "I2C module"       "$DOTFILES/system/modules-load.d/i2c-dev.conf"   "/etc/modules-load.d/i2c-dev.conf"
   "NM connectivity"  "$DOTFILES/system/networkmanager-conf.d/20-connectivity.conf" "/etc/NetworkManager/conf.d/20-connectivity.conf"
+  "Webcam late-load" "$DOTFILES/system/modprobe.d/webcam-late-load.conf" "/etc/modprobe.d/webcam-late-load.conf"
 )
 
 mac_only_configs=(
