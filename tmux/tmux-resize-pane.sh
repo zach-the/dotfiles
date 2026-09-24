@@ -22,13 +22,14 @@
 #
 # After the width pass, if the target pane isn't already full-height (i.e.
 # it shares its column with at least one other pane stacked above/below
-# it), it's also resized to 5/7 of that column's total height, with the
-# same top-to-bottom rebalancing applied to its vertical neighbors. A pane
-# alone in its column is already full height, so this is a no-op for it --
-# mirroring how a pane alone in its row is left untouched by the width
-# pass above.
-percent="$1"   # target width as a percentage of the row's total width
+# it), it's also resized to a percentage (3rd arg, default 71 ~= 5/7) of
+# that column's total height, with the same top-to-bottom rebalancing
+# applied to its vertical neighbors. A pane alone in its column is already
+# full height, so this is a no-op for it -- mirroring how a pane alone in
+# its row is left untouched by the width pass above.
+percent="$1"          # target width as a percentage of the row's total width
 pane_id="$2"
+height_percent="${3:-71}"   # target height as a percentage of the column's total height
 
 # axis: "x" resizes width across a row (panes grouped by vertical overlap,
 # deduped by left edge); "y" resizes height down a column (panes grouped
@@ -95,6 +96,6 @@ resize_axis() {
 }
 
 resize_axis "$percent" "$pane_id" x
-resize_axis 71 "$pane_id" y   # ~5/7
+resize_axis "$height_percent" "$pane_id" y
 
 tmux refresh-client

@@ -289,14 +289,17 @@ config.keys = {
   -- M-- split bindings (tmux.conf section 4), with no collision risk
   -- against Super+//- above.
 
-  -- Alt+= : equalize WezTerm's own panes (see equalize_panes above),
-  -- unless tmux is the foreground process, in which case pass the raw
-  -- key through for tmux's own M-= (select-layout -E, tmux.conf section 4).
+  -- Alt+= : equalize WezTerm's own panes (see equalize_panes above), unless
+  -- tmux is the foreground process or there's only one WezTerm pane in the
+  -- tab (see should_passthrough above) -- in which case pass the raw key
+  -- through, to tmux's own M-= (select-layout -E, tmux.conf section 4) or
+  -- to whatever app is running, rather than have it silently swallowed by
+  -- equalize_panes' own no-op when there's nothing to equalize.
   {
     key = '=',
     mods = 'ALT',
     action = wezterm.action_callback(function(window, pane)
-      if pane_is_tmux(pane) then
+      if should_passthrough(pane) then
         window:perform_action(act.SendKey { key = '=', mods = 'ALT' }, pane)
       else
         equalize_panes(window, pane)

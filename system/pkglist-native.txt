@@ -83,6 +83,7 @@ python-setuptools
 qbittorrent
 qt5-wayland
 qt6-wayland
+remmina
 ripgrep
 rofi
 rsync
@@ -100,7 +101,6 @@ texlive-fontsrecommended
 texlive-latexrecommended
 texlive-luatex
 texlive-pictures
-tigervnc
 tmux
 tree
 ttf-jetbrains-mono
@@ -120,6 +120,5 @@ wl-clip-persist
 xclip
 xdg-desktop-portal-gtk
 xdg-desktop-portal-hyprland
-xdotool
 xsel
 zram-generator
