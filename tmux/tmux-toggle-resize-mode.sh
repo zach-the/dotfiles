@@ -12,12 +12,21 @@
 mode="$1"   # w, a, z, or f
 cur=$(tmux show-options -gqv @resize_mode)
 
+name() {
+    case "$1" in
+        w) echo "TWO-THIRDS" ;;
+        a) echo "THIRD" ;;
+        z) echo "HALF" ;;
+        f) echo "FULL" ;;
+    esac
+}
+
 if [ -z "$cur" ]; then
     tmux set-option -g @resize_mode "$mode"
-    tmux display-message "resize-on-focus: $mode"
+    tmux display-message "resize-on-focus: $(name "$mode")"
 elif [ "$cur" = "$mode" ]; then
     tmux set-option -gu @resize_mode
     tmux display-message "resize-on-focus: off"
 else
-    tmux display-message "resize-on-focus: '$cur' is active -- turn it off first"
+    tmux display-message "resize-on-focus: $(name "$cur") is active -- turn it off first"
 fi
