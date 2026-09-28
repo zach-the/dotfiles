@@ -12,6 +12,7 @@ _ANSI_ESC = re.compile(r'\033\[[^a-zA-Z]*[a-zA-Z]')
 _SGR = re.compile(r'\033\[([0-9;]*)m')
 _SGR_MOUSE = re.compile(rb'\033\[<(\d+);(\d+);(\d+)([Mm])')
 MAX_BUFFER = 10_000  # lines per file
+WHEEL_SCROLL_LINES = 3  # lines scrolled per mouse wheel notch
 
 # --- -m (merged) mode ---
 MERGE_TAG_MAXLEN = 24     # cap on a tag's displayed length before middle-truncation
@@ -232,13 +233,19 @@ def read_key(fd):
             fcntl.fcntl(fd, fcntl.F_SETFL, flags)
     return c
 
-def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_widths, blank_fill=None):
+def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_widths, blank_fill=None, merged=False):
     """
     Render the TUI. Returns updated view_tops.
     col_widths: list of content widths per column (not counting │ dividers).
     blank_fill: per-column text to show on rows past a column's last buffered
     line (default: blank). Used by -m merged mode to keep its tag-column
     divider bar continuous down rows with no content yet.
+    merged: -m mode. Each tailed line stays a single row instead of being
+    pre-split at col width -- the terminal does its own soft-wrap for
+    anything too long. Pre-splitting looks identical on screen but plants a
+    real row break (and terminating newline) at the wrap point, so copying
+    a wrapped line picks up an invisible hard newline the terminal never
+    actually put there.
     """
     n = len(files)
     if blank_fill is None:
@@ -258,8 +265,11 @@ def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_width
         w = []
         for raw in buf:
             raw = raw.replace('\t', '    ')
-            for chunk in (_wrap_ansi(raw, max_len) if raw else [""]):
-                w.append(chunk)
+            if merged:
+                w.append(raw)
+            else:
+                for chunk in (_wrap_ansi(raw, max_len) if raw else [""]):
+                    w.append(chunk)
         wrapped.append(w)
 
     # Compute effective view start positions
@@ -318,7 +328,11 @@ def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_width
             if not is_last:
                 row += _ljust_visible(line, cw) + '\033[0m│'
             else:
-                row += _ljust_visible(line, cw) + '\033[0m'
+                # No pad needed here -- the trailing \033[K below already
+                # clears any stale content out to the end of the line, so
+                # padding would just be literal trailing spaces that show up
+                # on copy-paste.
+                row += line + '\033[0m'
         out.append(row + '\033[K')
 
     for i, line in enumerate(out):
@@ -492,6 +506,7 @@ def main():
             if needs_redraw:
                 view_tops, at_bottom, last_frame = draw_screen(
                     display_files, buffers, width, height, follow_mode, view_tops, col_widths,
+                    merged=merged,
                 )
                 needs_redraw = False
                 # Reaching the bottom via a manual scroll (j/d/f/...) resumes
@@ -525,6 +540,19 @@ def main():
                                 col_widths = dividers_to_widths(new_div_cols, width, n_display)
                                 div_fracs = [d / width for d in new_div_cols]
                                 needs_redraw = True
+                            elif btn & 0x40:
+                                # Wheel event: bit 6 set, direction is the low
+                                # two bits (64=up, 65=down) with modifier
+                                # flags (shift/meta/ctrl = 4/8/16) possibly
+                                # layered on top -- mask those off.
+                                base = btn & ~0x1C
+                                if base == 64:
+                                    follow_mode = False
+                                    view_tops = [max(0, t - WHEEL_SCROLL_LINES) for t in view_tops]
+                                    needs_redraw = True
+                                elif base == 65 and not follow_mode:
+                                    view_tops = [t + WHEEL_SCROLL_LINES for t in view_tops]
+                                    needs_redraw = True
                             elif not pressed:
                                 dragging_divider = None
 
