@@ -2,6 +2,7 @@
 alias sudo='sudo '
 alias ls='ls --color=auto'
 alias grep='grep --color=auto'
+alias dush='du -sh --apparent-size'
 # alias zg='rg -z'
 # alias rgs='rg -S'
 # alias zgs='rg -z -S'

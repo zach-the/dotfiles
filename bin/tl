@@ -274,13 +274,37 @@ def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_width
 
     # Compute effective view start positions
     new_tops = []
-    for i, w in enumerate(wrapped):
-        total = len(w)
+    merged_end = 0  # merged mode: index one past the last fully-visible line
+    merged_rows = 0  # merged mode: screen rows those visible lines occupy
+    if merged:
+        # Lines aren't pre-split, so one can span several screen rows when
+        # the terminal soft-wraps it. Budget by those physical rows, not by
+        # line count, or the frame overflows the screen and scrolls the
+        # header off the top. Whole lines only; the first is always kept.
+        w = wrapped[0]
+        hs = [max(1, -(-_visible_len(l) // width)) for l in w]
+        rows, bottom_top = 0, len(w)
+        while bottom_top > 0 and (rows == 0 or rows + hs[bottom_top - 1] <= content_lines):
+            rows += hs[bottom_top - 1]
+            bottom_top -= 1
         if follow_mode:
-            new_tops.append(max(0, total - content_lines))
+            top = bottom_top
         else:
-            prev = view_tops[i] if i < len(view_tops) else 0
-            new_tops.append(max(0, min(prev, max(0, total - content_lines))))
+            prev = view_tops[0] if view_tops else 0
+            top = max(0, min(prev, bottom_top))
+        merged_end = top
+        while merged_end < len(w) and (merged_rows == 0 or merged_rows + hs[merged_end] <= content_lines):
+            merged_rows += hs[merged_end]
+            merged_end += 1
+        new_tops.append(top)
+    else:
+        for i, w in enumerate(wrapped):
+            total = len(w)
+            if follow_mode:
+                new_tops.append(max(0, total - content_lines))
+            else:
+                prev = view_tops[i] if i < len(view_tops) else 0
+                new_tops.append(max(0, min(prev, max(0, total - content_lines))))
 
     sys.stdout.write('\033[H')
     out = []
@@ -297,7 +321,10 @@ def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_width
         name = f" {os.path.basename(f)} "
 
         wi = wrapped[i]
-        behind = max(0, len(wi) - (new_tops[i] + content_lines))
+        if merged:
+            behind = len(wi) - merged_end
+        else:
+            behind = max(0, len(wi) - (new_tops[i] + content_lines))
         behinds.append(behind)
 
         if follow_mode:
@@ -317,7 +344,11 @@ def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_width
     out.append(header + '\033[K')
 
     # Content rows
-    for y in range(content_lines):
+    if merged:
+        for line in wrapped[0][new_tops[0]:merged_end]:
+            out.append(line + '\033[0m\033[K')
+        out.extend(['\033[K'] * (content_lines - merged_rows))
+    for y in range(content_lines if merged else 0, content_lines):
         row = ""
         for i in range(n):
             w = wrapped[i]
