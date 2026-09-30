@@ -461,7 +461,13 @@ banner() {
         gaps+=("$top_pad")
     fi
 
-    clear
+    # Draw on the terminal's alternate screen (like vim/less) so the original
+    # screen and scrollback come back untouched on exit. Ctrl-C also restores it.
+    local old_int_trap
+    old_int_trap=$(trap -p INT)
+    tput smcup
+    tput clear
+    trap 'tput rmcup; trap - INT; '"$old_int_trap"'; return 130' INT
     local i pad
     for (( i=0; i<gaps[0]; i++ )); do echo; done
 
@@ -493,7 +499,9 @@ banner() {
         read -n 1 -s -r key
         [[ "$key" == "q" ]] && break
     done
-    clear
+    tput rmcup
+    trap - INT
+    eval "$old_int_trap"
 }
 alias banner='banner --alignment l'
 # --- Plex Media Server control ---

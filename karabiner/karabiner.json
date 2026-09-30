@@ -7,6 +7,31 @@
             "complex_modifications": {
                 "rules": [
                     {
+                        "description": "TigerVNC: Left Option -> Alt",
+                        "manipulators": [
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "left_option",
+                                    "modifiers": {
+                                        "optional": ["any"]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "key_code": "left_command"
+                                    }
+                                ],
+                                "conditions": [
+                                    {
+                                        "type": "frontmost_application_if",
+                                        "bundle_identifiers": ["^com\\.tigervnc\\.tigervnc$"]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
                         "description": "Caps Lock to Hyper (hold) and Escape (tap)",
                         "manipulators": [
                             {
@@ -243,6 +268,28 @@
                     },
                     "ignore": false,
                     "treat_as_built_in_keyboard": true
+                }
+            ],
+            "simple_modifications": [
+                {
+                    "from": {
+                        "key_code": "left_command"
+                    },
+                    "to": [
+                        {
+                            "key_code": "right_command"
+                        }
+                    ]
+                },
+                {
+                    "from": {
+                        "key_code": "right_command"
+                    },
+                    "to": [
+                        {
+                            "key_code": "left_command"
+                        }
+                    ]
                 }
             ],
             "fn_function_keys": [
