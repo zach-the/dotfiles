@@ -32,8 +32,8 @@ local function should_passthrough(pane)
   return pane_is_tmux(pane) or #pane:tab():panes() <= 1
 end
 
-config.window_background_opacity = is_mac and 0.88 or 1.0
-config.text_background_opacity = is_mac and 0.88 or 1.0
+config.window_background_opacity = is_mac and 0.9 or 0.9
+config.text_background_opacity = is_mac and 0.9 or 0.9
 
 -- Font Configuration
 config.font = wezterm.font 'JetBrainsMono Nerd Font Mono'
