@@ -26,6 +26,7 @@ from gi.repository import Gdk, GLib, Gtk
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import audio_popup
 import bluetooth_popup
+import jellyfin_popup
 import popup_ipc
 import wifi_popup
 
@@ -361,6 +362,7 @@ def main():
     TARGETS["audio"] = PopupTarget("audio", audio_popup.build, audio_popup.refresh)
     TARGETS["wifi"] = PopupTarget("wifi", wifi_popup.build, wifi_popup.refresh)
     TARGETS["bluetooth"] = PopupTarget("bluetooth", bluetooth_popup.build, bluetooth_popup.refresh)
+    TARGETS["jellyfin"] = PopupTarget("jellyfin", jellyfin_popup.build, jellyfin_popup.refresh)
     _load_css()
     _start_pactl_watch()
     Gtk.main()

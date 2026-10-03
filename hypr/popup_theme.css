@@ -7,7 +7,8 @@
 
 window.popup-audio,
 window.popup-wifi,
-window.popup-bluetooth {
+window.popup-bluetooth,
+window.popup-jellyfin {
     /* Solid, opaque version of the wifi/volume rings' dimmed-track grey
        (white at 30% opacity -- see generate_wifi_icons.py/
        generate_volume_icons.py's DIM_OPACITY) -- i.e. what that grey
@@ -22,14 +23,16 @@ window.popup-bluetooth {
 
 window.popup-audio .popup-header,
 window.popup-wifi .popup-header,
-window.popup-bluetooth .popup-header {
+window.popup-bluetooth .popup-header,
+window.popup-jellyfin .popup-header {
     font-weight: bold;
     padding: 2px 4px 4px 4px;
 }
 
 window.popup-audio .popup-subheader,
 window.popup-wifi .popup-subheader,
-window.popup-bluetooth .popup-subheader {
+window.popup-bluetooth .popup-subheader,
+window.popup-jellyfin .popup-subheader {
     font-size: 0.85em;
     opacity: 0.8;
     padding: 2px 4px 4px 0;
@@ -37,27 +40,31 @@ window.popup-bluetooth .popup-subheader {
 
 window.popup-audio list,
 window.popup-wifi list,
-window.popup-bluetooth list {
+window.popup-bluetooth list,
+window.popup-jellyfin list {
     background-color: transparent;
     color: @fg;
 }
 
 window.popup-audio row,
 window.popup-wifi row,
-window.popup-bluetooth row {
+window.popup-bluetooth row,
+window.popup-jellyfin row {
     background-color: transparent;
     border-radius: 6px;
 }
 
 window.popup-audio row:hover,
 window.popup-wifi row:hover,
-window.popup-bluetooth row:hover {
+window.popup-bluetooth row:hover,
+window.popup-jellyfin row:hover {
     background-color: alpha(@pink, 0.2);
 }
 
 window.popup-audio label,
 window.popup-wifi label,
-window.popup-bluetooth label {
+window.popup-bluetooth label,
+window.popup-jellyfin label {
     color: @fg;
 }
 

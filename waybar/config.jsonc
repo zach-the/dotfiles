@@ -10,7 +10,7 @@
 
   "modules-left": ["hyprland/workspaces"],
   "modules-center": ["clock"],
-  "modules-right": ["custom/language", "custom/mode", "custom/volume", "custom/bluetooth", "custom/backlight", "custom/wifi", "custom/battery"], //tray was here, but i removed it. look into optimizing that and figurig out system76-power later
+  "modules-right": ["custom/jellyfin", "custom/language", "custom/mode", "custom/volume", "custom/bluetooth", "custom/backlight", "custom/wifi", "custom/battery"], //tray was here, but i removed it. look into optimizing that and figurig out system76-power later
 
   "hyprland/workspaces": {
     "format": "{icon}",
@@ -67,6 +67,14 @@
     "interval": 5,
     "signal": 11,
     "on-click": "hyprctl switchxkblayout all next; pkill -RTMIN+11 waybar"
+  },
+
+  "custom/jellyfin": {
+    "exec": "~/.config/hypr/jellyfin_status.sh",
+    "interval": 10,
+    "signal": 14,
+    "on-click": "~/.config/hypr/popup_client.py toggle jellyfin",
+    "on-click-right": "~/.config/hypr/jellyfin_toggle.sh"
   },
 
   "custom/bluetooth": {

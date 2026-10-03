@@ -2,6 +2,7 @@
 @import 'battery-icons-generated.css';
 @import 'wifi-icons-generated.css';
 @import 'bluetooth-icons-generated.css';
+@import 'jellyfin-icons-generated.css';
 @import 'backlight-icons-generated.css';
 @import 'volume-icons-generated.css';
 @import 'language-icons-generated.css';
@@ -66,7 +67,8 @@ window#waybar {
 #custom-backlight,
 #custom-volume,
 #custom-language,
-#custom-mode {
+#custom-mode,
+#custom-jellyfin {
     padding-right: 4px;
 }
 
@@ -117,6 +119,13 @@ window#waybar {
     background-repeat: no-repeat;
     background-position: 4px center;
     background-size: 19px 19px;
+}
+
+#custom-jellyfin {
+    padding-left: 20px;
+    background-repeat: no-repeat;
+    background-position: 4px center;
+    background-size: 15px 15px;
 }
 
 #tray {
