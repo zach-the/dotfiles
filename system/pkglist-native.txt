@@ -68,6 +68,7 @@ nwg-displays
 obs-studio
 openssh
 pavucontrol
+perl-image-exiftool
 pipewire-alsa
 pipewire-libcamera
 pipewire-pulse

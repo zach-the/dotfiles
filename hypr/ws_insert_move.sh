@@ -50,29 +50,14 @@ fi
 # slot (the top of the block always lands on a genuinely empty id). For
 # "left", current_ws itself is in range and gets swept up here too (its
 # windows, including the one we're moving, all land one slot over).
-#
-# movetoworkspacesilent can reshuffle a tiled layout's split tree (windows
-# land back in whatever order they're re-inserted, not necessarily the
-# order they held before), so every moved window's exact position/size is
-# snapshotted beforehand and force-restored with movewindowpixel/
-# resizewindowpixel once all the moves are done -- same trick winmove.sh
-# uses for pixel-exact placement, just replaying geometry that's already
-# known to tile correctly instead of computing it fresh. The window that's
-# actually being reclaimed below is skipped here: it's about to end up
-# alone on a brand-new workspace, where it should fill the whole thing
-# rather than keep the cramped size it had while sharing with neighbors.
-clients_snapshot=$(hyprctl clients -j)
 mapfile -t shift_ids < <(hyprctl workspaces -j | jq -r '
     [.[] | select(.id >= '"$insert_id"' and .id <= '"$((base + BLOCK))"')] |
     sort_by(-.id) | .[].id
 ')
 
-restore_specs=()
 for id in "${shift_ids[@]}"; do
     new_id=$(( id + 1 ))
-    mapfile -t win_specs < <(jq -r --arg skip "$active_window_addr" \
-        '.[] | select(.workspace.id == '"$id"') | select(.fullscreen == 0) | select(.address != $skip) | "\(.address)\t\(.at[0])\t\(.at[1])\t\(.size[0])\t\(.size[1])"' <<< "$clients_snapshot")
-    addrs=$(jq -r '.[] | select(.workspace.id == '"$id"') | .address' <<< "$clients_snapshot")
+    addrs=$(hyprctl clients -j | jq -r '.[] | select(.workspace.id == '"$id"') | .address')
     for addr in $addrs; do
         hyprctl dispatch movetoworkspacesilent "$new_id,address:$addr"
         if [ -s "$RESCUE_LOG" ]; then
@@ -81,7 +66,6 @@ for id in "${shift_ids[@]}"; do
                 mv "$RESCUE_LOG.tmp" "$RESCUE_LOG"
         fi
     done
-    restore_specs+=("${win_specs[@]}")
 done
 
 # Reclaim the insert slot for the window that's actually moving. For
@@ -100,9 +84,3 @@ fi
 # would abort a batched switch too.
 hyprctl dispatch moveworkspacetomonitor "$insert_id" current 2>/dev/null
 hyprctl dispatch workspace "$insert_id"
-
-for spec in "${restore_specs[@]}"; do
-    IFS=$'\t' read -r addr x y w h <<< "$spec"
-    hyprctl dispatch resizewindowpixel "exact $w $h,address:$addr"
-    hyprctl dispatch movewindowpixel "exact $x $y,address:$addr"
-done

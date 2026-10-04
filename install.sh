@@ -35,6 +35,7 @@ linux_only_configs=(
   "MPV"              "$DOTFILES/mpv"                          "$HOME/.config/mpv"
   "Synopsys PT"      "$DOTFILES/synopsys_pt.setup"            "$HOME/.synopsys_pt.setup"
   "Mimeapps"         "$DOTFILES/system/mimeapps.list"         "$HOME/.config/mimeapps.list"
+  "Work VNC applet"  "$DOTFILES/system/applications/work-vnc.desktop" "$HOME/.local/share/applications/work-vnc.desktop"
   "Greetd"           "$DOTFILES/system/greetd-config.toml"    "/etc/greetd/config.toml"
   "Keychron udev"    "$DOTFILES/system/udev-rules/70-keychron.rules"  "/etc/udev/rules.d/70-keychron.rules"
   "Vial udev"        "$DOTFILES/system/udev-rules/99-vial.rules"      "/etc/udev/rules.d/99-vial.rules"

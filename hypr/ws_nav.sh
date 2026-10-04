@@ -89,31 +89,19 @@ fi
 # If the workspace we just switched to is itself renumbered in the
 # process, refocus its new id so the view doesn't end up pointing at the
 # now-empty old id.
-#
-# movetoworkspacesilent can reshuffle a tiled layout's split tree (windows
-# land back in whatever order they're re-inserted, not necessarily the
-# order they held before), so every moved window's exact position/size is
-# snapshotted beforehand and force-restored with movewindowpixel/
-# resizewindowpixel once all the moves are done -- same trick winmove.sh
-# uses for pixel-exact placement, just replaying geometry that's already
-# known to tile correctly instead of computing it fresh.
-clients_snapshot=$(hyprctl clients -j)
 mapfile -t existing_ids < <(hyprctl workspaces -j | jq -r '
     [.[] | select(.id > '"$base"' and .id <= '"$((base + BLOCK))"')] |
     sort_by(.id) | .[].id
 ')
 
-restore_specs=()
 refocus=""
 expected=1
 for id in "${existing_ids[@]}"; do
     want=$(( base + expected ))
     if [ "$id" != "$want" ]; then
-        mapfile -t win_specs < <(jq -r '.[] | select(.workspace.id == '"$id"') | select(.fullscreen == 0) | "\(.address)\t\(.at[0])\t\(.at[1])\t\(.size[0])\t\(.size[1])"' <<< "$clients_snapshot")
-        for spec in "${win_specs[@]}"; do
-            addr="${spec%%$'\t'*}"
+        addrs=$(hyprctl clients -j | jq -r '.[] | select(.workspace.id == '"$id"') | .address')
+        for addr in $addrs; do
             hyprctl dispatch movetoworkspacesilent "$want,address:$addr"
-            restore_specs+=("$spec")
             # Keep the rescue log pointing at the window's new workspace,
             # otherwise it no longer matches when the monitor comes back.
             if [ -s "$RESCUE_LOG" ]; then
@@ -132,9 +120,3 @@ done
 if [ -n "$refocus" ]; then
     hyprctl dispatch workspace "$refocus"
 fi
-
-for spec in "${restore_specs[@]}"; do
-    IFS=$'\t' read -r addr x y w h <<< "$spec"
-    hyprctl dispatch resizewindowpixel "exact $w $h,address:$addr"
-    hyprctl dispatch movewindowpixel "exact $x $y,address:$addr"
-done

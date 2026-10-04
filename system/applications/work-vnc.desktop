@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Work VNC
+Comment=Connect to the Work VNC Remmina profile
+Exec=remmina -c /home/zach/.local/share/remmina/group_vnc_work-vnc_lvnvda8240-lvn-broadcom-net.remmina
+Icon=org.remmina.Remmina
+Terminal=false
+Type=Application
+Categories=Network;RemoteAccess;

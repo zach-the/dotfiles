@@ -513,3 +513,155 @@ alias plex-restart='sudo systemctl restart plexmediaserver'
 alias jellyfin-start='sudo systemctl start jellyfin'
 alias jellyfin-stop='sudo systemctl stop jellyfin'
 alias jellyfin-restart='sudo systemctl restart jellyfin'
+
+# --- Copy photos/videos off a camera card and rename them by creation date ---
+# Renamed to yyyy-mm-dd-hhmm.ext (24h time), e.g. Jan 3 2026 3:38pm -> 2026-01-03-1538.png
+copy_from_camera_card() {
+    local usage="Usage: copy_from_camera_card [--change_date N|yyyy_mm_dd] <source> <destination>
+
+Copies files from <source> to <destination> with rsync (progress bar shown),
+then renames every file under <destination> to:
+
+    yyyy-mm-dd-hhmm.ext   (24-hour time, read from each file's own creation metadata)
+
+  e.g. a photo shot January 3, 2026 at 3:38pm -> 2026-01-03-1538.png
+
+If two files land on the same minute, '-2', '-3', etc. are appended before
+the extension so nothing gets overwritten. Safe to re-run on the same
+destination (already-renamed files are left alone).
+
+Options:
+  --change_date N           Replace the DATE portion with 'N days ago'
+                             (0 = today, 1 = yesterday, 2 = two days ago, ...).
+                             The TIME portion still comes from each file's
+                             metadata. Useful when the camera's clock had the
+                             wrong date set but the time-of-day is still correct.
+  --change_date yyyy_mm_dd   Replace the DATE portion with this exact date
+                             instead, e.g. --change_date 2026_01_03.
+  -h, --help                 Show this help message.
+
+Requires: rsync, exiftool (perl-image-exiftool), jq."
+
+    local change_date="" override_date="" src="" dest=""
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                echo "$usage"
+                return 0
+                ;;
+            --change_date)
+                if [[ -z "$2" ]]; then
+                    echo "copy_from_camera_card: --change_date requires a value" >&2
+                    return 1
+                fi
+                change_date="$2"
+                shift 2
+                ;;
+            --change_date=*)
+                change_date="${1#*=}"
+                shift
+                ;;
+            -*)
+                echo "copy_from_camera_card: unknown option '$1'" >&2
+                echo "$usage"
+                return 1
+                ;;
+            *)
+                if [[ -z "$src" ]]; then
+                    src="$1"
+                elif [[ -z "$dest" ]]; then
+                    dest="$1"
+                else
+                    echo "copy_from_camera_card: unexpected argument '$1'" >&2
+                    echo "$usage"
+                    return 1
+                fi
+                shift
+                ;;
+        esac
+    done
+
+    if [[ -z "$src" || -z "$dest" ]]; then
+        echo "$usage"
+        return 1
+    fi
+
+    local tool
+    for tool in rsync exiftool jq; do
+        if ! command -v "$tool" &>/dev/null; then
+            echo "copy_from_camera_card: '$tool' is required but not installed" >&2
+            return 1
+        fi
+    done
+
+    if [[ -n "$change_date" ]]; then
+        if [[ "$change_date" =~ ^[0-9]+$ ]]; then
+            override_date=$(date -d "${change_date} days ago" +%Y-%m-%d) || return 1
+        elif [[ "$change_date" =~ ^[0-9]{4}_[0-9]{2}_[0-9]{2}$ ]]; then
+            override_date=$(date -d "${change_date//_/-}" +%Y-%m-%d 2>/dev/null) || {
+                echo "copy_from_camera_card: invalid date '$change_date'" >&2
+                return 1
+            }
+        else
+            echo "copy_from_camera_card: --change_date must be a number of days ago (0, 1, 2, ...) or an exact yyyy_mm_dd date" >&2
+            return 1
+        fi
+    fi
+
+    mkdir -p "$dest" || return 1
+
+    local src_arg="$src" dest_arg="$dest"
+    [[ -d "$src_arg" && "$src_arg" != */ ]] && src_arg+="/"
+    [[ "$dest_arg" != */ ]] && dest_arg+="/"
+
+    echo "Copying from '$src' to '$dest'..."
+    rsync -aHAX --info=progress2 "$src_arg" "$dest_arg" || return 1
+
+    echo "Renaming files by creation date..."
+    local file fname ext stamp date_part time_part tag dir candidate n
+    local skipped=0 renamed=0 duplicates=0
+    while IFS= read -r -d '' file; do
+        stamp=$(exiftool -j -DateTimeOriginal -CreateDate -MediaCreateDate -TrackCreateDate -FileModifyDate "$file" 2>/dev/null \
+            | jq -r '.[0] | .DateTimeOriginal // .CreateDate // .MediaCreateDate // .TrackCreateDate // .FileModifyDate // empty')
+
+        if [[ -z "$stamp" ]]; then
+            echo "  skip (no date metadata): $file" >&2
+            ((skipped++))
+            continue
+        fi
+
+        date_part=$(awk '{print $1}' <<< "$stamp" | tr ':' '-')
+        time_part=$(awk '{print $2}' <<< "$stamp" | cut -c1-5 | tr -d ':')
+        [[ -n "$override_date" ]] && date_part="$override_date"
+        tag="${date_part}-${time_part}"
+
+        dir="${file%/*}"
+        fname="${file##*/}"
+        [[ "$fname" == *.* ]] && ext="${fname##*.}" || ext=""
+        candidate="$dir/$tag${ext:+.$ext}"
+
+        # Walk collisions: a byte-identical file already at the candidate name
+        # means this is the same shot re-copied (e.g. a re-run against the same
+        # source), so drop the redundant copy instead of renaming it with a
+        # suffix. Only genuinely different files taken in the same minute get
+        # a -2, -3, ... suffix.
+        n=1
+        while [[ -e "$candidate" && "$candidate" != "$file" ]]; do
+            if cmp -s -- "$file" "$candidate"; then
+                rm -f -- "$file"
+                ((duplicates++))
+                continue 2
+            fi
+            ((n++))
+            candidate="$dir/${tag}-${n}${ext:+.$ext}"
+        done
+
+        if [[ "$candidate" != "$file" ]]; then
+            mv -n -- "$file" "$candidate"
+            ((renamed++))
+        fi
+    done < <(find "$dest" -type f -print0)
+
+    echo "Done. Renamed $renamed file(s), dropped $duplicates duplicate(s), skipped $skipped file(s) with no date metadata."
+}
