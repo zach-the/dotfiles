@@ -25,9 +25,10 @@ if {[info exists env(PT_RLWRAP)] && $env(PT_RLWRAP) == 1} {
   set sh_enable_line_editing false
 } else {
   set sh_enable_line_editing true
-  set sh_line_editing_mode vi
+  #set sh_line_editing_mode vi
 }
-
+# Set terminal cursor shape to vertical line (I-beam)
+puts -nonewline "\033[5 q"
 
 #############
 # SHORTCUTS #

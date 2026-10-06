@@ -243,7 +243,7 @@ nv() {
 
         echo -e "\e[33mLarge file(s) detected, opening with a stripped-down Neovim:\e[0m"
         echo -e "$file_report"
-        command nvim --clean -n -c "syntax off | set nonumber nonrelativenumber | filetype off" "$@"
+        command nvim --clean -n -c "syntax off | set nonumber norelativenumber | filetype off" "$@"
         return
     fi
 
