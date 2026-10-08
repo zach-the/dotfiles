@@ -7,6 +7,7 @@ import signal
 import re
 import fcntl
 import time
+import base64
 
 _ANSI_ESC = re.compile(r'\033\[[^a-zA-Z]*[a-zA-Z]')
 _SGR = re.compile(r'\033\[([0-9;]*)m')
@@ -108,6 +109,53 @@ def _wrap_ansi(line, width):
         chunks.append(chunk)
     return chunks if chunks else [""]
 
+def _highlight(s, start, end):
+    """Reverse-video the visible characters [start, end) of s. Reverse is
+    re-asserted after every escape sequence inside the range, so an SGR
+    reset in the middle of the text doesn't cut the highlight short."""
+    if end <= start:
+        return s
+    out, vis, i, on = [], 0, 0, False
+    while i < len(s):
+        m = _ANSI_ESC.match(s, i)
+        if m:
+            out.append(m.group())
+            if on:
+                out.append('\033[7m')
+            i = m.end()
+            continue
+        if vis == start:
+            out.append('\033[7m')
+            on = True
+        elif vis == end and on:
+            out.append('\033[27m')
+            on = False
+        out.append(s[i])
+        vis += 1
+        i += 1
+    if on:
+        out.append('\033[27m')
+    return ''.join(out)
+
+def selection_text(buf, start, end):
+    """Plain text of a selection over buf's raw lines. start/end are
+    (line index, visible offset), both inclusive. Works on the raw lines
+    rather than what's on screen, so a line that got wrapped for display
+    comes back as one line, with no newline planted at the wrap point."""
+    (l0, o0), (l1, o1) = start, end
+    out = []
+    for li in range(max(0, l0), min(l1, len(buf) - 1) + 1):
+        s = _ANSI_ESC.sub('', buf[li].replace('\t', '    '))
+        out.append(s[o0 if li == l0 else 0: o1 + 1 if li == l1 else len(s)])
+    return '\n'.join(out)
+
+def osc52_copy(text):
+    """Put text on the system clipboard via an OSC 52 escape -- the terminal
+    does the copy, so it works over ssh with no clipboard tool on this end."""
+    data = base64.b64encode(text.encode('utf-8', 'replace')).decode('ascii')
+    sys.stdout.write(f'\033]52;c;{data}\a')
+    sys.stdout.flush()
+
 def get_terminal_size():
     try:
         import struct, termios as _t
@@ -128,15 +176,14 @@ def get_terminal_size():
     return 80, 24
 
 def parse_mouse(raw):
-    """Parse SGR mouse event. Returns (btn, col, row, pressed) or None. col/row are 0-indexed."""
-    m = _SGR_MOUSE.match(raw)
-    if not m:
-        return None
-    btn = int(m.group(1))
-    col = int(m.group(2)) - 1
-    row = int(m.group(3)) - 1
-    pressed = m.group(4) == b'M'
-    return btn, col, row, pressed
+    """Parse SGR mouse events. Returns a list of (btn, col, row, pressed),
+    col/row 0-indexed -- a list because a fast drag can deliver several
+    events in one read, and dropping all but the first could lose the
+    button release that ends it."""
+    if not raw.startswith(b'\033[<'):
+        return []
+    return [(int(b), int(c) - 1, int(r) - 1, k == b'M')
+            for b, c, r, k in _SGR_MOUSE.findall(raw)]
 
 def compute_col_widths(total_width, n_files):
     """Equal column content widths (excluding │ dividers) that together fill total_width."""
@@ -226,16 +273,16 @@ def read_key(fd):
         flags = fcntl.fcntl(fd, fcntl.F_GETFL)
         fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
         try:
-            c += os.read(fd, 32)
+            c += os.read(fd, 1024)
         except (BlockingIOError, OSError):
             pass
         finally:
             fcntl.fcntl(fd, fcntl.F_SETFL, flags)
     return c
 
-def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_widths, blank_fill=None, merged=False):
+def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_widths, blank_fill=None, merged=False, selection=None):
     """
-    Render the TUI. Returns updated view_tops.
+    Render the TUI. Returns (view_tops, at_bottom, last_frame, row_map).
     col_widths: list of content widths per column (not counting │ dividers).
     blank_fill: per-column text to show on rows past a column's last buffered
     line (default: blank). Used by -m merged mode to keep its tag-column
@@ -246,6 +293,11 @@ def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_width
     real row break (and terminating newline) at the wrap point, so copying
     a wrapped line picks up an invisible hard newline the terminal never
     actually put there.
+    selection: (column, start, end) to draw highlighted, start/end being
+    inclusive (raw line index, visible offset) positions in that column's
+    buffer. row_map is the inverse the caller needs to build one from mouse
+    coordinates: per column, per content row, the (raw line index, visible
+    offset) that row starts at, or None for a row past the last line.
     """
     n = len(files)
     if blank_fill is None:
@@ -253,24 +305,40 @@ def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_width
     if width < n * 5:
         sys.stdout.write(f'\033[H Terminal too small: {width}x{height}\033[K')
         sys.stdout.flush()
-        return view_tops, False, []
+        return view_tops, False, [], []
 
     content_lines = height - 1  # one row for the header
 
     # Wrap all raw buffers into display lines
-    wrapped = []
+    # origins parallels wrapped: the (raw line index, visible offset) each
+    # display line starts at.
+    wrapped, origins = [], []
     for i, buf in enumerate(buffers):
         cw = col_widths[i]
         max_len = max(1, cw - 1 if i < n - 1 else cw)
-        w = []
-        for raw in buf:
+        w, o = [], []
+        for ri, raw in enumerate(buf):
             raw = raw.replace('\t', '    ')
             if merged:
                 w.append(raw)
+                o.append((ri, 0))
             else:
-                for chunk in (_wrap_ansi(raw, max_len) if raw else [""]):
+                for k, chunk in enumerate(_wrap_ansi(raw, max_len) if raw else [""]):
                     w.append(chunk)
+                    o.append((ri, k * max_len))
         wrapped.append(w)
+        origins.append(o)
+
+    def hl(line, i, idx):
+        if selection is None or selection[0] != i:
+            return line
+        ri, off = origins[i][idx]
+        (l0, o0), (l1, o1) = selection[1], selection[2]
+        if not l0 <= ri <= l1:
+            return line
+        start = o0 - off if ri == l0 else 0
+        end = o1 + 1 - off if ri == l1 else float('inf')
+        return _highlight(line, max(0, start), end)
 
     # Compute effective view start positions
     new_tops = []
@@ -344,17 +412,25 @@ def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_width
     out.append(header + '\033[K')
 
     # Content rows
+    row_map = [[] for _ in range(n)]
     if merged:
-        for line in wrapped[0][new_tops[0]:merged_end]:
-            out.append(line + '\033[0m\033[K')
+        for idx in range(new_tops[0], merged_end):
+            out.append(hl(wrapped[0][idx], 0, idx) + '\033[0m\033[K')
+            row_map[0].extend((idx, r * width) for r in range(hs[idx]))
         out.extend(['\033[K'] * (content_lines - merged_rows))
+        row_map[0] = (row_map[0] + [None] * content_lines)[:content_lines]
     for y in range(content_lines if merged else 0, content_lines):
         row = ""
         for i in range(n):
             w = wrapped[i]
             cw = col_widths[i]
             idx = new_tops[i] + y
-            line = w[idx] if idx < len(w) else blank_fill[i]
+            if idx < len(w):
+                line = hl(w[idx], i, idx)
+                row_map[i].append(origins[i][idx])
+            else:
+                line = blank_fill[i]
+                row_map[i].append(None)
             is_last = i == n - 1
             if not is_last:
                 row += _ljust_visible(line, cw) + '\033[0m│'
@@ -382,7 +458,7 @@ def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_width
     last_frame = list(out)
     while len(last_frame) > 1 and _ANSI_ESC.sub('', last_frame[-1]).replace('│', '').strip() == '':
         last_frame.pop()
-    return new_tops, at_bottom, last_frame
+    return new_tops, at_bottom, last_frame, row_map
 
 
 def main():
@@ -461,6 +537,14 @@ def main():
     follow_mode = True          # True = live tail; False = frozen at view_tops
     view_tops = [0] * n_display
     dragging_divider = None     # index of divider currently being dragged
+    # Text selection: [column, anchor, cursor], anchor/cursor being (raw line
+    # index, visible offset) into that column's buffer -- content positions,
+    # not screen ones, so the highlight stays on its text through scrolling,
+    # divider drags and resizes.
+    sel = None
+    selecting = False           # left button is down on a selection drag
+    resume_follow = False       # go back to live tail once the drag ends
+    row_map = []                # from the last draw_screen; see locate()
 
     def _quit(sig, frame):
         nonlocal running
@@ -481,12 +565,32 @@ def main():
 
     signal.signal(signal.SIGWINCH, _resize)
 
-    procs, sel = [], selectors.DefaultSelector()
+    def locate(col, row, pane=None):
+        """Map a 0-indexed screen cell to (column, raw line index, visible
+        offset). With pane given, the cell is clamped into that column, so a
+        drag that strays outside it keeps extending the selection inside."""
+        starts = [0] + [d + 1 for d in get_divider_cols(col_widths)]
+        if pane is None:
+            pane = max(i for i, s in enumerate(starts) if s <= col)
+        if pane >= len(row_map) or not row_map[pane]:
+            return None
+        rows = row_map[pane]
+        cw = col_widths[pane]
+        max_len = max(1, cw - 1 if pane < n_display - 1 else cw)
+        x = max(0, min(col - starts[pane], max_len - 1))
+        hit = rows[max(0, min(row - 1, len(rows) - 1))]
+        if hit is None:
+            # Below the last line: snap to the end of it.
+            filled = [r for r in rows if r is not None]
+            return (pane, filled[-1][0], sys.maxsize) if filled else None
+        return pane, hit[0], hit[1] + x
+
+    procs, selector = [], selectors.DefaultSelector()
     last_frame = []  # last drawn frame, left visible in the finally block on exit
 
     try:
         if sys.stdin.isatty():
-            sel.register(sys.stdin, selectors.EVENT_READ, data='stdin')
+            selector.register(sys.stdin, selectors.EVENT_READ, data='stdin')
 
         for i, f in enumerate(files):
             p = subprocess.Popen(
@@ -495,7 +599,7 @@ def main():
                 universal_newlines=True, bufsize=1,
             )
             os.set_blocking(p.stdout.fileno(), False)
-            sel.register(p.stdout, selectors.EVENT_READ, data=i)
+            selector.register(p.stdout, selectors.EVENT_READ, data=i)
             procs.append(p)
 
         buffers = [[]] if merged else [[] for _ in files]
@@ -512,7 +616,7 @@ def main():
             quiet_since = time.time()
             while time.time() < prime_deadline:
                 got_any = False
-                for key, _ in sel.select(timeout=0.05):
+                for key, _ in selector.select(timeout=0.05):
                     if key.data == 'stdin':
                         continue
                     fi = key.data
@@ -535,27 +639,29 @@ def main():
 
         while running:
             if needs_redraw:
-                view_tops, at_bottom, last_frame = draw_screen(
+                view_tops, at_bottom, last_frame, row_map = draw_screen(
                     display_files, buffers, width, height, follow_mode, view_tops, col_widths,
                     merged=merged,
+                    selection=(sel[0], *sorted(sel[1:])) if sel else None,
                 )
                 needs_redraw = False
                 # Reaching the bottom via a manual scroll (j/d/f/...) resumes
                 # live-follow instead of leaving the view stuck showing "END"
                 # until 'G' is pressed explicitly.
-                if not follow_mode and at_bottom:
+                # (Not mid-selection though: the view stays frozen so the
+                # text doesn't move out from under the pointer.)
+                if not follow_mode and at_bottom and not selecting:
                     follow_mode = True
                     needs_redraw = True
 
-            for key, _ in sel.select(timeout=0.1):
+            for key, _ in selector.select(timeout=0.1):
                 if key.data == 'stdin':
                     try:
                         raw = read_key(sys.stdin.fileno())
                         cl = height - 1  # visible content lines
 
-                        mouse = parse_mouse(raw)
-                        if mouse:
-                            btn, col, row, pressed = mouse
+                        mice = parse_mouse(raw)
+                        for btn, col, row, pressed in mice:
                             if btn == 0 and pressed:
                                 # Left button press: start drag if on a divider
                                 div_cols = get_divider_cols(col_widths)
@@ -564,6 +670,16 @@ def main():
                                     if col == d_col:
                                         dragging_divider = d_idx
                                         break
+                                # Anywhere else in the content area it anchors
+                                # a text selection (and drops the old one).
+                                sel = None
+                                pos = locate(col, row) if dragging_divider is None and row >= 1 else None
+                                if pos:
+                                    sel = [pos[0], pos[1:], pos[1:]]
+                                    selecting = True
+                                    resume_follow = follow_mode
+                                    follow_mode = False
+                                needs_redraw = True
                             elif btn == 32 and dragging_divider is not None:
                                 # Left drag: move split, cascading into neighbors if needed
                                 div_cols = get_divider_cols(col_widths)
@@ -571,6 +687,12 @@ def main():
                                 col_widths = dividers_to_widths(new_div_cols, width, n_display)
                                 div_fracs = [d / width for d in new_div_cols]
                                 needs_redraw = True
+                            elif btn == 32 and selecting and sel:
+                                # Left drag: extend the selection
+                                pos = locate(col, row, sel[0])
+                                if pos and pos[1:] != sel[2]:
+                                    sel[2] = pos[1:]
+                                    needs_redraw = True
                             elif btn & 0x40:
                                 # Wheel event: bit 6 set, direction is the low
                                 # two bits (64=up, 65=down) with modifier
@@ -579,6 +701,7 @@ def main():
                                 base = btn & ~0x1C
                                 if base == 64:
                                     follow_mode = False
+                                    resume_follow = False
                                     view_tops = [max(0, t - WHEEL_SCROLL_LINES) for t in view_tops]
                                     needs_redraw = True
                                 elif base == 65 and not follow_mode:
@@ -586,8 +709,22 @@ def main():
                                     needs_redraw = True
                             elif not pressed:
                                 dragging_divider = None
+                                if selecting:
+                                    # Release: copy what was dragged over. The
+                                    # highlight stays up until the next click;
+                                    # a click with no drag just clears it.
+                                    selecting = False
+                                    if sel and sel[1] != sel[2]:
+                                        osc52_copy(selection_text(buffers[sel[0]], *sorted(sel[1:])))
+                                    else:
+                                        sel = None
+                                    follow_mode = follow_mode or resume_follow
+                                    needs_redraw = True
 
-                        elif raw == b'q':
+                        if mice:
+                            continue
+
+                        if raw == b'q':
                             running = False
 
                         elif raw in (b'k', b'\033[A'):  # k / Up: scroll up one line
@@ -624,6 +761,10 @@ def main():
                             follow_mode = True
                             needs_redraw = True
 
+                        elif raw == b'\033':  # Esc: clear the selection highlight
+                            sel = None
+                            needs_redraw = True
+
                         elif raw == b'g':  # g: go to top of history
                             follow_mode = False
                             view_tops = [0] * n_display
@@ -651,6 +792,10 @@ def main():
                             buffers[target] = buffers[target][-MAX_BUFFER:]
                             if not follow_mode and target < len(view_tops):
                                 view_tops[target] = max(0, view_tops[target] - drop)
+                            if sel and sel[0] == target:
+                                sel[1:] = [(l - drop, o) for l, o in sel[1:]]
+                                if min(sel[1][0], sel[2][0]) < 0:
+                                    sel = None
                         needs_redraw = True
                 except (IOError, OSError):
                     pass
