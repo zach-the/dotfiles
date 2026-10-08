@@ -28,7 +28,7 @@ if {[info exists env(PT_RLWRAP)] && $env(PT_RLWRAP) == 1} {
   #set sh_line_editing_mode vi
 }
 # Set terminal cursor shape to vertical line (I-beam)
-puts -nonewline "\033[5 q"
+puts -nonewline "\033\[5 q"
 
 #############
 # SHORTCUTS #
