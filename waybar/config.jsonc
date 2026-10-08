@@ -73,8 +73,8 @@
     "exec": "~/.config/hypr/jellyfin_status.sh",
     "interval": 10,
     "signal": 14,
-    "on-click": "~/.config/hypr/popup_client.py toggle jellyfin",
-    "on-click-right": "~/.config/hypr/jellyfin_toggle.sh"
+    "on-click": "~/.config/hypr/jellyfin_toggle.sh",
+    "on-click-right": "~/.config/hypr/popup_client.py toggle jellyfin"
   },
 
   "custom/bluetooth": {
