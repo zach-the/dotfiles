@@ -8,6 +8,10 @@
 # ws_nav.sh) risks grabbing a workspace ID that already legitimately
 # belongs to another monitor, since eDP-1's block has no upper cap.
 #
+# On connect, claim_block() sweeps the monitor for any workspace that
+# landed on it from outside its block (see claim_block()'s own comment for
+# why that happens) and moves it, windows and all, into the block.
+#
 # On monitor removal, Hyprland re-homes the unplugged monitor's workspaces
 # (e.g. 101-104) onto a remaining monitor, but ws_nav.sh only navigates the
 # monitor's own block, so those windows become unreachable. rescue_orphans()
@@ -67,6 +71,55 @@ assign_workspace() {
         prev_mon=$(hyprctl activeworkspace -j | jq -r '.monitor')
         hyprctl --batch "dispatch focusmonitor $monitor ; dispatch workspace $ws ; dispatch focusmonitor $prev_mon"
     fi
+}
+
+# Moves any workspace CURRENTLY SITTING on $1 that falls outside $1's own
+# block (and all its windows) into a fresh workspace appended to the top of
+# that block, so $1 only ever hosts workspaces that belong to it.
+#
+# This exists because Hyprland gives a newly-connected monitor its own
+# default workspace (the lowest free ID) the moment it connects -- before
+# assign_workspace() below gets a chance to claim that monitor's actual
+# block-start ID. Anything opened in that gap (a terminal launched right
+# after boot/dock, etc.) lands on the stray low-numbered workspace instead,
+# which sits outside ws_nav.sh's block for that monitor and breaks its
+# prev/next math. Since the race is in Hyprland's own connect-time
+# behavior, it can't be closed by reacting faster to the connect event --
+# only by sweeping and fixing up whatever Hyprland did after the fact. This
+# runs for every monitor the same way (via monitor_index(), same as
+# assign_workspace()), so it's correct no matter which monitor or port it
+# turns out to be, not just the one that happened to trigger this once.
+claim_block() {
+    local monitor="$1"
+    local index
+    index=$(monitor_index "$monitor")
+    [[ -z "$index" || "$index" == "null" ]] && return
+    local base=$(( index * BLOCK ))
+
+    local workspaces stray
+    workspaces=$(hyprctl workspaces -j) || return
+    mapfile -t stray < <(jq -r --arg mon "$monitor" --argjson base "$base" --argjson block "$BLOCK" '
+        [.[] | select(.monitor == $mon and .id > 0 and (.id <= $base or .id > $base + $block))] |
+        sort_by(.id) | .[].id
+    ' <<< "$workspaces")
+
+    (( ${#stray[@]} == 0 )) && return
+
+    local next
+    next=$(jq -r --argjson b "$base" --argjson block "$BLOCK" \
+        '[.[] | select(.id > $b and .id <= $b + $block) | .id] | max // $b' \
+        <<< "$workspaces")
+
+    local old want addrs addr
+    for old in "${stray[@]}"; do
+        next=$(( next + 1 ))
+        want=$next
+        addrs=$(hyprctl clients -j | jq -r '.[] | select(.workspace.id == '"$old"') | .address')
+        for addr in $addrs; do
+            hyprctl dispatch movetoworkspacesilent "$want,address:$addr"
+        done
+        hyprctl dispatch moveworkspacetomonitor "$want" "$monitor" 2>/dev/null
+    done
 }
 
 # Move windows stranded on workspaces outside their monitor's block (see
@@ -190,6 +243,7 @@ prune_rescue_log
 # Assign starting workspace for all monitors already connected at startup
 hyprctl monitors -j | jq -r '.[].name' | while read -r mon; do
     assign_workspace "$mon"
+    claim_block "$mon"
 done
 
 # Listen for new monitor connections and assign on the fly
@@ -200,6 +254,7 @@ socat - "UNIX-CONNECT:$socket" | while IFS= read -r line; do
         monitor="${line#monitoradded>>}"
         sleep 0.3  # let Hyprland finish initializing the new monitor
         assign_workspace "$monitor"
+        claim_block "$monitor"
         restore_rescued "$monitor"
     elif [[ "$line" == "monitorremoved>>"* ]]; then
         # lid.sh disables eDP-1 itself and relocates its windows; leave that alone.
