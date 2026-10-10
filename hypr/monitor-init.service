@@ -1,0 +1,15 @@
+[Unit]
+Description=Hyprland monitor/workspace numbering daemon (ws_nav.sh's monitor-block scheme)
+# Not After=hyprland-session.target: that target may not exist/fire
+# depending on the greeter, and hyprland.conf's exec-once starts this unit
+# directly anyway. Restart=always is what actually matters here.
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/dotfiles/hypr/monitor_init.sh
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target

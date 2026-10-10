@@ -92,7 +92,8 @@ window.popup-wifi .lock-icon {
     opacity: 0.8;
 }
 
-window.popup-bluetooth button {
+window.popup-bluetooth button,
+window.popup-jellyfin button {
     background: transparent;
     border: none;
     box-shadow: none;
@@ -100,9 +101,35 @@ window.popup-bluetooth button {
     padding: 4px 6px;
 }
 
-window.popup-bluetooth button:hover {
+window.popup-bluetooth button:hover,
+window.popup-jellyfin button:hover {
     background-color: alpha(@pink, 0.2);
     border-radius: 6px;
+}
+
+/* Flat progress bar (library scan), same redesign as popup-audio's
+   scale: a thin track + pink fill instead of GTK3's default beveled
+   trough. */
+window.popup-jellyfin progressbar {
+    min-height: 6px;
+    padding: 0;
+    margin: 2px 0;
+}
+
+window.popup-jellyfin progressbar trough {
+    background-color: rgba(255, 255, 255, 0.2);
+    background-image: none;
+    border: none;
+    border-radius: 999px;
+    min-height: 6px;
+}
+
+window.popup-jellyfin progressbar progress {
+    background-color: @pink;
+    background-image: none;
+    border: none;
+    border-radius: 999px;
+    min-height: 6px;
 }
 
 /* Modern flat switch (Multi-Output toggle): a plain pill instead of

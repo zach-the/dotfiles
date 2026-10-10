@@ -43,6 +43,7 @@ linux_only_configs=(
   "I2C module"       "$DOTFILES/system/modules-load.d/i2c-dev.conf"   "/etc/modules-load.d/i2c-dev.conf"
   "NM connectivity"  "$DOTFILES/system/networkmanager-conf.d/20-connectivity.conf" "/etc/NetworkManager/conf.d/20-connectivity.conf"
   "Webcam late-load" "$DOTFILES/system/modprobe.d/webcam-late-load.conf" "/etc/modprobe.d/webcam-late-load.conf"
+  "Monitor-init service" "$DOTFILES/hypr/monitor-init.service" "$HOME/.config/systemd/user/monitor-init.service"
 )
 
 mac_only_configs=(
@@ -145,6 +146,13 @@ if [[ "$OS" == "linux" ]]; then
     echo "# placeholder - nwg-displays (SUPER+I) overwrites this when you save a layout" \
       > "$DOTFILES/hypr/monitors.conf"
     echo "[Hyprland] Created placeholder hypr/monitors.conf"
+  fi
+
+  if [ -L "$HOME/.config/systemd/user/monitor-init.service" ]; then
+    echo ""
+    echo "[Monitor-init service] Enabling (Restart=always via systemd --user)"
+    systemctl --user daemon-reload
+    systemctl --user enable --now monitor-init.service
   fi
 fi
 

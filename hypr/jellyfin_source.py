@@ -22,7 +22,13 @@ BASE_URL = "http://localhost:8096"
 ENV_PATH = os.path.expanduser("~/.config/jellyfin/waybar.env")
 REQUEST_TIMEOUT = 3  # seconds; local server on this same machine
 
+# ScheduledTasks' stable Key for the built-in "Scan Media Library" task
+# (its Id is server-generated but its Key is a fixed string across
+# every Jellyfin install).
+SCAN_TASK_KEY = "RefreshLibrary"
+
 _api_key = None
+_scan_task_id = None
 
 
 def _load_api_key():
@@ -100,3 +106,40 @@ def set_folder_enabled(folder_id, enable, all_folder_ids):
 
     resp = requests.post(f"{BASE_URL}/Users/{user_id}/Policy", headers=_headers(), json=policy, timeout=REQUEST_TIMEOUT)
     resp.raise_for_status()
+
+
+def _get_scan_task_id():
+    # Cached process-wide: the task's Id is stable for the lifetime of a
+    # given Jellyfin server install, so this is one extra request ever
+    # (the first poll after this module loads), not one per poll.
+    global _scan_task_id
+    if _scan_task_id is None:
+        resp = requests.get(f"{BASE_URL}/ScheduledTasks", headers=_headers(), timeout=REQUEST_TIMEOUT)
+        resp.raise_for_status()
+        task = next((t for t in resp.json() if t["Key"] == SCAN_TASK_KEY), None)
+        if task is not None:
+            _scan_task_id = task["Id"]
+    return _scan_task_id
+
+
+def start_library_scan():
+    task_id = _get_scan_task_id()
+    if task_id is None:
+        return False
+    resp = requests.post(f"{BASE_URL}/ScheduledTasks/Running/{task_id}", headers=_headers(), timeout=REQUEST_TIMEOUT)
+    resp.raise_for_status()
+    return True
+
+
+def get_scan_progress():
+    """Returns (running, percent): percent is 0-100 while a scan is in
+    progress, None otherwise (idle, or the server hasn't reported a
+    percentage yet)."""
+    task_id = _get_scan_task_id()
+    if task_id is None:
+        return False, None
+    resp = requests.get(f"{BASE_URL}/ScheduledTasks/{task_id}", headers=_headers(), timeout=REQUEST_TIMEOUT)
+    resp.raise_for_status()
+    data = resp.json()
+    running = data["State"] != "Idle"
+    return running, (data.get("CurrentProgressPercentage") if running else None)

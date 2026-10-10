@@ -9,3 +9,4 @@ pipewire.service
 pipewire.socket
 wireplumber.service
 xdg-user-dirs.service
+monitor-init.service

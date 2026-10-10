@@ -26,6 +26,16 @@
 # restored. Note ws_nav.sh's compaction can renumber a rescue workspace, in
 # which case its windows no longer match the log and stay where they are.
 
+# When launched by Hyprland itself (exec-once), this is already set and
+# inherited for free. When launched as a systemd --user unit instead (so a
+# crash gets Restart=always instead of staying dead until something
+# notices), the unit's own environment doesn't have it -- systemd --user is
+# a separate long-lived manager whose env only gets what's been explicitly
+# imported into it, and this isn't. Resolve it ourselves so hyprctl (which
+# needs it to find the right instance's socket) works either way.
+: "${HYPRLAND_INSTANCE_SIGNATURE:=$(ls -t "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/hypr" 2>/dev/null | head -n1)}"
+export HYPRLAND_INSTANCE_SIGNATURE
+
 BLOCK=100
 RESCUE_LOG="${XDG_STATE_HOME:-$HOME/.local/state}/hypr/workspace-rescue.log"
 DEBUG_LOG="${RESCUE_LOG%.log}.debug.log"
@@ -246,21 +256,30 @@ hyprctl monitors -j | jq -r '.[].name' | while read -r mon; do
     claim_block "$mon"
 done
 
-# Listen for new monitor connections and assign on the fly
+# Listen for new monitor connections and assign on the fly. socat exiting
+# (socket momentarily gone during a Hyprland restart, a transient read
+# error, etc.) used to end this whole script -- nothing was left running
+# to react to the next hotplug. Loop around it instead: a dead connection
+# just gets re-dialed a beat later, same as Restart=always does for the
+# whole process one level up (see monitor-init.service).
 socket="$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock"
-socat - "UNIX-CONNECT:$socket" | while IFS= read -r line; do
-    [[ "$line" == monitor* ]] && dbg "event: $line"
-    if [[ "$line" == monitoradded* ]]; then
-        monitor="${line#monitoradded>>}"
-        sleep 0.3  # let Hyprland finish initializing the new monitor
-        assign_workspace "$monitor"
-        claim_block "$monitor"
-        restore_rescued "$monitor"
-    elif [[ "$line" == "monitorremoved>>"* ]]; then
-        # lid.sh disables eDP-1 itself and relocates its windows; leave that alone.
-        monitor="${line#monitorremoved>>}"
-        [ "$monitor" == "eDP-1" ] && continue
-        sleep 0.3  # let Hyprland finish re-homing the removed monitor's workspaces
-        rescue_orphans "$monitor"
-    fi
+while true; do
+    socat - "UNIX-CONNECT:$socket" | while IFS= read -r line; do
+        [[ "$line" == monitor* ]] && dbg "event: $line"
+        if [[ "$line" == monitoradded* ]]; then
+            monitor="${line#monitoradded>>}"
+            sleep 0.3  # let Hyprland finish initializing the new monitor
+            assign_workspace "$monitor"
+            claim_block "$monitor"
+            restore_rescued "$monitor"
+        elif [[ "$line" == "monitorremoved>>"* ]]; then
+            # lid.sh disables eDP-1 itself and relocates its windows; leave that alone.
+            monitor="${line#monitorremoved>>}"
+            [ "$monitor" == "eDP-1" ] && continue
+            sleep 0.3  # let Hyprland finish re-homing the removed monitor's workspaces
+            rescue_orphans "$monitor"
+        fi
+    done
+    dbg "socat connection to $socket ended -- reconnecting"
+    sleep 1
 done
