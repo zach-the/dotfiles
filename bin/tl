@@ -13,7 +13,7 @@ from bisect import bisect_right
 _ANSI_ESC = re.compile(r'\033\[[^a-zA-Z]*[a-zA-Z]')
 _SGR = re.compile(r'\033\[([0-9;]*)m')
 _SGR_MOUSE = re.compile(rb'\033\[<(\d+);(\d+);(\d+)([Mm])')
-MAX_BUFFER = 10_000  # lines per file
+MAX_BUFFER = 10_000  # lines per file: both the backlog loaded at startup and the scrollback kept (-n raises it)
 WHEEL_SCROLL_LINES = 3  # lines scrolled per mouse wheel notch
 
 # --- -m (merged) mode ---
@@ -554,8 +554,9 @@ def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_width
 def main():
     width, height = get_terminal_size()
     args = sys.argv[1:]
-    n_lines = height
-    n_lines_given = False
+    # Backlog to load from each file -- what was already in it before tl
+    # started, so it can be scrolled back to.
+    n_lines = MAX_BUFFER
     files = []
     merged = False
     tag_colors = False
@@ -564,18 +565,18 @@ def main():
     while i < len(args):
         if args[i] == '-n' and i + 1 < len(args):
             try:
-                n_lines = int(args[i + 1]); n_lines_given = True
+                n_lines = int(args[i + 1])
             except ValueError:
                 pass
             i += 2
         elif args[i].startswith('-n') and args[i][2:].isdigit():
-            n_lines = int(args[i][2:]); n_lines_given = True; i += 1
+            n_lines = int(args[i][2:]); i += 1
         elif args[i] == '-m':
             merged = True; i += 1
         elif args[i] == '-c':
             tag_colors = True; i += 1
         elif args[i].startswith('-') and args[i][1:].isdigit():
-            n_lines = int(args[i][1:]); n_lines_given = True; i += 1
+            n_lines = int(args[i][1:]); i += 1
         else:
             files.append(args[i]); i += 1
 
@@ -588,6 +589,9 @@ def main():
     # the difference. n_display is that pane count: 1 when merged, else one
     # real column per file.
     n_display = 1 if merged else len(files)
+    # Scrollback cap per pane. A merged pane holds every file's lines, so it
+    # gets every file's share.
+    max_buffer = max(MAX_BUFFER, n_lines) * (len(files) if merged else 1)
 
     # Per-file tag shown at the start of each merged line. If every filename
     # shares a common prefix/suffix (e.g. same base name, differing only by
@@ -650,10 +654,8 @@ def main():
     needs_redraw = True
 
     def _resize(sig, frame):
-        nonlocal width, height, needs_redraw, n_lines, col_widths
+        nonlocal width, height, needs_redraw, col_widths
         width, height = get_terminal_size()
-        if not n_lines_given:
-            n_lines = height
         col_widths = fracs_to_col_widths(div_fracs, width, n_display)
         needs_redraw = True
 
@@ -947,8 +949,8 @@ def main():
                         else:
                             target = fi
                         buffers[target].append(text)
-                        if len(buffers[target]) > MAX_BUFFER:
-                            drop = len(buffers[target]) - MAX_BUFFER
+                        if len(buffers[target]) > max_buffer:
+                            drop = len(buffers[target]) - max_buffer
                             del buffers[target][:drop]
                             dropped_rows = caches[target].trim(drop)
                             if not follow_mode and target < len(view_tops):
