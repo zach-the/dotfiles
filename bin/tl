@@ -137,6 +137,23 @@ def _highlight(s, start, end):
         out.append('\033[27m')
     return ''.join(out)
 
+def _plain(raw):
+    """A raw buffer line as it reads on screen: tabs expanded, escapes gone."""
+    return _ANSI_ESC.sub('', raw.replace('\t', '    '))
+
+def compile_search(pattern):
+    """Compile a '/' search pattern: a regex (taken literally if it isn't a
+    valid one), case-insensitive unless it contains an uppercase letter."""
+    flags = 0 if any(c.isupper() for c in pattern) else re.IGNORECASE
+    try:
+        return re.compile(pattern, flags)
+    except re.error:
+        return re.compile(re.escape(pattern), flags)
+
+def match_spans(search, raw):
+    """Visible-offset [start, end) spans of every search match in a raw line."""
+    return [m.span() for m in search.finditer(_plain(raw)) if m.end() > m.start()]
+
 def selection_text(buf, start, end):
     """Plain text of a selection over buf's raw lines. start/end are
     (line index, visible offset), both inclusive. Works on the raw lines
@@ -145,7 +162,7 @@ def selection_text(buf, start, end):
     (l0, o0), (l1, o1) = start, end
     out = []
     for li in range(max(0, l0), min(l1, len(buf) - 1) + 1):
-        s = _ANSI_ESC.sub('', buf[li].replace('\t', '    '))
+        s = _plain(buf[li])
         out.append(s[o0 if li == l0 else 0: o1 + 1 if li == l1 else len(s)])
     return '\n'.join(out)
 
@@ -280,7 +297,7 @@ def read_key(fd):
             fcntl.fcntl(fd, fcntl.F_SETFL, flags)
     return c
 
-def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_widths, blank_fill=None, merged=False, selection=None):
+def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_widths, blank_fill=None, merged=False, selection=None, search=None, status=None):
     """
     Render the TUI. Returns (view_tops, at_bottom, last_frame, row_map).
     col_widths: list of content widths per column (not counting │ dividers).
@@ -298,6 +315,9 @@ def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_width
     buffer. row_map is the inverse the caller needs to build one from mouse
     coordinates: per column, per content row, the (raw line index, visible
     offset) that row starts at, or None for a row past the last line.
+    search: compiled regex whose matches get highlighted wherever visible.
+    status: plain text shown in place of the header row (the '/' search
+    prompt, or a message).
     """
     n = len(files)
     if blank_fill is None:
@@ -330,15 +350,26 @@ def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_width
         origins.append(o)
 
     def hl(line, i, idx):
-        if selection is None or selection[0] != i:
-            return line
         ri, off = origins[i][idx]
-        (l0, o0), (l1, o1) = selection[1], selection[2]
-        if not l0 <= ri <= l1:
-            return line
-        start = o0 - off if ri == l0 else 0
-        end = o1 + 1 - off if ri == l1 else float('inf')
-        return _highlight(line, max(0, start), end)
+        spans = []
+        if selection is not None and selection[0] == i:
+            (l0, o0), (l1, o1) = selection[1], selection[2]
+            if l0 <= ri <= l1:
+                spans.append((o0 - off if ri == l0 else 0,
+                              o1 + 1 - off if ri == l1 else float('inf')))
+        if search is not None:
+            spans += [(s - off, e - off) for s, e in match_spans(search, buffers[i][ri])]
+        # Merge into disjoint ranges first: _highlight's reverse-video on/off
+        # pairs don't nest, so overlapping ranges would cut each other short.
+        merged_spans = []
+        for s, e in sorted((max(0, s), e) for s, e in spans if e > 0):
+            if merged_spans and s <= merged_spans[-1][1]:
+                merged_spans[-1][1] = max(merged_spans[-1][1], e)
+            else:
+                merged_spans.append([s, e])
+        for s, e in merged_spans:
+            line = _highlight(line, s, e)
+        return line
 
     # Compute effective view start positions
     new_tops = []
@@ -409,6 +440,9 @@ def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_width
         header += f'\033[7m{_ljust_visible(cell, cw)}\033[0m'
         if not is_last:
             header += '│'
+    if status is not None:
+        # Keep the tail, so the prompt's cursor stays on screen.
+        header = status[-width:]
     out.append(header + '\033[K')
 
     # Content rows
@@ -545,6 +579,9 @@ def main():
     selecting = False           # left button is down on a selection drag
     resume_follow = False       # go back to live tail once the drag ends
     row_map = []                # from the last draw_screen; see locate()
+    search = None               # compiled regex of the active '/' search
+    prompt = None               # bytes typed so far at the '/' prompt, else None
+    message = None              # shown in the header row until the next key
 
     def _quit(sig, frame):
         nonlocal running
@@ -565,6 +602,37 @@ def main():
 
     signal.signal(signal.SIGWINCH, _resize)
 
+    def text_width(pane):
+        """Visible characters a column wraps its lines at."""
+        cw = col_widths[pane]
+        return max(1, cw - 1 if pane < n_display - 1 else cw)
+
+    def search_jump(direction):
+        """Scroll each column to its next (direction 1) or previous (-1)
+        line matching the search, counting from its top row -- as in less,
+        the match lands on the top row. Returns whether any column had one."""
+        nonlocal follow_mode, needs_redraw
+        found = False
+        for i, buf in enumerate(buffers):
+            if i >= len(row_map) or not row_map[i] or row_map[i][0] is None:
+                continue
+            cur = row_map[i][0][0]
+            lines = range(cur + 1, len(buf)) if direction > 0 else range(min(cur, len(buf)) - 1, -1, -1)
+            hit = next((ri for ri in lines if match_spans(search, buf[ri])), None)
+            if hit is None:
+                continue
+            if merged:
+                view_tops[i] = hit
+            else:
+                # view_tops counts wrapped display lines, not raw ones.
+                w = text_width(i)
+                view_tops[i] = sum(len(_wrap_ansi(r.replace('\t', '    '), w)) for r in buf[:hit])
+            found = True
+        if found:
+            follow_mode = False
+            needs_redraw = True
+        return found
+
     def locate(col, row, pane=None):
         """Map a 0-indexed screen cell to (column, raw line index, visible
         offset). With pane given, the cell is clamped into that column, so a
@@ -575,9 +643,7 @@ def main():
         if pane >= len(row_map) or not row_map[pane]:
             return None
         rows = row_map[pane]
-        cw = col_widths[pane]
-        max_len = max(1, cw - 1 if pane < n_display - 1 else cw)
-        x = max(0, min(col - starts[pane], max_len - 1))
+        x = max(0, min(col - starts[pane], text_width(pane) - 1))
         hit = rows[max(0, min(row - 1, len(rows) - 1))]
         if hit is None:
             # Below the last line: snap to the end of it.
@@ -643,6 +709,8 @@ def main():
                     display_files, buffers, width, height, follow_mode, view_tops, col_widths,
                     merged=merged,
                     selection=(sel[0], *sorted(sel[1:])) if sel else None,
+                    search=search,
+                    status='/' + prompt.decode('utf-8', 'replace') + '█' if prompt is not None else message,
                 )
                 needs_redraw = False
                 # Reaching the bottom via a manual scroll (j/d/f/...) resumes
@@ -724,8 +792,44 @@ def main():
                         if mice:
                             continue
 
+                        if message:
+                            message = None
+                            needs_redraw = True
+
+                        if prompt is not None:
+                            # Typing a search pattern: every key goes to it.
+                            if raw in (b'\r', b'\n'):
+                                # Enter: search forward from the top row,
+                                # falling back to backward -- when tailing at
+                                # the bottom, that's where the matches are.
+                                # An empty pattern reuses the last one.
+                                pattern = prompt.decode('utf-8', 'replace')
+                                prompt = None
+                                if pattern:
+                                    search = compile_search(pattern)
+                                if search and not (search_jump(1) or search_jump(-1)):
+                                    message = 'Pattern not found'
+                            elif raw == b'\033':  # Esc: cancel
+                                prompt = None
+                            elif raw in (b'\x7f', b'\x08'):  # Backspace (cancels once empty)
+                                prompt = prompt.decode('utf-8', 'ignore')[:-1].encode() if prompt else None
+                            elif raw and raw[0] >= 0x20:
+                                prompt += raw
+                            needs_redraw = True
+                            continue
+
                         if raw == b'q':
                             running = False
+
+                        elif raw == b'/':  # /: search (regex)
+                            prompt = b''
+                            needs_redraw = True
+
+                        elif raw == b'n' and search:  # n: next match
+                            search_jump(1)
+
+                        elif raw == b'N' and search:  # N: previous match
+                            search_jump(-1)
 
                         elif raw in (b'k', b'\033[A'):  # k / Up: scroll up one line
                             follow_mode = False
@@ -761,8 +865,9 @@ def main():
                             follow_mode = True
                             needs_redraw = True
 
-                        elif raw == b'\033':  # Esc: clear the selection highlight
+                        elif raw == b'\033':  # Esc: clear the selection and search highlights
                             sel = None
+                            search = None
                             needs_redraw = True
 
                         elif raw == b'g':  # g: go to top of history
