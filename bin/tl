@@ -8,6 +8,7 @@ import re
 import fcntl
 import time
 import base64
+from bisect import bisect_right
 
 _ANSI_ESC = re.compile(r'\033\[[^a-zA-Z]*[a-zA-Z]')
 _SGR = re.compile(r'\033\[([0-9;]*)m')
@@ -83,6 +84,9 @@ def _ljust_visible(s, width):
 
 def _wrap_ansi(line, width):
     """Wrap line at `width` visible characters, carrying active SGR color state to each new chunk."""
+    if '\033' not in line:
+        # Plain text (most lines): slicing gives the same chunks, far faster.
+        return [line[k:k + width] for k in range(0, len(line), width)] or [""]
     chunks, active, chunk, visible = [], [], "", 0
     i = 0
     while i < len(line):
@@ -108,6 +112,68 @@ def _wrap_ansi(line, width):
     if chunk:
         chunks.append(chunk)
     return chunks if chunks else [""]
+
+class _WrapCache:
+    """One column's buffer as wrapped display lines, kept across redraws.
+    Wrapping is by far the slowest part of a redraw, so only lines appended
+    since the last one get wrapped (or all of them, after a width change)
+    rather than the whole buffer on every scroll step."""
+
+    def __init__(self, merged=False):
+        self.merged = merged  # -m: one display line per raw line, unwrapped
+        self.width = None
+        self.chunks = []      # per raw line: its display lines
+        self.ends = []        # per raw line: display index one past its last chunk (+ base)
+        self.vlens = []       # per raw line: visible length (merged only)
+        self.base = 0         # display lines trimmed off the front, in ends' numbering
+
+    def _reset(self):
+        self.chunks, self.ends, self.vlens, self.base = [], [], [], 0
+
+    def sync(self, buf, width):
+        """Catch up with buf, wrapping at `width` visible characters."""
+        if self.merged:
+            width = 0
+        if width != self.width or len(buf) < len(self.chunks):
+            self.width = width
+            self._reset()
+        end = self.ends[-1] if self.ends else self.base
+        for raw in buf[len(self.chunks):]:
+            raw = raw.replace('\t', '    ')
+            if self.merged:
+                c = [raw]
+                self.vlens.append(_visible_len(raw))
+            else:
+                c = _wrap_ansi(raw, width)
+            end += len(c)
+            self.chunks.append(c)
+            self.ends.append(end)
+
+    def trim(self, n):
+        """The buffer dropped its first n lines. Returns how many display
+        lines that was."""
+        if n >= len(self.chunks):
+            # Dropped lines never synced: their wrapped size is unknown.
+            self._reset()
+            return n
+        rows = self.ends[n - 1] - self.base
+        self.base = self.ends[n - 1]
+        del self.chunks[:n], self.ends[:n], self.vlens[:n]
+        return rows
+
+    def total(self):
+        return self.ends[-1] - self.base if self.ends else 0
+
+    def index_of(self, ri):
+        """Display index raw line ri starts at."""
+        return (self.ends[ri - 1] - self.base) if ri else 0
+
+    def line(self, idx):
+        """Display line idx, as (text, (raw line index, visible offset))."""
+        pos = idx + self.base
+        ri = bisect_right(self.ends, pos)
+        k = pos - (self.ends[ri - 1] if ri else self.base)
+        return self.chunks[ri][k], (ri, k * self.width)
 
 def _highlight(s, start, end):
     """Reverse-video the visible characters [start, end) of s. Reverse is
@@ -297,7 +363,7 @@ def read_key(fd):
             fcntl.fcntl(fd, fcntl.F_SETFL, flags)
     return c
 
-def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_widths, blank_fill=None, merged=False, selection=None, search=None, status=None):
+def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_widths, blank_fill=None, merged=False, selection=None, search=None, status=None, caches=None):
     """
     Render the TUI. Returns (view_tops, at_bottom, last_frame, row_map).
     col_widths: list of content widths per column (not counting │ dividers).
@@ -318,6 +384,8 @@ def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_width
     search: compiled regex whose matches get highlighted wherever visible.
     status: plain text shown in place of the header row (the '/' search
     prompt, or a message).
+    caches: one _WrapCache per column, reused between calls so each redraw
+    only wraps what's new. Omitted, everything is wrapped from scratch.
     """
     n = len(files)
     if blank_fill is None:
@@ -329,28 +397,17 @@ def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_width
 
     content_lines = height - 1  # one row for the header
 
-    # Wrap all raw buffers into display lines
-    # origins parallels wrapped: the (raw line index, visible offset) each
-    # display line starts at.
-    wrapped, origins = [], []
+    # Wrap the raw buffers into display lines (only what's new since the
+    # last draw -- see _WrapCache).
+    if caches is None:
+        caches = [_WrapCache(merged) for _ in buffers]
     for i, buf in enumerate(buffers):
         cw = col_widths[i]
-        max_len = max(1, cw - 1 if i < n - 1 else cw)
-        w, o = [], []
-        for ri, raw in enumerate(buf):
-            raw = raw.replace('\t', '    ')
-            if merged:
-                w.append(raw)
-                o.append((ri, 0))
-            else:
-                for k, chunk in enumerate(_wrap_ansi(raw, max_len) if raw else [""]):
-                    w.append(chunk)
-                    o.append((ri, k * max_len))
-        wrapped.append(w)
-        origins.append(o)
+        caches[i].sync(buf, max(1, cw - 1 if i < n - 1 else cw))
+    totals = [c.total() for c in caches]
 
-    def hl(line, i, idx):
-        ri, off = origins[i][idx]
+    def hl(line, i, origin):
+        ri, off = origin
         spans = []
         if selection is not None and selection[0] == i:
             (l0, o0), (l1, o1) = selection[1], selection[2]
@@ -380,11 +437,11 @@ def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_width
         # the terminal soft-wraps it. Budget by those physical rows, not by
         # line count, or the frame overflows the screen and scrolls the
         # header off the top. Whole lines only; the first is always kept.
-        w = wrapped[0]
-        hs = [max(1, -(-_visible_len(l) // width)) for l in w]
-        rows, bottom_top = 0, len(w)
-        while bottom_top > 0 and (rows == 0 or rows + hs[bottom_top - 1] <= content_lines):
-            rows += hs[bottom_top - 1]
+        def h(idx):
+            return max(1, -(-caches[0].vlens[idx] // width))
+        rows, bottom_top = 0, totals[0]
+        while bottom_top > 0 and (rows == 0 or rows + h(bottom_top - 1) <= content_lines):
+            rows += h(bottom_top - 1)
             bottom_top -= 1
         if follow_mode:
             top = bottom_top
@@ -392,13 +449,12 @@ def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_width
             prev = view_tops[0] if view_tops else 0
             top = max(0, min(prev, bottom_top))
         merged_end = top
-        while merged_end < len(w) and (merged_rows == 0 or merged_rows + hs[merged_end] <= content_lines):
-            merged_rows += hs[merged_end]
+        while merged_end < totals[0] and (merged_rows == 0 or merged_rows + h(merged_end) <= content_lines):
+            merged_rows += h(merged_end)
             merged_end += 1
         new_tops.append(top)
     else:
-        for i, w in enumerate(wrapped):
-            total = len(w)
+        for i, total in enumerate(totals):
             if follow_mode:
                 new_tops.append(max(0, total - content_lines))
             else:
@@ -419,11 +475,10 @@ def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_width
         cw = col_widths[i]
         name = f" {os.path.basename(f)} "
 
-        wi = wrapped[i]
         if merged:
-            behind = len(wi) - merged_end
+            behind = totals[i] - merged_end
         else:
-            behind = max(0, len(wi) - (new_tops[i] + content_lines))
+            behind = max(0, totals[i] - (new_tops[i] + content_lines))
         behinds.append(behind)
 
         if follow_mode:
@@ -449,19 +504,20 @@ def draw_screen(files, buffers, width, height, follow_mode, view_tops, col_width
     row_map = [[] for _ in range(n)]
     if merged:
         for idx in range(new_tops[0], merged_end):
-            out.append(hl(wrapped[0][idx], 0, idx) + '\033[0m\033[K')
-            row_map[0].extend((idx, r * width) for r in range(hs[idx]))
+            line, origin = caches[0].line(idx)
+            out.append(hl(line, 0, origin) + '\033[0m\033[K')
+            row_map[0].extend((idx, r * width) for r in range(h(idx)))
         out.extend(['\033[K'] * (content_lines - merged_rows))
         row_map[0] = (row_map[0] + [None] * content_lines)[:content_lines]
     for y in range(content_lines if merged else 0, content_lines):
         row = ""
         for i in range(n):
-            w = wrapped[i]
             cw = col_widths[i]
             idx = new_tops[i] + y
-            if idx < len(w):
-                line = hl(w[idx], i, idx)
-                row_map[i].append(origins[i][idx])
+            if idx < totals[i]:
+                line, origin = caches[i].line(idx)
+                line = hl(line, i, origin)
+                row_map[i].append(origin)
             else:
                 line = blank_fill[i]
                 row_map[i].append(None)
@@ -579,6 +635,7 @@ def main():
     selecting = False           # left button is down on a selection drag
     resume_follow = False       # go back to live tail once the drag ends
     row_map = []                # from the last draw_screen; see locate()
+    caches = [_WrapCache(merged) for _ in range(n_display)]
     search = None               # compiled regex of the active '/' search
     prompt = None               # bytes typed so far at the '/' prompt, else None
     message = None              # shown in the header row until the next key
@@ -621,12 +678,9 @@ def main():
             hit = next((ri for ri in lines if match_spans(search, buf[ri])), None)
             if hit is None:
                 continue
-            if merged:
-                view_tops[i] = hit
-            else:
-                # view_tops counts wrapped display lines, not raw ones.
-                w = text_width(i)
-                view_tops[i] = sum(len(_wrap_ansi(r.replace('\t', '    '), w)) for r in buf[:hit])
+            # view_tops counts wrapped display lines, not raw ones.
+            caches[i].sync(buf, text_width(i))
+            view_tops[i] = caches[i].index_of(hit)
             found = True
         if found:
             follow_mode = False
@@ -710,6 +764,7 @@ def main():
                     merged=merged,
                     selection=(sel[0], *sorted(sel[1:])) if sel else None,
                     search=search,
+                    caches=caches,
                     status='/' + prompt.decode('utf-8', 'replace') + '█' if prompt is not None else message,
                 )
                 needs_redraw = False
@@ -894,9 +949,10 @@ def main():
                         buffers[target].append(text)
                         if len(buffers[target]) > MAX_BUFFER:
                             drop = len(buffers[target]) - MAX_BUFFER
-                            buffers[target] = buffers[target][-MAX_BUFFER:]
+                            del buffers[target][:drop]
+                            dropped_rows = caches[target].trim(drop)
                             if not follow_mode and target < len(view_tops):
-                                view_tops[target] = max(0, view_tops[target] - drop)
+                                view_tops[target] = max(0, view_tops[target] - dropped_rows)
                             if sel and sel[0] == target:
                                 sel[1:] = [(l - drop, o) for l, o in sel[1:]]
                                 if min(sel[1][0], sel[2][0]) < 0:
