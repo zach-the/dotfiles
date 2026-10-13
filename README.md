@@ -259,6 +259,8 @@ Prefix: `Ctrl + B`
 |---|---|
 | `Alt + -` | Split horizontal (new pane below) |
 | `Alt + \` | Split vertical (new pane right) |
+| `Alt + _` | Split horizontal (new pane above) |
+| `Alt + ?` | Split vertical (new pane left) |
 | `Alt + h` | Focus pane left |
 | `Alt + j` | Focus pane down |
 | `Alt + k` | Focus pane up |

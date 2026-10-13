@@ -6,7 +6,8 @@
 # The previous geometry-based rebalance is kept commented out below in case
 # it's ever wanted again; to go back, uncomment it and remove the
 # select-layout line.
-direction="$1"   # -v (new pane below) or -h (new pane to the right)
+direction="$1"   # -v (new pane below) or -h (new pane to the right);
+                 # add b (-vb / -hb) to put it above / to the left instead
 pane_id="$2"
 
 pane_path=$(tmux display-message -p -t "$pane_id" "#{pane_current_path}")
