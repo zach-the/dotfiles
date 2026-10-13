@@ -96,6 +96,25 @@ local function directionalMatch(deltaX, deltaY, direction)
     return false, nil
 end
 
+-- True if the candidate frame shares some extent with the origin frame on the
+-- axis perpendicular to travel (same row for H/L, same column for J/K).
+local function overlapsOrthogonally(originFrame, f, direction)
+    if direction == "West" or direction == "East" then
+        return f.y < originFrame.y + originFrame.h and f.y + f.h > originFrame.y
+    else
+        return f.x < originFrame.x + originFrame.w and f.x + f.w > originFrame.x
+    end
+end
+
+-- How far off the travel axis the candidate's center is.
+local function orthogonalOffset(deltaX, deltaY, direction)
+    if direction == "West" or direction == "East" then
+        return math.abs(deltaY)
+    else
+        return math.abs(deltaX)
+    end
+end
+
 local function smartFocus(direction)
     local win = hs.window.focusedWindow()
     -- Safety check: If a tab closed and focus is "lost" to the OS, try to grab the frontmost app's window
@@ -119,8 +138,10 @@ local function smartFocus(direction)
         end
     end
     local origin
+    local originFrame = winFrame
     if mouseScreen and mouseScreen:id() ~= winScreen:id() then
         origin = mousePos
+        originFrame = {x = mousePos.x, y = mousePos.y, w = 0, h = 0}
         winScreen = mouseScreen
     else
         origin = {x = winFrame.x + winFrame.w/2, y = winFrame.y + winFrame.h/2}
@@ -159,7 +180,12 @@ local function smartFocus(direction)
                 local isCandidate, distance = directionalMatch(deltaX, deltaY, direction)
 
                 if isCandidate then
-                    table.insert(candidates, {window = w, dist = distance})
+                    table.insert(candidates, {
+                        window = w,
+                        dist = distance,
+                        aligned = overlapsOrthogonally(originFrame, f, direction),
+                        offAxis = orthogonalOffset(deltaX, deltaY, direction),
+                    })
                 end
             end
         end
@@ -179,16 +205,26 @@ local function smartFocus(direction)
 
                 if isCandidate then
                     -- virtual candidate: no window field, just a point to move the mouse to
-                    table.insert(candidates, {point = sc, dist = distance})
+                    table.insert(candidates, {
+                        point = sc,
+                        dist = distance,
+                        aligned = overlapsOrthogonally(originFrame, sf, direction),
+                        offAxis = orthogonalOffset(deltaX, deltaY, direction),
+                    })
                 end
             end
         end
     end
 
-    -- Sort by distance (closest first)
+    -- Prefer candidates in the same row/column as the origin, then closest
+    -- along the travel axis, then closest off-axis. Without the first and last
+    -- keys, windows stacked in a grid tie on distance and the pick is arbitrary.
+    -- Unaligned windows stay reachable when nothing aligned exists.
     if #candidates > 0 then
         table.sort(candidates, function(a, b)
-            return a.dist < b.dist
+            if a.aligned ~= b.aligned then return a.aligned end
+            if a.dist ~= b.dist then return a.dist < b.dist end
+            return a.offAxis < b.offAxis
         end)
 
         local best = candidates[1]
