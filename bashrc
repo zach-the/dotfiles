@@ -88,8 +88,11 @@ _ascii_prompt() {
     local c_qagents=$bmag
     local c_pwd=$blu
     local c_git=$grn
+    local c_time=$bblk
 
     local p=''
+
+    p+="${c_time}[\A]${reset}"
 
     if [[ -n "$SSH_CLIENT" || -n "$SSH_TTY" ]]; then
         p+="${c_ssh}[SSH]${reset}"
