@@ -78,6 +78,8 @@ _ascii_prompt() {
     local bmag='\[\e[95m\]'
     local bcyn='\[\e[96m\]'
     local bwht='\[\e[97m\]'
+    # 256-color
+    local org='\[\e[38;5;208m\]'
     # --- segment colors (edit these) ---
     local c_venv=$grn
     local c_ssh=$yel
@@ -88,7 +90,7 @@ _ascii_prompt() {
     local c_qagents=$bmag
     local c_pwd=$blu
     local c_git=$grn
-    local c_time=$bblk
+    local c_time=$org
 
     local p=''
 
