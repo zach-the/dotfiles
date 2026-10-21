@@ -90,8 +90,8 @@ _ascii_prompt() {
     local c_qagents=$bmag
     local c_pwd=$blu
     local c_git=$grn
-    local c_date=$org
-    local c_time=$red
+    local c_date=$red
+    local c_time=$org
 
     local p=''
 
