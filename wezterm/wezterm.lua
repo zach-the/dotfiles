@@ -35,30 +35,32 @@ end
 config.window_background_opacity = is_mac and 0.9 or 0.9
 config.text_background_opacity = is_mac and 0.9 or 0.9
 
+-- Disabled: see-through gaps between tmux panes (pairs with the disabled
+-- see-through borders block in tmux/tmux.conf). Uncomment to re-enable.
 -- Whenever the active pane is in passthrough mode (same rule as the Alt keys
 -- -- see should_passthrough above), i.e. tmux is running or there's only one
 -- WezTerm pane in the tab, the window's own background goes fully transparent
 -- while cells with an explicit background colour stay fully opaque. So
 -- anything tmux paints (solid-mode panes, status bar) looks normal, and only
--- the bg=default gaps (pane borders, the spacer scrollbars) show through.
+-- the bg=default gaps (pane borders) show through.
 -- Otherwise the default opacity above. update-status fires on focus changes and every
 -- status_update_interval, so this tracks tmux starting/exiting and panes
 -- being split/closed. Overrides are only touched when they'd actually change,
 -- since set_config_overrides triggers a config reload for the window.
-wezterm.on('update-status', function(window, pane)
-  local win_opacity, text_opacity = nil, nil
-  if should_passthrough(pane) then
-    win_opacity, text_opacity = 0, 1.0
-  end
-  local overrides = window:get_config_overrides() or {}
-  if overrides.window_background_opacity == win_opacity
-    and overrides.text_background_opacity == text_opacity then
-    return
-  end
-  overrides.window_background_opacity = win_opacity
-  overrides.text_background_opacity = text_opacity
-  window:set_config_overrides(overrides)
-end)
+-- wezterm.on('update-status', function(window, pane)
+--   local win_opacity, text_opacity = nil, nil
+--   if should_passthrough(pane) then
+--     win_opacity, text_opacity = 0, 1.0
+--   end
+--   local overrides = window:get_config_overrides() or {}
+--   if overrides.window_background_opacity == win_opacity
+--     and overrides.text_background_opacity == text_opacity then
+--     return
+--   end
+--   overrides.window_background_opacity = win_opacity
+--   overrides.text_background_opacity = text_opacity
+--   window:set_config_overrides(overrides)
+-- end)
 
 -- Font Configuration
 config.font = wezterm.font 'JetBrainsMono Nerd Font Mono'
