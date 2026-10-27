@@ -32,30 +32,35 @@ alias color_test='for i in {0..7}; do printf "\e[48;5;${i}m  "; done; printf "\e
 alias zd='~/dotfiles/bin/zd -vw'
 alias audio-combine='~/dotfiles/bin/audio-combine'
 pp() {
-    local input path b64
-    input=$(echo "$*" | xargs)
-    path=$(realpath "$input") || return 1
-    printf '%s' "$path"
+    local p path paths="" sep=$'\n' b64
+    if [ "$1" = "-l" ]; then
+        sep=" "
+        shift
+    fi
+    for p in "$@"; do
+        path=$(realpath "$p") || return 1
+        echo "$path"
+        paths="${paths:+$paths$sep}$path"
+    done
 
     if command -v pbcopy &>/dev/null; then
-        printf '%s' "$path" | pbcopy
+        printf '%s' "$paths" | pbcopy
     elif [ -n "$WAYLAND_DISPLAY" ] && command -v wl-copy &>/dev/null; then
-        printf '%s' "$path" | wl-copy
+        printf '%s' "$paths" | wl-copy
     elif [ -n "$DISPLAY" ] && command -v xclip &>/dev/null; then
-        printf '%s' "$path" | xclip -selection clipboard
+        printf '%s' "$paths" | xclip -selection clipboard
     elif [ -n "$DISPLAY" ] && command -v xsel &>/dev/null; then
-        printf '%s' "$path" | xsel --clipboard --input
+        printf '%s' "$paths" | xsel --clipboard --input
     else
         # Headless / SSH: no clipboard helper and no display, so ask the
         # terminal emulator itself to set its clipboard via OSC 52.
-        if [ -n "$TMUX" ] && printf '%s' "$path" | tmux load-buffer -w - 2>/dev/null; then
+        if [ -n "$TMUX" ] && printf '%s' "$paths" | tmux load-buffer -w - 2>/dev/null; then
             : # tmux 3.2+ set its own buffer and forwarded OSC 52 to the terminal
         else
-            b64=$(printf '%s' "$path" | base64 | tr -d '\n')
+            b64=$(printf '%s' "$paths" | base64 | tr -d '\n')
             printf '\033]52;c;%s\a' "$b64" > /dev/tty
         fi
     fi
-    echo
 }
 alias rs='rsync -aHAX --info=progress2'
 alias print_block='pyfiglet -f blocky -w $(tput cols)'
@@ -288,7 +293,7 @@ md() {
 b() {
     if (( _DIR_HISTORY_INDEX > 0 )); then
         local target="${_DIR_HISTORY[$((_DIR_HISTORY_INDEX - 1))]}"
-        if cd "$target" 2>/dev/null && ls -lrt; then
+        if d "$target" 2>/dev/null; then
             ((_DIR_HISTORY_INDEX--))
         else
             echo "Failed to go back."
@@ -301,7 +306,7 @@ b() {
 f() {
     if (( _DIR_HISTORY_INDEX < ${#_DIR_HISTORY[@]} - 1 )); then
         local target="${_DIR_HISTORY[$((_DIR_HISTORY_INDEX + 1))]}"
-        if cd "$target" 2>/dev/null && ls -lrt; then
+        if d "$target" 2>/dev/null; then
             ((_DIR_HISTORY_INDEX++))
         else
             echo "Failed to go forward."
@@ -357,6 +362,8 @@ _banner_wrap() {
     [[ -n "$current" ]] && printf '%s\n' "$current"
 }
 
+# Drop the alias (defined near the bottom of this file) so re-sourcing doesn't expand it inside the definition below.
+unalias banner 2>/dev/null
 banner() {
     local justify="c"
     local paragraphs=()
