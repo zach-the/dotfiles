@@ -1,0 +1,83 @@
+#!/bin/bash
+# Collects hotspot diagnostics to a file while the AP is up, so they can be
+# reviewed later once this machine is back on normal wifi (starting the AP
+# takes the only network connection down, so nothing can inspect it live).
+#
+# Usage: start the hotspot (sudo iPhoneTransferStart), try connecting from
+# the iPhone, THEN run this (sudo iPhoneTransferDiag) before stopping it.
+
+set -u
+
+IFACE="wlp0s20f3"
+PID_DIR="/run/iphonetransfer"
+OUT="/home/zach/iphone-hotspot-diag.txt"
+
+if [ "$EUID" -ne 0 ]; then
+    exec sudo "$0" "$@"
+fi
+
+{
+    echo "=== $(date) ==="
+    echo
+
+    echo "--- ps (hostapd/dnsmasq) ---"
+    ps aux | grep -iE "hostapd|dnsmasq" | grep -v grep
+    echo
+
+    echo "--- ip addr show $IFACE ---"
+    ip addr show "$IFACE"
+    echo
+
+    echo "--- iw dev $IFACE info ---"
+    iw dev "$IFACE" info
+    echo
+
+    echo "--- iw dev $IFACE station dump ---"
+    iw dev "$IFACE" station dump
+    echo
+
+    echo "--- iw reg get ---"
+    iw reg get
+    echo
+
+    echo "--- cfg80211 ieee80211_regdom param ---"
+    cat /sys/module/cfg80211/parameters/ieee80211_regdom
+    echo
+
+    echo "--- hostapd_cli status ---"
+    if command -v hostapd_cli >/dev/null; then
+        hostapd_cli -i "$IFACE" -p "$PID_DIR/hostapd_ctrl" status 2>&1
+        echo
+        echo "--- hostapd_cli all_sta ---"
+        hostapd_cli -i "$IFACE" -p "$PID_DIR/hostapd_ctrl" all_sta 2>&1
+    else
+        echo "hostapd_cli not installed"
+    fi
+    echo
+
+    echo "--- hostapd.log (full) ---"
+    cat "$PID_DIR/hostapd.log" 2>&1
+    echo
+
+    echo "--- monitor.log (last 100) ---"
+    tail -n 100 "$PID_DIR/monitor.log" 2>&1
+    echo
+
+    echo "--- dnsmasq leases ---"
+    cat /var/lib/misc/dnsmasq.leases 2>&1
+    echo
+
+    echo "--- journalctl -b, hostapd/dnsmasq/iwlwifi ---"
+    journalctl -b --no-pager 2>&1 | grep -iE "hostapd|dnsmasq|iwlwifi.*$IFACE|iwlwifi.*AP"
+    echo
+
+    echo "--- dmesg, iwlwifi/$IFACE ---"
+    dmesg 2>&1 | grep -iE "iwlwifi|$IFACE"
+    echo
+
+} > "$OUT" 2>&1
+
+chown zach:zach "$OUT"
+chmod 644 "$OUT"
+echo "Diagnostics written to $OUT"
+echo "Stop the hotspot (sudo iPhoneTransferStop), reconnect to wifi, then show this file to Claude."

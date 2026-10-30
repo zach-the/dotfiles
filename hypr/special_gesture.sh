@@ -17,4 +17,4 @@ NAME="special"
 # reflects whether it's currently open.
 special_ws="$(hyprctl monitors -j | jq -r '.[] | select(.focused) | .specialWorkspace.name')"
 
-[[ "$special_ws" == "special:$NAME" ]] && hyprctl dispatch togglespecialworkspace "$NAME"
+[[ "$special_ws" == "special:$NAME" ]] && hyprctl dispatch "hl.dsp.workspace.toggle_special(\"$NAME\")"

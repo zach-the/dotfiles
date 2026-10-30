@@ -223,6 +223,24 @@ $shadow_color        = {rgba(p['shadow'], 'ee')}
 """
 
 
+def gen_hypr_colors_lua(p: dict, name: str) -> str:
+    # Same values as gen_hypr_colors above, but as a plain Lua data file
+    # for hyprland.lua to read with loadfile() — hyprlang's $var = ...
+    # syntax (hypr/colors.conf, for hyprland.conf) can't be `source`d or
+    # `require`d from Lua.
+    def rgba(hex_color: str, alpha: str) -> str:
+        return f"rgba({hex_color.lstrip('#')}{alpha})"
+    return f"""\
+-- GENERATED from palettes/{name}.toml — run generate_colors.py to update
+return {{
+  active_border_start = "{rgba(p['blue'], 'cc')}",
+  active_border_end   = "{rgba(p['green'], '88')}",
+  inactive_border     = "{rgba(p['border_inactive'], 'aa')}",
+  shadow_color        = "{rgba(p['shadow'], 'ee')}",
+}}
+"""
+
+
 def gen_waybar_css(p: dict, name: str) -> str:
     return f"""\
 {_header_css(name)}
@@ -532,6 +550,7 @@ OUTPUTS = {
     "wezterm/colors.lua": gen_wezterm_colors,
     "tmux/tmux-colors.conf": gen_tmux_colors,
     "hypr/colors.conf":   gen_hypr_colors,
+    "hypr/colors.lua":    gen_hypr_colors_lua,
     "waybar/colors-neon.css": gen_waybar_css,
     "rofi-colors.rasi":   gen_rofi_colors,
 }

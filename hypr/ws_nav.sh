@@ -22,6 +22,19 @@ RESCUE_LOG="${XDG_STATE_HOME:-$HOME/.local/state}/hypr/workspace-rescue.log"
 
 active_ws_info=$(hyprctl activeworkspace -j)
 current_mon_name=$(echo "$active_ws_info" | jq -r '.monitor')
+
+# Defensive self-heal: fold anything on this monitor that's outside its
+# block back into it before computing pos/target below -- see
+# claim_block.sh for why a stray can exist here at all even with
+# monitor_init.sh's own proactive sweep on connect. Cheap no-op when
+# nothing's wrong (single hyprctl read, no dispatches), so this runs
+# unconditionally rather than only in response to a symptom.
+"$(dirname "$0")/claim_block.sh" "$current_mon_name"
+
+# Re-read after claim_block.sh: if current_ws itself was the stray, it
+# followed its relabel to a new id and switched focus there, so this has
+# to reflect that rather than the (now gone) id we started with.
+active_ws_info=$(hyprctl activeworkspace -j)
 current_ws=$(echo "$active_ws_info" | jq -r '.id')
 current_ws_windows=$(echo "$active_ws_info" | jq -r '.windows')
 
@@ -69,7 +82,7 @@ if [ "$action" == "next" ] && (( current_ws_windows == 0 )); then
 fi
 
 if [ "$move" == "move" ]; then
-    hyprctl dispatch movetoworkspace "$target"
+    hyprctl dispatch "hl.dsp.window.move({ workspace = $target, follow = true })"
 else
     # Separate calls, not --batch: when $target doesn't exist yet (growing
     # past this monitor's current top), moveworkspacetomonitor fails --
@@ -77,8 +90,8 @@ else
     # that first failure, so the workspace switch right after it would
     # never actually run. Run standalone, moveworkspacetomonitor's failure
     # can't block the switch that follows it.
-    hyprctl dispatch moveworkspacetomonitor "$target" current 2>/dev/null
-    hyprctl dispatch workspace "$target"
+    hyprctl dispatch "hl.dsp.workspace.move({ workspace = $target, monitor = \"current\" })" 2>/dev/null
+    hyprctl dispatch "hl.dsp.focus({ workspace = $target })"
 fi
 
 # Compact numbering on this monitor. Hyprland destroys an empty,
@@ -101,7 +114,7 @@ for id in "${existing_ids[@]}"; do
     if [ "$id" != "$want" ]; then
         addrs=$(hyprctl clients -j | jq -r '.[] | select(.workspace.id == '"$id"') | .address')
         for addr in $addrs; do
-            hyprctl dispatch movetoworkspacesilent "$want,address:$addr"
+            hyprctl dispatch "hl.dsp.window.move({ window = \"address:$addr\", workspace = $want, follow = false })"
             # Keep the rescue log pointing at the window's new workspace,
             # otherwise it no longer matches when the monitor comes back.
             if [ -s "$RESCUE_LOG" ]; then
@@ -118,5 +131,5 @@ for id in "${existing_ids[@]}"; do
 done
 
 if [ -n "$refocus" ]; then
-    hyprctl dispatch workspace "$refocus"
+    hyprctl dispatch "hl.dsp.focus({ workspace = $refocus })"
 fi

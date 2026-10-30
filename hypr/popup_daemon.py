@@ -28,6 +28,7 @@ import audio_popup
 import bluetooth_popup
 import jellyfin_popup
 import popup_ipc
+import power_popup
 import wifi_popup
 
 WAYBAR_COLORS_CSS = os.path.expanduser("~/.config/waybar/colors.css")
@@ -363,6 +364,7 @@ def main():
     TARGETS["wifi"] = PopupTarget("wifi", wifi_popup.build, wifi_popup.refresh)
     TARGETS["bluetooth"] = PopupTarget("bluetooth", bluetooth_popup.build, bluetooth_popup.refresh)
     TARGETS["jellyfin"] = PopupTarget("jellyfin", jellyfin_popup.build, jellyfin_popup.refresh)
+    TARGETS["power"] = PopupTarget("power", power_popup.build, power_popup.refresh)
     _load_css()
     _start_pactl_watch()
     Gtk.main()

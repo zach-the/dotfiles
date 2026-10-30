@@ -116,30 +116,27 @@ def main():
     else:
         fh -= GAP_IN
 
-    # hyprctl dispatch takes each dispatcher's args as a single string,
-    # not separate argv items; moveresizeactive doesn't exist on this
-    # Hyprland version (0.55.2), so use moveactive + resizeactive.
-    # Resize first: `resizeactive exact` anchors the resize at the
-    # window's CURRENT center, so doing it before the move means the
-    # subsequent moveactive (an absolute top-left, independent of size)
-    # lands exactly where we want regardless of where the resize
-    # center happened to be.
+    # hyprctl dispatch now compiles its argument as a Lua expression
+    # (`hl.dsp...`), not the old space-separated dispatcher-name/args
+    # form. relative=false makes x/y an absolute size/position, same as
+    # the old `resizeactive exact`/`moveactive exact`.
+    # Resize first: anchors the resize at the window's CURRENT center,
+    # so doing it before the move means the subsequent move (an
+    # absolute top-left, independent of size) lands exactly where we
+    # want regardless of where the resize center happened to be.
     #
-    # Sent twice: on a freshly mapped Firefox window, the FIRST
-    # resizeactive a window ever receives undershoots the requested
-    # width by a fixed ~26px (confirmed independent of target size;
-    # height is unaffected, other clients like wezterm don't do this
-    # at all) — a Firefox/GTK first-configure quirk, not a Hyprland or
-    # animation issue. The second call always lands exactly, so send
-    # it twice unconditionally; it's a no-op on windows that didn't
-    # need it.
-    resize_args = f"exact {int(fw)} {int(fh)}"
-    subprocess.run(["hyprctl", "dispatch", "resizeactive", resize_args], check=True)
-    subprocess.run(["hyprctl", "dispatch", "resizeactive", resize_args], check=True)
-    subprocess.run(
-        ["hyprctl", "dispatch", "moveactive", f"exact {int(fx)} {int(fy)}"],
-        check=True,
-    )
+    # Sent twice: on a freshly mapped Firefox window, the FIRST resize
+    # a window ever receives undershoots the requested width by a
+    # fixed ~26px (confirmed independent of target size; height is
+    # unaffected, other clients like wezterm don't do this at all) — a
+    # Firefox/GTK first-configure quirk, not a Hyprland or animation
+    # issue. The second call always lands exactly, so send it twice
+    # unconditionally; it's a no-op on windows that didn't need it.
+    resize_expr = f"hl.dsp.window.resize({{ x = {int(fw)}, y = {int(fh)}, relative = false }})"
+    subprocess.run(["hyprctl", "dispatch", resize_expr], check=True)
+    subprocess.run(["hyprctl", "dispatch", resize_expr], check=True)
+    move_expr = f"hl.dsp.window.move({{ x = {int(fx)}, y = {int(fy)}, relative = false }})"
+    subprocess.run(["hyprctl", "dispatch", move_expr], check=True)
 
 
 if __name__ == "__main__":

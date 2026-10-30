@@ -29,5 +29,5 @@ socat -U - UNIX-CONNECT:"$SOCK" | while read -r line; do
     esac
     [[ "$ws" == "special:special" ]] || continue
     floating=$(hyprctl clients -j | jq -r --arg a "$addr" '.[] | select(.address == $a) | .floating')
-    [[ "$floating" == "false" ]] && hyprctl dispatch setfloating "address:$addr" >/dev/null 2>&1
+    [[ "$floating" == "false" ]] && hyprctl dispatch "hl.dsp.window.float({ window = \"address:$addr\", action = \"enable\" })" >/dev/null 2>&1
 done

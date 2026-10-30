@@ -8,15 +8,14 @@
 window.popup-audio,
 window.popup-wifi,
 window.popup-bluetooth,
-window.popup-jellyfin {
-    /* Solid, opaque version of the wifi/volume rings' dimmed-track grey
-       (white at 30% opacity -- see generate_wifi_icons.py/
-       generate_volume_icons.py's DIM_OPACITY) -- i.e. what that grey
-       looks like painted over black, computed once here rather than
-       left translucent so the popup reads as a consistent solid grey
-       instead of tinting with whatever wallpaper/window happens to be
-       behind it. */
-    background-color: #4d4d4d;
+window.popup-jellyfin,
+window.popup-power {
+    /* macOS-style frosted panel: dark and noticeably more translucent
+       than the old solid #4d4d4d, so hyprland.conf's blur (vibrancy'd
+       up for this exact reason -- see decoration.blur there) can
+       actually show saturated color from whatever's behind the popup
+       through the glass, instead of this tint flattening it to grey. */
+    background-color: rgba(40, 40, 46, 0.55);
     border-radius: 10px;
     color: @fg;
 }
@@ -24,7 +23,8 @@ window.popup-jellyfin {
 window.popup-audio .popup-header,
 window.popup-wifi .popup-header,
 window.popup-bluetooth .popup-header,
-window.popup-jellyfin .popup-header {
+window.popup-jellyfin .popup-header,
+window.popup-power .popup-header {
     font-weight: bold;
     padding: 2px 4px 4px 4px;
 }
@@ -41,7 +41,8 @@ window.popup-jellyfin .popup-subheader {
 window.popup-audio list,
 window.popup-wifi list,
 window.popup-bluetooth list,
-window.popup-jellyfin list {
+window.popup-jellyfin list,
+window.popup-power list {
     background-color: transparent;
     color: @fg;
 }
@@ -49,7 +50,8 @@ window.popup-jellyfin list {
 window.popup-audio row,
 window.popup-wifi row,
 window.popup-bluetooth row,
-window.popup-jellyfin row {
+window.popup-jellyfin row,
+window.popup-power row {
     background-color: transparent;
     border-radius: 6px;
 }
@@ -57,14 +59,16 @@ window.popup-jellyfin row {
 window.popup-audio row:hover,
 window.popup-wifi row:hover,
 window.popup-bluetooth row:hover,
-window.popup-jellyfin row:hover {
+window.popup-jellyfin row:hover,
+window.popup-power row:hover {
     background-color: alpha(@pink, 0.2);
 }
 
 window.popup-audio label,
 window.popup-wifi label,
 window.popup-bluetooth label,
-window.popup-jellyfin label {
+window.popup-jellyfin label,
+window.popup-power label {
     color: @fg;
 }
 
@@ -93,7 +97,8 @@ window.popup-wifi .lock-icon {
 }
 
 window.popup-bluetooth button,
-window.popup-jellyfin button {
+window.popup-jellyfin button,
+window.popup-power button {
     background: transparent;
     border: none;
     box-shadow: none;
@@ -102,9 +107,22 @@ window.popup-jellyfin button {
 }
 
 window.popup-bluetooth button:hover,
-window.popup-jellyfin button:hover {
+window.popup-jellyfin button:hover,
+window.popup-power button:hover {
     background-color: alpha(@pink, 0.2);
     border-radius: 6px;
+}
+
+/* Confirm button on power_popup.py's reboot/shutdown confirm page --
+   @orange rather than the shared pink hover, so the one destructive
+   action in these popups reads as a warning rather than a normal row. */
+window.popup-power .popup-danger {
+    color: @orange;
+    font-weight: bold;
+}
+
+window.popup-power .popup-danger:hover {
+    background-color: alpha(@orange, 0.2);
 }
 
 /* Flat progress bar (library scan), same redesign as popup-audio's

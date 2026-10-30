@@ -2,7 +2,9 @@
 @import "~/.config/rofi/rofi-colors.rasi"
 
 /* Approximating macOS Spotlight with a hyprland twist */
-/* Real blur requires a compositor like picom with blur enabled */
+/* Real blur comes from hyprland.conf's layerrule for namespace "rofi"
+   (vibrancy-tuned alongside the waybar popups) -- @bg below is
+   translucent on purpose so there's something for it to blur. */
 * {
     background-color: transparent;
     text-color:       @fg;

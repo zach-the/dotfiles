@@ -122,4 +122,5 @@ xclip
 xdg-desktop-portal-gtk
 xdg-desktop-portal-hyprland
 xsel
+yt-dlp
 zram-generator

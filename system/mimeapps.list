@@ -1,5 +1,5 @@
 [Added Associations]
-application/pdf=evince-4.desktop;evince-3.desktop;evince-2.desktop;evince.desktop;
+application/pdf=evince-4.desktop;evince-3.desktop;evince-2.desktop;evince.desktop;org.gnome.Evince.desktop;
 image/png=qimgv.desktop;
 image/jpeg=qimgv.desktop;
 x-scheme-handler/http=firefox.desktop;
@@ -14,7 +14,7 @@ application/x-extension-xhtml=firefox.desktop;
 application/x-extension-xht=firefox.desktop;
 
 [Default Applications]
-application/pdf=evince-4.desktop;
+application/pdf=org.gnome.Evince.desktop
 text/html=firefox.desktop
 x-scheme-handler/about=google-chrome.desktop
 x-scheme-handler/claude-cli=claude-code-url-handler.desktop

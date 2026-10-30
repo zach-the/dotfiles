@@ -15,13 +15,13 @@ floating=$(echo "$win" | jq -r ".floating")
 mode=$(cat "$MODE_STATE_FILE" 2>/dev/null)
 
 if [[ "$ws" == special* ]]; then
-    hyprctl dispatch movetoworkspacesilent e+0
+    hyprctl dispatch 'hl.dsp.window.move({ workspace = "e+0", follow = false })'
     if [[ "$mode" != "FLOAT" && "$floating" == "true" ]]; then
-        hyprctl dispatch togglefloating "address:$addr"
+        hyprctl dispatch "hl.dsp.window.float({ window = \"address:$addr\" })"
     fi
 else
-    hyprctl dispatch movetoworkspacesilent special
+    hyprctl dispatch 'hl.dsp.window.move({ workspace = "special", follow = false })'
     if [[ "$floating" == "false" ]]; then
-        hyprctl dispatch togglefloating "address:$addr"
+        hyprctl dispatch "hl.dsp.window.float({ window = \"address:$addr\" })"
     fi
 fi

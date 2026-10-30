@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# Usage: ./ws_insert_left.sh
+#
+# Inserts a new empty workspace in the current workspace's own slot, on
+# the current monitor, and switches focus to it. The current workspace
+# -- along with everything already at or past it within this monitor's
+# block (see ws_nav.sh for the block layout) -- shifts one position
+# further right to make room. Companion to ws_insert_right.sh, which
+# inserts to the right instead of pushing the current workspace over.
+
+BLOCK=100
+RESCUE_LOG="${XDG_STATE_HOME:-$HOME/.local/state}/hypr/workspace-rescue.log"
+
+active_ws_info=$(hyprctl activeworkspace -j)
+current_mon_name=$(echo "$active_ws_info" | jq -r '.monitor')
+current_ws=$(echo "$active_ws_info" | jq -r '.id')
+
+# eDP-1 is always index 0; external monitors ordered by X then Y position
+if [ "$current_mon_name" == "eDP-1" ]; then
+    mon_index=0
+else
+    mon_index=$(hyprctl monitors -j | jq -r '
+        [.[] | select(.name != "eDP-1")] |
+        sort_by(.x, .y) |
+        to_entries[] |
+        select(.value.name == "'"$current_mon_name"'") |
+        (.key + 1)
+    ')
+fi
+
+base=$(( mon_index * BLOCK ))
+insert_id=$current_ws
+
+# Shift every workspace at or past the insert point -- including the
+# current one -- one position further right. Process highest id first
+# so no move ever lands on a still-occupied slot (the top of the block
+# always lands on a genuinely empty id).
+mapfile -t shift_ids < <(hyprctl workspaces -j | jq -r '
+    [.[] | select(.id >= '"$insert_id"' and .id <= '"$((base + BLOCK))"')] |
+    sort_by(-.id) | .[].id
+')
+
+for id in "${shift_ids[@]}"; do
+    new_id=$(( id + 1 ))
+    addrs=$(hyprctl clients -j | jq -r '.[] | select(.workspace.id == '"$id"') | .address')
+    for addr in $addrs; do
+        hyprctl dispatch "hl.dsp.window.move({ window = \"address:$addr\", workspace = $new_id, follow = false })"
+        # Keep the rescue log pointing at each window's new workspace,
+        # otherwise it no longer matches when a monitor comes back.
+        if [ -s "$RESCUE_LOG" ]; then
+            awk -F'\t' -v OFS='\t' -v a="$addr" -v old="$id" -v new="$new_id" \
+                '$5 == a && $4 == old { $4 = new } 1' "$RESCUE_LOG" > "$RESCUE_LOG.tmp" &&
+                mv "$RESCUE_LOG.tmp" "$RESCUE_LOG"
+        fi
+    done
+done
+
+# Same two-step (not --batch) as ws_nav.sh/ws_insert_right.sh:
+# moveworkspacetomonitor fails when $insert_id doesn't exist yet, which
+# would abort a batched switch too.
+hyprctl dispatch "hl.dsp.workspace.move({ workspace = $insert_id, monitor = \"current\" })" 2>/dev/null
+hyprctl dispatch "hl.dsp.focus({ workspace = $insert_id })"

@@ -41,14 +41,14 @@ retile_all() {
     hyprctl clients -j | jq -r --arg ws "$SKIP_WORKSPACE_PREFIX" \
         '.[] | select(.floating == true) | select(.workspace.name | startswith($ws) | not) | .address' |
     while read -r addr; do
-        hyprctl dispatch togglefloating "address:$addr"
+        hyprctl dispatch "hl.dsp.window.float({ window = \"address:$addr\" })"
     done
 }
 
 float_all() {
     hyprctl clients -j | jq -r '.[] | select(.floating == false) | .address' |
     while read -r addr; do
-        hyprctl dispatch togglefloating "address:$addr"
+        hyprctl dispatch "hl.dsp.window.float({ window = \"address:$addr\" })"
     done
 }
 

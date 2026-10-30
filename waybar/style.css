@@ -3,6 +3,7 @@
 @import 'wifi-icons-generated.css';
 @import 'bluetooth-icons-generated.css';
 @import 'jellyfin-icons-generated.css';
+@import 'scrollsesh-icons-generated.css';
 @import 'backlight-icons-generated.css';
 @import 'volume-icons-generated.css';
 @import 'language-icons-generated.css';
@@ -14,6 +15,14 @@
     border: none;
     border-radius: 0;
     min-height: 0;
+    /* Kill Adwaita's default button chrome (box-shadow inset highlight +
+       focus outline) -- without this, hovering a button that sits at the
+       very top of the layer-shell surface (workspace dots, the power
+       icon) draws its inset top highlight/focus ring right at the
+       surface's edge, which reads as a stray white line along the whole
+       top of the screen rather than a highlight on the button itself. */
+    box-shadow: none;
+    outline: none;
 }
 
 window#waybar {
@@ -72,6 +81,19 @@ window#waybar {
     padding-right: 4px;
 }
 
+/* Power button, left side: static icon (no generated tier classes --
+   it's a single fixed logo, not a gauge), opens the power_popup.py
+   reboot/shutdown dropdown (popup_daemon.py's "power" target). */
+#custom-power {
+    background-image: url("file:///home/zach/dotfiles/waybar/icons/power/arch-linux-logo.png");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 16px 16px;
+    min-width: 28px;
+    padding-left: 0;
+    padding-right: 0;
+}
+
 #custom-battery {
     padding-left: 33px;
     background-repeat: no-repeat;
@@ -122,6 +144,13 @@ window#waybar {
 }
 
 #custom-jellyfin {
+    padding-left: 20px;
+    background-repeat: no-repeat;
+    background-position: 4px center;
+    background-size: 15px 15px;
+}
+
+#custom-scrollsesh {
     padding-left: 20px;
     background-repeat: no-repeat;
     background-position: 4px center;

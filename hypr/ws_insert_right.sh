@@ -42,7 +42,7 @@ for id in "${shift_ids[@]}"; do
     new_id=$(( id + 1 ))
     addrs=$(hyprctl clients -j | jq -r '.[] | select(.workspace.id == '"$id"') | .address')
     for addr in $addrs; do
-        hyprctl dispatch movetoworkspacesilent "$new_id,address:$addr"
+        hyprctl dispatch "hl.dsp.window.move({ window = \"address:$addr\", workspace = $new_id, follow = false })"
         # Keep the rescue log pointing at each window's new workspace,
         # otherwise it no longer matches when a monitor comes back.
         if [ -s "$RESCUE_LOG" ]; then
@@ -55,5 +55,5 @@ done
 
 # Same two-step (not --batch) as ws_nav.sh: moveworkspacetomonitor fails
 # when $insert_id doesn't exist yet, which would abort a batched switch too.
-hyprctl dispatch moveworkspacetomonitor "$insert_id" current 2>/dev/null
-hyprctl dispatch workspace "$insert_id"
+hyprctl dispatch "hl.dsp.workspace.move({ workspace = $insert_id, monitor = \"current\" })" 2>/dev/null
+hyprctl dispatch "hl.dsp.focus({ workspace = $insert_id })"

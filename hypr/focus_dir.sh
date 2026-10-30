@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Usage: focus_dir.sh <l|r|u|d>
 #
-# win+hjkl / arrow-key focus movement. Plain `hyprctl dispatch movefocus`
+# win+hjkl / arrow-key focus movement. Plain `hl.dsp.focus({ direction })`
 # doesn't reliably cross monitor boundaries (hyprwm/Hyprland#3567), does
 # nothing on a blank monitor, and never moves the mouse -- so with
 # follow_mouse=1 the cursor is left hovering the old monitor after a
@@ -49,7 +49,7 @@ if jq -e 'type == "object" and has("at")' <<< "$active" > /dev/null; then
 fi
 
 if [ "$has_neighbor" == "true" ]; then
-    exec hyprctl dispatch movefocus "$dir"
+    exec hyprctl dispatch "hl.dsp.focus({ direction = \"$dir\" })"
 fi
 
 # Current monitor is exhausted in this direction (blank, edge, or only
@@ -77,4 +77,4 @@ target=$(jq -r --arg cur "$cur_name" --arg dir "$dir" '
 
 IFS=$'\t' read -r target_name target_cx target_cy <<< "$target"
 
-hyprctl --batch "dispatch focusmonitor $target_name ; dispatch movecursor $target_cx $target_cy"
+hyprctl --batch "dispatch hl.dsp.focus({ monitor = \"$target_name\" }) ; dispatch hl.dsp.cursor.move({ x = $target_cx, y = $target_cy })"

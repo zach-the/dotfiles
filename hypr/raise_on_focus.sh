@@ -15,7 +15,7 @@ socat -U - UNIX-CONNECT:"$SOCK" | while read -r line; do
             # it doesn't add IPC contention on unrelated focus changes,
             # e.g. focusing TigerVNC, which is always tiled.
             floating=$(hyprctl activewindow -j 2>/dev/null | jq -r '.floating // false')
-            [[ "$floating" == "true" ]] && hyprctl dispatch bringactivetotop >/dev/null 2>&1
+            [[ "$floating" == "true" ]] && hyprctl dispatch 'hl.dsp.window.alter_zorder({ mode = "top" })' >/dev/null 2>&1
             ;;
     esac
 done

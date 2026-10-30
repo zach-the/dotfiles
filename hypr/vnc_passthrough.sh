@@ -17,10 +17,10 @@ SOCK="$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock"
 set_submap_for_class() {
     case "${1,,}" in
         vncviewer|org.remmina.remmina)
-            hyprctl dispatch submap vnc >/dev/null 2>&1
+            hyprctl dispatch 'hl.dsp.submap("vnc")' >/dev/null 2>&1
             ;;
         *)
-            hyprctl dispatch submap reset >/dev/null 2>&1
+            hyprctl dispatch 'hl.dsp.submap("reset")' >/dev/null 2>&1
             ;;
     esac
 }

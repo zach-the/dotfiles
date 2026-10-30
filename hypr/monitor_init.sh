@@ -71,7 +71,7 @@ assign_workspace() {
 
     if hyprctl workspaces -j | jq -e --argjson ws "$ws" 'any(.[]; .id == $ws)' > /dev/null; then
         # Workspace already exists somewhere -- just reassign it.
-        hyprctl dispatch moveworkspacetomonitor "$ws" "$monitor" 2>/dev/null
+        hyprctl dispatch "hl.dsp.workspace.move({ workspace = $ws, monitor = \"$monitor\" })" 2>/dev/null
     else
         # Workspace doesn't exist yet, so moveworkspacetomonitor is a no-op.
         # dispatch workspace creates it, but always on the CURRENTLY
@@ -79,57 +79,16 @@ assign_workspace() {
         # there, then hop back to avoid stealing focus.
         local prev_mon
         prev_mon=$(hyprctl activeworkspace -j | jq -r '.monitor')
-        hyprctl --batch "dispatch focusmonitor $monitor ; dispatch workspace $ws ; dispatch focusmonitor $prev_mon"
+        hyprctl --batch "dispatch hl.dsp.focus({ monitor = \"$monitor\" }) ; dispatch hl.dsp.focus({ workspace = $ws }) ; dispatch hl.dsp.focus({ monitor = \"$prev_mon\" })"
     fi
 }
 
-# Moves any workspace CURRENTLY SITTING on $1 that falls outside $1's own
-# block (and all its windows) into a fresh workspace appended to the top of
-# that block, so $1 only ever hosts workspaces that belong to it.
-#
-# This exists because Hyprland gives a newly-connected monitor its own
-# default workspace (the lowest free ID) the moment it connects -- before
-# assign_workspace() below gets a chance to claim that monitor's actual
-# block-start ID. Anything opened in that gap (a terminal launched right
-# after boot/dock, etc.) lands on the stray low-numbered workspace instead,
-# which sits outside ws_nav.sh's block for that monitor and breaks its
-# prev/next math. Since the race is in Hyprland's own connect-time
-# behavior, it can't be closed by reacting faster to the connect event --
-# only by sweeping and fixing up whatever Hyprland did after the fact. This
-# runs for every monitor the same way (via monitor_index(), same as
-# assign_workspace()), so it's correct no matter which monitor or port it
-# turns out to be, not just the one that happened to trigger this once.
+# Ensures $1 only ever hosts workspaces inside its own block -- see
+# claim_block.sh (shared with ws_nav.sh, which also calls it defensively
+# on every hyper+H/L, since the race this closes can't be fully won from
+# the connect-time side alone).
 claim_block() {
-    local monitor="$1"
-    local index
-    index=$(monitor_index "$monitor")
-    [[ -z "$index" || "$index" == "null" ]] && return
-    local base=$(( index * BLOCK ))
-
-    local workspaces stray
-    workspaces=$(hyprctl workspaces -j) || return
-    mapfile -t stray < <(jq -r --arg mon "$monitor" --argjson base "$base" --argjson block "$BLOCK" '
-        [.[] | select(.monitor == $mon and .id > 0 and (.id <= $base or .id > $base + $block))] |
-        sort_by(.id) | .[].id
-    ' <<< "$workspaces")
-
-    (( ${#stray[@]} == 0 )) && return
-
-    local next
-    next=$(jq -r --argjson b "$base" --argjson block "$BLOCK" \
-        '[.[] | select(.id > $b and .id <= $b + $block) | .id] | max // $b' \
-        <<< "$workspaces")
-
-    local old want addrs addr
-    for old in "${stray[@]}"; do
-        next=$(( next + 1 ))
-        want=$next
-        addrs=$(hyprctl clients -j | jq -r '.[] | select(.workspace.id == '"$old"') | .address')
-        for addr in $addrs; do
-            hyprctl dispatch movetoworkspacesilent "$want,address:$addr"
-        done
-        hyprctl dispatch moveworkspacetomonitor "$want" "$monitor" 2>/dev/null
-    done
+    "$(dirname "${BASH_SOURCE[0]}")/claim_block.sh" "$1"
 }
 
 # Move windows stranded on workspaces outside their monitor's block (see
@@ -170,10 +129,10 @@ rescue_orphans() {
             fi
             next[$base]=$(( next[$base] + 1 ))
             remap[$old]=${next[$base]}
-            hyprctl dispatch movetoworkspacesilent "${remap[$old]},address:$addr"
-            hyprctl dispatch moveworkspacetomonitor "${remap[$old]}" "$mon" 2>/dev/null
+            hyprctl dispatch "hl.dsp.window.move({ window = \"address:$addr\", workspace = ${remap[$old]}, follow = false })"
+            hyprctl dispatch "hl.dsp.workspace.move({ workspace = ${remap[$old]}, monitor = \"$mon\" })" 2>/dev/null
         else
-            hyprctl dispatch movetoworkspacesilent "${remap[$old]},address:$addr"
+            hyprctl dispatch "hl.dsp.window.move({ window = \"address:$addr\", workspace = ${remap[$old]}, follow = false })"
         fi
         printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$(date -Is)" "$origin" "$old" "${remap[$old]}" "$addr" "$class" >> "$RESCUE_LOG"
     done
@@ -213,10 +172,10 @@ restore_rescued() {
             keep+=("$line")
             continue
         fi
-        hyprctl dispatch movetoworkspacesilent "$old,address:$addr"
+        hyprctl dispatch "hl.dsp.window.move({ window = \"address:$addr\", workspace = $old, follow = false })"
         if [ -z "${placed[$old]}" ]; then
             placed[$old]=1
-            hyprctl dispatch moveworkspacetomonitor "$old" "$monitor" 2>/dev/null
+            hyprctl dispatch "hl.dsp.workspace.move({ workspace = $old, monitor = \"$monitor\" })" 2>/dev/null
         fi
     done < "$RESCUE_LOG"
 
@@ -264,7 +223,16 @@ done
 # whole process one level up (see monitor-init.service).
 socket="$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock"
 while true; do
-    socat - "UNIX-CONNECT:$socket" | while IFS= read -r line; do
+    # -u (unidirectional: read the socket, write stdout) matters here, not
+    # just style -- plain `socat - UNIX-CONNECT:...` is duplex over stdio by
+    # default, so it also tries to READ stdin. Under systemd (and in plenty
+    # of other non-interactive launch contexts) stdin is /dev/null, which
+    # reads as immediate EOF, and socat tears down the whole connection the
+    # instant one side EOFs. That's what was actually ending this listener
+    # every ~1.5s under the service (see the dbg() line below) -- not a
+    # dropped socket, but this process killing its own connection against a
+    # socket that was fine the entire time. `-u` never touches stdin.
+    socat -u "UNIX-CONNECT:$socket" - | while IFS= read -r line; do
         [[ "$line" == monitor* ]] && dbg "event: $line"
         if [[ "$line" == monitoradded* ]]; then
             monitor="${line#monitoradded>>}"

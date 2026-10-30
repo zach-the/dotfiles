@@ -98,8 +98,13 @@ def _spawn_positioned(class_name, cmd_tail, rel_x, rel_y, rows, cols=COLS):
         "start", "--class", class_name,
         "--", *cmd_tail,
     ]
-    exec_str = f"[float;move {rel_x} {rel_y}] " + shlex.join(cmd)
-    subprocess.run(["hyprctl", "dispatch", "exec", exec_str], capture_output=True, check=True)
+    # hyprctl dispatch now compiles its argument as a Lua expression
+    # (hl.dsp.exec_cmd(cmd, rules) replaces the old `[float;move X Y]
+    # cmd` inline-rule exec syntax). json.dumps gives a safely escaped
+    # Lua string literal for the shlex-quoted command.
+    exec_str = shlex.join(cmd)
+    dispatch_expr = f"hl.dsp.exec_cmd({json.dumps(exec_str)}, {{ float = true, move = {{{rel_x}, {rel_y}}} }})"
+    subprocess.run(["hyprctl", "dispatch", dispatch_expr], capture_output=True, check=True)
 
     addr = None
     for _ in range(50):
@@ -110,7 +115,7 @@ def _spawn_positioned(class_name, cmd_tail, rel_x, rel_y, rows, cols=COLS):
             addr = found["address"]
             break
     if addr:
-        hyprctl("dispatch", "focuswindow", f"address:{addr}")
+        hyprctl("dispatch", f'hl.dsp.focus({{ window = "address:{addr}" }})')
     return addr
 
 

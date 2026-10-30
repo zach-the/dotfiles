@@ -8,10 +8,10 @@ any_tiled=$(echo "$windows" | jq '[.[] | select(.floating == false)] | length > 
 
 if [ "$any_tiled" = "true" ]; then
     echo "$windows" | jq -r '.[] | select(.floating == false) | .address' | while read -r addr; do
-        hyprctl dispatch togglefloating "address:$addr"
+        hyprctl dispatch "hl.dsp.window.float({ window = \"address:$addr\" })"
     done
 else
     echo "$windows" | jq -r '.[].address' | while read -r addr; do
-        hyprctl dispatch togglefloating "address:$addr"
+        hyprctl dispatch "hl.dsp.window.float({ window = \"address:$addr\" })"
     done
 fi

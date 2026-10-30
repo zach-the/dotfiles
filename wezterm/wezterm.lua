@@ -64,7 +64,7 @@ config.text_background_opacity = is_mac and 0.9 or 0.9
 
 -- Font Configuration
 config.font = wezterm.font 'JetBrainsMono Nerd Font Mono'
-config.font_size = is_linux and 11 or 12.5
+config.font_size = is_linux and 10 or 12.5
 
 -- Default Window Size
 -- Note: WezTerm uses columns/rows, not pixels. Adjust these to match your old 1100x600 size.

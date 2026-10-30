@@ -43,6 +43,7 @@ linux_only_configs=(
   "I2C module"       "$DOTFILES/system/modules-load.d/i2c-dev.conf"   "/etc/modules-load.d/i2c-dev.conf"
   "NM connectivity"  "$DOTFILES/system/networkmanager-conf.d/20-connectivity.conf" "/etc/NetworkManager/conf.d/20-connectivity.conf"
   "Webcam late-load" "$DOTFILES/system/modprobe.d/webcam-late-load.conf" "/etc/modprobe.d/webcam-late-load.conf"
+  "cfg80211 regdom"  "$DOTFILES/system/modprobe.d/cfg80211-regdom.conf" "/etc/modprobe.d/cfg80211-regdom.conf"
   "Monitor-init service" "$DOTFILES/hypr/monitor-init.service" "$HOME/.config/systemd/user/monitor-init.service"
 )
 

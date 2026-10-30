@@ -59,7 +59,7 @@ for id in "${shift_ids[@]}"; do
     new_id=$(( id + 1 ))
     addrs=$(hyprctl clients -j | jq -r '.[] | select(.workspace.id == '"$id"') | .address')
     for addr in $addrs; do
-        hyprctl dispatch movetoworkspacesilent "$new_id,address:$addr"
+        hyprctl dispatch "hl.dsp.window.move({ window = \"address:$addr\", workspace = $new_id, follow = false })"
         if [ -s "$RESCUE_LOG" ]; then
             awk -F'\t' -v OFS='\t' -v a="$addr" -v old="$id" -v new="$new_id" \
                 '$5 == a && $4 == old { $4 = new } 1' "$RESCUE_LOG" > "$RESCUE_LOG.tmp" &&
@@ -72,7 +72,7 @@ done
 # "right" this is where it already was (current_ws sat outside the shift
 # range above); for "left" it was swept up into the shift and needs
 # pulling back down into the now-empty original slot.
-hyprctl dispatch movetoworkspacesilent "$insert_id,address:$active_window_addr"
+hyprctl dispatch "hl.dsp.window.move({ window = \"address:$active_window_addr\", workspace = $insert_id, follow = false })"
 if [ -s "$RESCUE_LOG" ]; then
     awk -F'\t' -v OFS='\t' -v a="$active_window_addr" -v new="$insert_id" \
         '$5 == a { $4 = new } 1' "$RESCUE_LOG" > "$RESCUE_LOG.tmp" &&
@@ -82,5 +82,5 @@ fi
 # Same two-step (not --batch) as ws_nav.sh/ws_insert_right.sh:
 # moveworkspacetomonitor fails when $insert_id doesn't exist yet, which
 # would abort a batched switch too.
-hyprctl dispatch moveworkspacetomonitor "$insert_id" current 2>/dev/null
-hyprctl dispatch workspace "$insert_id"
+hyprctl dispatch "hl.dsp.workspace.move({ workspace = $insert_id, monitor = \"current\" })" 2>/dev/null
+hyprctl dispatch "hl.dsp.focus({ workspace = $insert_id })"

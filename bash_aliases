@@ -362,30 +362,13 @@ _banner_wrap() {
     [[ -n "$current" ]] && printf '%s\n' "$current"
 }
 
-# Drop the alias (defined near the bottom of this file) so re-sourcing doesn't expand it inside the definition below.
-unalias banner 2>/dev/null
-banner() {
-    local justify="c"
-    local paragraphs=()
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            --alignment)
-                case "$2" in
-                    l|c|r) justify="$2" ;;
-                    *) echo "banner: --alignment must be l, c, or r" >&2; return 1 ;;
-                esac
-                shift 2
-                ;;
-            *)
-                paragraphs+=("$1")
-                shift
-                ;;
-        esac
-    done
-    if [[ ${#paragraphs[@]} -eq 0 ]]; then
-        echo "banner: no message given" >&2
-        return 1
-    fi
+# Compute layout for the current terminal size and draw one frame. Split out
+# of banner() so a resize mid-display can just call this again instead of
+# re-running the whole read-input/trap-setup dance.
+_banner_draw() {
+    local justify="$1"
+    shift
+    local -a paragraphs=("$@")
 
     local cols rows
     cols=$(tput cols)
@@ -468,13 +451,7 @@ banner() {
         gaps+=("$top_pad")
     fi
 
-    # Draw on the terminal's alternate screen (like vim/less) so the original
-    # screen and scrollback come back untouched on exit. Ctrl-C also restores it.
-    local old_int_trap
-    old_int_trap=$(trap -p INT)
-    tput smcup
     tput clear
-    trap 'tput rmcup; trap - INT; '"$old_int_trap"'; return 130' INT
     local i pad
     for (( i=0; i<gaps[0]; i++ )); do echo; done
 
@@ -500,14 +477,65 @@ banner() {
         (( gi < ngroups - 1 )) && for (( i=0; i<gaps[gi+1]; i++ )); do echo; done
     done
     (( ngroups > 1 )) && for (( i=0; i<gaps[ngroups]; i++ )); do echo; done
+}
+
+# unalias first: this file is re-sourceable, and the self-referential
+# 'alias banner=...' below (added once this function already exists)
+# would otherwise get expanded here on every re-source, breaking this
+# function definition with a syntax error.
+unalias banner 2>/dev/null
+banner() {
+    local justify="c"
+    local paragraphs=()
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --alignment)
+                case "$2" in
+                    l|c|r) justify="$2" ;;
+                    *) echo "banner: --alignment must be l, c, or r" >&2; return 1 ;;
+                esac
+                shift 2
+                ;;
+            *)
+                paragraphs+=("$1")
+                shift
+                ;;
+        esac
+    done
+    if [[ ${#paragraphs[@]} -eq 0 ]]; then
+        echo "banner: no message given" >&2
+        return 1
+    fi
+
+    # Draw on the terminal's alternate screen (like vim/less) so the original
+    # screen and scrollback come back untouched on exit. Ctrl-C also restores it.
+    # old_int_trap is "" when no INT trap was set beforehand (the common
+    # case), so it's only spliced in when non-empty -- otherwise it leaves a
+    # stray ';' that makes the whole trap body a syntax error, silently
+    # skipping tput rmcup and leaving the terminal stuck on the alt screen.
+    local old_int_trap
+    old_int_trap=$(trap -p INT)
+    tput smcup
+    trap 'tput rmcup; trap - INT; trap - WINCH; '"${old_int_trap:+$old_int_trap; }"'return 130' INT
+
+    # Re-layout and redraw on terminal resize instead of leaving a stale,
+    # wrongly-wrapped/off-center frame up. SIGWINCH interrupts the poll below
+    # immediately, so the redraw happens as soon as the resize is detected.
+    local resized=1
+    trap 'resized=1' WINCH
 
     local key
     while true; do
-        read -n 1 -s -r key
-        [[ "$key" == "q" ]] && break
+        if [[ -n "$resized" ]]; then
+            resized=
+            _banner_draw "$justify" "${paragraphs[@]}"
+        fi
+        read -n 1 -s -r -t 0.3 key && [[ "$key" == "q" ]] && break
     done
+
     tput rmcup
     trap - INT
+    trap - WINCH
     eval "$old_int_trap"
 }
 alias banner='banner --alignment l'
@@ -524,10 +552,11 @@ alias jellyfin-restart='sudo systemctl restart jellyfin'
 # --- Copy photos/videos off a camera card and rename them by creation date ---
 # Renamed to yyyy-mm-dd-hhmm.ext (24h time), e.g. Jan 3 2026 3:38pm -> 2026-01-03-1538.png
 copy_from_camera_card() {
-    local usage="Usage: copy_from_camera_card [--change_date N|yyyy_mm_dd] <source> <destination>
+    local usage="Usage: copy_from_camera_card [--change_date N|yyyy_mm_dd] [--change_time ±H[:MM]] <source>... <destination>
 
-Copies files from <source> to <destination> with rsync (progress bar shown),
-then renames every file under <destination> to:
+Copies files from <source> (one path, or several — e.g. a shell glob) to
+<destination> with rsync (progress bar shown), then renames every file
+under <destination> to:
 
     yyyy-mm-dd-hhmm.ext   (24-hour time, read from each file's own creation metadata)
 
@@ -545,11 +574,18 @@ Options:
                              wrong date set but the time-of-day is still correct.
   --change_date yyyy_mm_dd   Replace the DATE portion with this exact date
                              instead, e.g. --change_date 2026_01_03.
+  --change_time ±H[:MM]     Shift every file's recorded time-of-day by this
+                             amount (e.g. --change_time +2 or --change_time
+                             -0:30), carrying over into the date if it crosses
+                             midnight. Useful when the camera's clock was left
+                             on the wrong timezone or wasn't adjusted for DST.
+                             Applied before --change_date.
   -h, --help                 Show this help message.
 
 Requires: rsync, exiftool (perl-image-exiftool), jq."
 
-    local change_date="" override_date="" src="" dest=""
+    local change_date="" override_date="" change_time="" change_time_offset=""
+    local -a positional=()
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -569,30 +605,37 @@ Requires: rsync, exiftool (perl-image-exiftool), jq."
                 change_date="${1#*=}"
                 shift
                 ;;
+            --change_time)
+                if [[ -z "$2" ]]; then
+                    echo "copy_from_camera_card: --change_time requires a value" >&2
+                    return 1
+                fi
+                change_time="$2"
+                shift 2
+                ;;
+            --change_time=*)
+                change_time="${1#*=}"
+                shift
+                ;;
             -*)
                 echo "copy_from_camera_card: unknown option '$1'" >&2
                 echo "$usage"
                 return 1
                 ;;
             *)
-                if [[ -z "$src" ]]; then
-                    src="$1"
-                elif [[ -z "$dest" ]]; then
-                    dest="$1"
-                else
-                    echo "copy_from_camera_card: unexpected argument '$1'" >&2
-                    echo "$usage"
-                    return 1
-                fi
+                positional+=("$1")
                 shift
                 ;;
         esac
     done
 
-    if [[ -z "$src" || -z "$dest" ]]; then
+    if [[ "${#positional[@]}" -lt 2 ]]; then
         echo "$usage"
         return 1
     fi
+
+    local -a src_list=("${positional[@]:0:${#positional[@]}-1}")
+    local dest="${positional[-1]}"
 
     local tool
     for tool in rsync exiftool jq; do
@@ -616,17 +659,32 @@ Requires: rsync, exiftool (perl-image-exiftool), jq."
         fi
     fi
 
+    if [[ -n "$change_time" ]]; then
+        if [[ "$change_time" =~ ^([+-])([0-9]+)(:([0-5][0-9]))?$ ]]; then
+            local sign="${BASH_REMATCH[1]}" hours="${BASH_REMATCH[2]}" minutes="${BASH_REMATCH[4]:-0}"
+            change_time_offset=$(( (10#$hours * 3600 + 10#$minutes * 60) ))
+            [[ "$sign" == "-" ]] && change_time_offset=$(( -change_time_offset ))
+        else
+            echo "copy_from_camera_card: --change_time must be a signed offset like +2, -0:30, or +1:15" >&2
+            return 1
+        fi
+    fi
+
     mkdir -p "$dest" || return 1
 
-    local src_arg="$src" dest_arg="$dest"
-    [[ -d "$src_arg" && "$src_arg" != */ ]] && src_arg+="/"
+    local -a src_args=()
+    local src_arg dest_arg="$dest"
+    for src_arg in "${src_list[@]}"; do
+        [[ -d "$src_arg" && "$src_arg" != */ ]] && src_arg+="/"
+        src_args+=("$src_arg")
+    done
     [[ "$dest_arg" != */ ]] && dest_arg+="/"
 
-    echo "Copying from '$src' to '$dest'..."
-    rsync -aHAX --info=progress2 "$src_arg" "$dest_arg" || return 1
+    echo "Copying to '$dest'..."
+    rsync -aHAX --info=progress2 "${src_args[@]}" "$dest_arg" || return 1
 
     echo "Renaming files by creation date..."
-    local file fname ext stamp date_part time_part tag dir candidate n
+    local file fname ext stamp raw_date raw_time epoch date_part time_part tag dir candidate n
     local skipped=0 renamed=0 duplicates=0
     while IFS= read -r -d '' file; do
         stamp=$(exiftool -j -DateTimeOriginal -CreateDate -MediaCreateDate -TrackCreateDate -FileModifyDate "$file" 2>/dev/null \
@@ -638,8 +696,23 @@ Requires: rsync, exiftool (perl-image-exiftool), jq."
             continue
         fi
 
-        date_part=$(awk '{print $1}' <<< "$stamp" | tr ':' '-')
-        time_part=$(awk '{print $2}' <<< "$stamp" | cut -c1-5 | tr -d ':')
+        raw_date=$(awk '{print $1}' <<< "$stamp" | tr ':' '-')
+        raw_time=$(awk '{print $2}' <<< "$stamp")
+
+        if [[ -n "$change_time_offset" ]]; then
+            epoch=$(date -d "$raw_date $raw_time" +%s 2>/dev/null)
+            if [[ -z "$epoch" ]]; then
+                echo "  skip (unparseable date metadata): $file" >&2
+                ((skipped++))
+                continue
+            fi
+            epoch=$(( epoch + change_time_offset ))
+            raw_date=$(date -d "@$epoch" +%Y-%m-%d)
+            raw_time=$(date -d "@$epoch" +%H:%M:%S)
+        fi
+
+        date_part="$raw_date"
+        time_part=$(cut -c1-5 <<< "$raw_time" | tr -d ':')
         [[ -n "$override_date" ]] && date_part="$override_date"
         tag="${date_part}-${time_part}"
 

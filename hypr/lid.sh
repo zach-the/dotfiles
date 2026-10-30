@@ -33,7 +33,7 @@ case "$1" in
         for entry in "${moves[@]}"; do
           ws="${entry%% *}"
           addr="${entry#* }"
-          batch+="dispatch movetoworkspacesilent $(( base + ws )),address:$addr ; "
+          batch+="dispatch hl.dsp.window.move({ window = \"address:$addr\", workspace = $(( base + ws )), follow = false }) ; "
         done
         hyprctl --batch "${batch% ; }"
       fi
@@ -41,13 +41,27 @@ case "$1" in
     else
       hyprlock &
       sleep 0.5
-      hyprctl dispatch dpms off
+      hyprctl dispatch 'hl.dsp.dpms({ action = "disable" })'
       systemctl suspend
     fi
     ;;
   open)
     line=$(grep "^monitor=$INTERNAL," "$MONITORS_CONF")
     hyprctl keyword monitor "${line#monitor=}"
-    hyprctl dispatch dpms on "$INTERNAL"
+    # hyprlock's PAM thread tried Howdy once at lock time (lid closing, nobody
+    # looking), Howdy failed, and the thread is now blocked waiting on the
+    # password prompt - it can't loop back to retry Howdy until something is
+    # submitted. A synthetic Enter unblocks that stale attempt (which can only
+    # fail) so the thread loops back and tries Howdy again, now that a face is
+    # actually in view. There's a brief visible "authentication failed" flash
+    # from the stale attempt before the fresh one lands - known cosmetic
+    # issue, not fixed yet. Do NOT replace this with killing/relaunching
+    # hyprlock: that raced badly and crashed the lock client entirely
+    # (Hyprland's "oopsie daisy" crashed-lockscreen fallback, 2026-10-26).
+    if pgrep -x hyprlock >/dev/null; then
+      wtype -k Return
+      sleep 2
+    fi
+    hyprctl dispatch "hl.dsp.dpms({ action = \"enable\", monitor = \"$INTERNAL\" })"
     ;;
 esac
