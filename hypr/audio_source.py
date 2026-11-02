@@ -130,6 +130,119 @@ def set_default(sink_id):
     subprocess.run(["wpctl", "set-default", sink_id], check=True)
 
 
+# --- Sources (microphones) -----------------------------------------------
+#
+# No pactl-name join needed here, unlike get_sinks()/_pactl_sink_info()
+# above: there's no Multi-Output-equivalent combine-source feature, so
+# nothing needs a pactl-facing slaves= name -- wpctl's own id is all
+# set_default_source()/get_source_volume()/set_source_volume() need.
+
+def _default_source_id():
+    try:
+        out = subprocess.run(
+            ["wpctl", "inspect", "@DEFAULT_AUDIO_SOURCE@"], capture_output=True, text=True, check=True
+        ).stdout
+    except Exception:
+        return None
+    m = re.match(r"id (\d+)", out)
+    return m.group(1) if m else None
+
+
+def _pactl_source_descriptions():
+    """Map each source's pactl-facing Name to its human-readable
+    Description, keyed the same way _pactl_sink_info() keys sinks --
+    except here the join key going the other direction (wpctl's
+    Filters-section display text *is* the Name, not the Description),
+    so this is looked up by Name instead."""
+    try:
+        out = subprocess.run(["pactl", "list", "sources"], capture_output=True, text=True, check=True).stdout
+    except Exception:
+        return {}
+    descriptions = {}
+    for block in re.split(r"(?m)^Source #\d+\n", out)[1:]:
+        name_m = re.search(r"^\tName: (.+)$", block, re.M)
+        desc_m = re.search(r"^\tDescription: (.+)$", block, re.M)
+        if name_m and desc_m:
+            descriptions[name_m.group(1).strip()] = desc_m.group(1).strip()
+    return descriptions
+
+
+_SOURCE_HEADERS = {
+    "Devices:": None,
+    "Sinks:": None,
+    "Sources:": "sources",
+    "Filters:": "filters",
+    "Streams:": None,
+}
+
+
+def get_sources():
+    """List real microphones (wpctl status's Sources: section) plus any
+    Audio/Source filter-chain node -- e.g. PipeWire's echo-cancel
+    module's virtual mic (see ~/.config/pipewire/pipewire.conf.d/99-echo-cancel.conf)
+    -- that wpctl status buckets under Filters instead, since those are
+    exactly as selectable/controllable via wpctl as a real Sources:
+    entry despite not being listed there."""
+    out = subprocess.run(["wpctl", "status"], capture_output=True, text=True, check=True).stdout
+    lines = out.splitlines()
+    start = next((i for i, l in enumerate(lines) if l.strip() == "Audio"), None)
+    if start is None:
+        return []
+    end = next((i for i in range(start + 1, len(lines)) if lines[i].strip() == "Video"), len(lines))
+    audio_lines = lines[start:end]
+
+    default_id = _default_source_id()
+    descriptions = _pactl_source_descriptions()
+
+    sources = []
+    section = None
+    for line in audio_lines:
+        stripped = line.strip()
+        header = next((h for h in _SOURCE_HEADERS if stripped.endswith(h)), None)
+        if header is not None:
+            section = _SOURCE_HEADERS[header]
+            continue
+
+        if section == "sources":
+            m = re.match(r"^[│\s]*(?:\*)?\s*(\d+)\.\s+(.*?)\s*\[vol:", stripped)
+            if not m:
+                continue
+            sid, raw_name = m.group(1), m.group(2).strip()
+            sources.append({"id": sid, "raw_name": raw_name, "name": raw_name, "default": sid == default_id})
+        elif section == "filters":
+            # Same optional "*" (currently-default) prefix as the
+            # Sources: rows above -- easy to miss since this filter
+            # entry only ever carries it once it's actually selected as
+            # the default source, i.e. exactly the state this function
+            # must not drop it in.
+            m = re.match(r"^[│\s]*(?:\*)?\s*(\d+)\.\s+(.*?)\s+\[Audio/Source\]\s*$", stripped)
+            if not m:
+                continue
+            sid, raw_name = m.group(1), m.group(2).strip()
+            display = descriptions.get(raw_name, raw_name)
+            sources.append({"id": sid, "raw_name": display, "name": display, "default": sid == default_id})
+
+    names = simplify_names([s["raw_name"] for s in sources])
+    for s, name in zip(sources, names):
+        s["name"] = name
+    return sources
+
+
+def set_default_source(source_id):
+    subprocess.run(["wpctl", "set-default", source_id], check=True)
+
+
+def get_source_volume(source_id):
+    out = subprocess.run(["wpctl", "get-volume", source_id], capture_output=True, text=True, check=True).stdout
+    m = re.search(r"([\d.]+)", out)
+    return round(float(m.group(1)) * 100) if m else 0
+
+
+def set_source_volume(source_id, pct):
+    pct = max(0, min(150, round(pct)))
+    subprocess.run(["wpctl", "set-volume", source_id, f"{pct}%"], check=True)
+
+
 def get_volume(sink_id):
     out = subprocess.run(["wpctl", "get-volume", sink_id], capture_output=True, text=True, check=True).stdout
     m = re.search(r"([\d.]+)", out)

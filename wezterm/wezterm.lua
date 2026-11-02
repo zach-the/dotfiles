@@ -250,6 +250,19 @@ config.keys = {
     end),
   },
 
+  -- Alt+z/f/w/a : tmux's own sticky-resize bindings (M-z/f/w/a,
+  -- tmux.conf section 4 / tmux-resize-pane.py) have no WezTerm-side
+  -- meaning, so in principle these could be left unbound like Alt+/,
+  -- Alt+\, Alt+- above. Unlike those punctuation keys, though, a genuinely
+  -- unbound Alt+<letter> doesn't reliably reach the terminal with its Alt
+  -- bit intact (same reason Alt+h/j/k/l below go through an explicit
+  -- SendKey instead of being left unbound) -- so these force it through
+  -- WezTerm's own encoder instead of relying on default raw forwarding.
+  { key = 'z', mods = 'ALT', action = act.SendKey { key = 'z', mods = 'ALT' } },
+  { key = 'f', mods = 'ALT', action = act.SendKey { key = 'f', mods = 'ALT' } },
+  { key = 'w', mods = 'ALT', action = act.SendKey { key = 'w', mods = 'ALT' } },
+  { key = 'a', mods = 'ALT', action = act.SendKey { key = 'a', mods = 'ALT' } },
+
   -- Alt+h/j/k/l (and Alt+arrows) : move focus between WezTerm panes,
   -- unless tmux is the foreground process in the current pane or there's
   -- only one WezTerm pane in the tab (see should_passthrough above), in

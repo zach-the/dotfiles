@@ -10,7 +10,7 @@
 
   "modules-left": ["custom/power", "hyprland/workspaces"],
   "modules-center": ["clock"],
-  "modules-right": ["custom/scrollsesh", "custom/jellyfin", "custom/language", "custom/mode", "custom/volume", "custom/bluetooth", "custom/backlight", "custom/wifi", "custom/battery"], //tray was here, but i removed it. look into optimizing that and figurig out system76-power later
+  "modules-right": ["custom/scrollsesh", "custom/jellyfin", "custom/language", "custom/mode", "custom/mic", "custom/volume", "custom/bluetooth", "custom/backlight", "custom/wifi", "custom/battery"], //tray was here, but i removed it. look into optimizing that and figurig out system76-power later
 
   "custom/power": {
     "format": " ",
@@ -21,6 +21,7 @@
   "hyprland/workspaces": {
     "format": "{icon}",
     "on-click": "activate",
+    "tooltip": false,
     "format-icons": {
       "default": "●"
     }
@@ -87,7 +88,8 @@
     "exec": "/usr/local/bin/scrollsesh status --waybar",
     "interval": 5,
     "signal": 15,
-    "on-click": "/usr/local/bin/scrollsesh waybar-toggle"
+    "on-click": "~/.config/hypr/popup_client.py toggle scrollsesh",
+    "on-click-right": "systemctl start scrollsesh-end.service; pkill -RTMIN+15 waybar"
   },
 
   "custom/bluetooth": {
@@ -96,6 +98,19 @@
     "signal": 9,
     "on-click": "~/.config/hypr/popup_client.py toggle bluetooth",
     "on-click-right": "~/.config/hypr/bluetooth_toggle.sh"
+  },
+
+  "custom/mic": {
+    "exec": "~/.config/hypr/mic_color.py",
+    "return-type": "json",
+    "interval": 30,
+    "signal": 16,
+    "on-click": "~/.config/hypr/popup_client.py toggle mic",
+    "on-click-middle": "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle; ~/.config/hypr/mic_refresh.sh",
+    "on-click-right": "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle; ~/.config/hypr/mic_refresh.sh",
+    "on-scroll-up": "wpctl set-volume @DEFAULT_AUDIO_SOURCE@ 10%+ --limit 1.5; ~/.config/hypr/mic_refresh.sh",
+    "on-scroll-down": "wpctl set-volume @DEFAULT_AUDIO_SOURCE@ 10%-; ~/.config/hypr/mic_refresh.sh",
+    "smooth-scrolling-threshold": 0.2
   },
 
   "custom/volume": {

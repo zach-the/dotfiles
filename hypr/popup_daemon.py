@@ -27,8 +27,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import audio_popup
 import bluetooth_popup
 import jellyfin_popup
+import mic_popup
 import popup_ipc
 import power_popup
+import scrollsesh_popup
 import wifi_popup
 
 WAYBAR_COLORS_CSS = os.path.expanduser("~/.config/waybar/colors.css")
@@ -322,18 +324,31 @@ def _start_server():
 # --- pactl subscribe watcher --------------------------------------------
 
 _pactl_debounce_source = None
+_pactl_pending_kinds = set()
 
 
 def _on_pactl_event():
-    global _pactl_debounce_source
+    global _pactl_debounce_source, _pactl_pending_kinds
+    kinds = _pactl_pending_kinds
+    _pactl_pending_kinds = set()
     _pactl_debounce_source = None
-    audio = TARGETS.get("audio")
-    # Skip while a Multi-Output volume slider is being dragged: the drag
-    # itself generates these same subscribe events, and refresh() would
-    # tear down and rebuild the very slider the pointer is gripping.
-    if audio is not None and audio._visible and not getattr(audio.window, "_dragging", False):
-        audio.refresh(audio.window)
-    subprocess.run(["pkill", "-RTMIN+10", "waybar"], check=False)
+
+    if "sink" in kinds or "server" in kinds:
+        audio = TARGETS.get("audio")
+        # Skip while a Multi-Output volume slider is being dragged: the
+        # drag itself generates these same subscribe events, and
+        # refresh() would tear down and rebuild the very slider the
+        # pointer is gripping.
+        if audio is not None and audio._visible and not getattr(audio.window, "_dragging", False):
+            audio.refresh(audio.window)
+        subprocess.run(["pkill", "-RTMIN+10", "waybar"], check=False)
+
+    if "source" in kinds or "server" in kinds:
+        mic = TARGETS.get("mic")
+        if mic is not None and mic._visible and not getattr(mic.window, "_dragging", False):
+            mic.refresh(mic.window)
+        subprocess.run(["pkill", "-RTMIN+16", "waybar"], check=False)
+
     return False
 
 
@@ -344,7 +359,9 @@ def _on_pactl_line(source, condition):
     line = source.readline()
     if not line:
         return False
-    if re.search(r"on (sink|server) #", line):
+    m = re.search(r"on (sink|source|server) #", line)
+    if m:
+        _pactl_pending_kinds.add(m.group(1))
         if _pactl_debounce_source is not None:
             GLib.source_remove(_pactl_debounce_source)
         _pactl_debounce_source = GLib.timeout_add(PACTL_DEBOUNCE_MS, _on_pactl_event)
@@ -361,10 +378,12 @@ def _start_pactl_watch():
 def main():
     _start_server()
     TARGETS["audio"] = PopupTarget("audio", audio_popup.build, audio_popup.refresh)
+    TARGETS["mic"] = PopupTarget("mic", mic_popup.build, mic_popup.refresh)
     TARGETS["wifi"] = PopupTarget("wifi", wifi_popup.build, wifi_popup.refresh)
     TARGETS["bluetooth"] = PopupTarget("bluetooth", bluetooth_popup.build, bluetooth_popup.refresh)
     TARGETS["jellyfin"] = PopupTarget("jellyfin", jellyfin_popup.build, jellyfin_popup.refresh)
     TARGETS["power"] = PopupTarget("power", power_popup.build, power_popup.refresh)
+    TARGETS["scrollsesh"] = PopupTarget("scrollsesh", scrollsesh_popup.build, scrollsesh_popup.refresh)
     _load_css()
     _start_pactl_watch()
     Gtk.main()

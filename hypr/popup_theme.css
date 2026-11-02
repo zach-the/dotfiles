@@ -6,10 +6,12 @@
    restart. */
 
 window.popup-audio,
+window.popup-mic,
 window.popup-wifi,
 window.popup-bluetooth,
 window.popup-jellyfin,
-window.popup-power {
+window.popup-power,
+window.popup-scrollsesh {
     /* macOS-style frosted panel: dark and noticeably more translucent
        than the old solid #4d4d4d, so hyprland.conf's blur (vibrancy'd
        up for this exact reason -- see decoration.blur there) can
@@ -21,10 +23,12 @@ window.popup-power {
 }
 
 window.popup-audio .popup-header,
+window.popup-mic .popup-header,
 window.popup-wifi .popup-header,
 window.popup-bluetooth .popup-header,
 window.popup-jellyfin .popup-header,
-window.popup-power .popup-header {
+window.popup-power .popup-header,
+window.popup-scrollsesh .popup-header {
     font-weight: bold;
     padding: 2px 4px 4px 4px;
 }
@@ -32,43 +36,52 @@ window.popup-power .popup-header {
 window.popup-audio .popup-subheader,
 window.popup-wifi .popup-subheader,
 window.popup-bluetooth .popup-subheader,
-window.popup-jellyfin .popup-subheader {
+window.popup-jellyfin .popup-subheader,
+window.popup-scrollsesh .popup-subheader {
     font-size: 0.85em;
     opacity: 0.8;
     padding: 2px 4px 4px 0;
 }
 
 window.popup-audio list,
+window.popup-mic list,
 window.popup-wifi list,
 window.popup-bluetooth list,
 window.popup-jellyfin list,
-window.popup-power list {
+window.popup-power list,
+window.popup-scrollsesh list {
     background-color: transparent;
     color: @fg;
 }
 
 window.popup-audio row,
+window.popup-mic row,
 window.popup-wifi row,
 window.popup-bluetooth row,
 window.popup-jellyfin row,
-window.popup-power row {
+window.popup-power row,
+window.popup-scrollsesh row {
     background-color: transparent;
     border-radius: 6px;
 }
 
 window.popup-audio row:hover,
+window.popup-mic row:hover,
 window.popup-wifi row:hover,
 window.popup-bluetooth row:hover,
 window.popup-jellyfin row:hover,
-window.popup-power row:hover {
+window.popup-power row:hover,
+window.popup-scrollsesh row:hover {
     background-color: alpha(@pink, 0.2);
 }
 
 window.popup-audio label,
+window.popup-mic label,
 window.popup-wifi label,
 window.popup-bluetooth label,
 window.popup-jellyfin label,
-window.popup-power label {
+window.popup-power label,
+window.popup-scrollsesh label {
     color: @fg;
 }
 
@@ -178,15 +191,18 @@ window.popup-audio switch slider {
     margin: 2px;
 }
 
-/* Modern flat slider (per-output volume, Multi-Output mode): a thin
-   accent-filled track and a plain circular thumb instead of GTK3's
-   default beveled trough/handle. */
-window.popup-audio scale {
+/* Modern flat slider (per-output volume, Multi-Output mode; and
+   mic_popup.py's persistent input-volume slider): a thin accent-filled
+   track and a plain circular thumb instead of GTK3's default beveled
+   trough/handle. */
+window.popup-audio scale,
+window.popup-mic scale {
     min-height: 16px;
     padding: 0;
 }
 
-window.popup-audio scale trough {
+window.popup-audio scale trough,
+window.popup-mic scale trough {
     background-color: rgba(255, 255, 255, 0.2);
     background-image: none;
     border: none;
@@ -194,7 +210,8 @@ window.popup-audio scale trough {
     min-height: 4px;
 }
 
-window.popup-audio scale highlight {
+window.popup-audio scale highlight,
+window.popup-mic scale highlight {
     background-color: @pink;
     background-image: none;
     border: none;
@@ -202,7 +219,8 @@ window.popup-audio scale highlight {
     min-height: 4px;
 }
 
-window.popup-audio scale slider {
+window.popup-audio scale slider,
+window.popup-mic scale slider {
     background-color: #ffffff;
     background-image: none;
     border: none;

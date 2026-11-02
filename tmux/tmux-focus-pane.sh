@@ -2,7 +2,7 @@
 # Move focus one pane in the given direction (L/D/U/R, matching tmux's own
 # select-pane flags), then, if a sticky resize-on-focus mode is toggled on
 # (Prefix+W/A/Z/F -- see tmux-toggle-resize-mode.sh), resize the newly
-# focused pane to that mode's size via tmux-resize-pane.sh.
+# focused pane to that mode's size via tmux-resize-pane.py.
 dir="$1"
 tmux select-pane "-$dir"
 
@@ -18,4 +18,4 @@ case "$mode" in
 esac
 
 pane_id=$(tmux display-message -p '#{pane_id}')
-~/dotfiles/tmux/tmux-resize-pane.sh "$width" "$pane_id" "$height"
+~/dotfiles/tmux/tmux-resize-pane.py "$width" "$pane_id" "$height"

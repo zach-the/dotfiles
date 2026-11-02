@@ -6,6 +6,7 @@
 @import 'scrollsesh-icons-generated.css';
 @import 'backlight-icons-generated.css';
 @import 'volume-icons-generated.css';
+@import 'mic-icons-generated.css';
 @import 'language-icons-generated.css';
 @import 'mode-icons-generated.css';
 
@@ -74,6 +75,7 @@ window#waybar {
 #custom-wifi,
 #custom-bluetooth,
 #custom-backlight,
+#custom-mic,
 #custom-volume,
 #custom-language,
 #custom-mode,
@@ -116,6 +118,13 @@ window#waybar {
 }
 
 #custom-backlight {
+    padding-left: 20px;
+    background-repeat: no-repeat;
+    background-position: 4px center;
+    background-size: 15px 15px;
+}
+
+#custom-mic {
     padding-left: 20px;
     background-repeat: no-repeat;
     background-position: 4px center;
