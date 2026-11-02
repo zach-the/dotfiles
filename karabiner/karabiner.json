@@ -14,7 +14,9 @@
                                 "from": {
                                     "key_code": "left_option",
                                     "modifiers": {
-                                        "optional": ["any"]
+                                        "optional": [
+                                            "any"
+                                        ]
                                     }
                                 },
                                 "to": [
@@ -25,7 +27,9 @@
                                 "conditions": [
                                     {
                                         "type": "frontmost_application_if",
-                                        "bundle_identifiers": ["^com\\.tigervnc\\.tigervnc$"]
+                                        "bundle_identifiers": [
+                                            "^com\\.tigervnc\\.tigervnc$"
+                                        ]
                                     }
                                 ]
                             }
@@ -186,6 +190,57 @@
                                     }
                                 ],
                                 "type": "basic"
+                            }
+                        ]
+                    },
+                    {
+                        "description": "Command + Space to toggle U.S. / Georgian input source",
+                        "manipulators": [
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "spacebar",
+                                    "modifiers": {
+                                        "mandatory": [
+                                            "command"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "select_input_source": {
+                                            "input_source_id": "^com\\.apple\\.keylayout\\.US$"
+                                        }
+                                    }
+                                ],
+                                "conditions": [
+                                    {
+                                        "type": "input_source_if",
+                                        "input_sources": [
+                                            {
+                                                "input_source_id": "^com\\.apple\\.keylayout\\.Georgian-QWERTY$"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "basic",
+                                "from": {
+                                    "key_code": "spacebar",
+                                    "modifiers": {
+                                        "mandatory": [
+                                            "command"
+                                        ]
+                                    }
+                                },
+                                "to": [
+                                    {
+                                        "select_input_source": {
+                                            "input_source_id": "^com\\.apple\\.keylayout\\.Georgian-QWERTY$"
+                                        }
+                                    }
+                                ]
                             }
                         ]
                     },

@@ -20,8 +20,14 @@ import subprocess
 
 
 def tmux(*args):
+    # stdout/stderr/universal_newlines rather than capture_output/text:
+    # those are Python 3.7+, and some hosts still ship 3.6 as python3.
     return subprocess.run(
-        ["tmux", *args], capture_output=True, text=True, check=True
+        ["tmux", *args],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        universal_newlines=True,
+        check=True,
     ).stdout.strip()
 
 
