@@ -88,11 +88,13 @@ def _serialize_classic(node):
 
 
 def _classic_checksum(body):
+    # Mask every step, not just at the end: tmux accumulates in a u_short,
+    # so overflow wraps mid-loop and changes what the next >> 1 sees.
     csum = 0
     for ch in body:
         csum = (csum >> 1) + ((csum & 1) << 15)
-        csum += ord(ch)
-    return csum & 0xFFFF
+        csum = (csum + ord(ch)) & 0xFFFF
+    return csum
 
 
 def equalize(node, x, y, w, h):
