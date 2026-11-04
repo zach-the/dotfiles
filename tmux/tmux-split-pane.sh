@@ -1,23 +1,19 @@
 #!/bin/bash
-# Split the source pane, then do the equivalent of Alt+= (select-layout -E)
-# so that creating a pane, closing a pane (tmux-kill-pane.sh) and pressing
-# Alt+= all equalize the same way.
+# Split the source pane exactly in half and touch nothing else: a left/right
+# split (-h) keeps the pane's height and halves its width, a top/bottom split
+# (-v) keeps its width and halves its height. Every other pane in the window
+# keeps its size. (This used to follow the split with select-layout -E, which
+# re-evened the whole row/column and so resized neighboring panes too.)
 #
-# The previous geometry-based rebalance is kept commented out below in case
-# it's ever wanted again; to go back, uncomment it and remove the
-# select-layout line.
+# The older geometry-based rebalance is kept commented out below in case
+# it's ever wanted again.
 direction="$1"   # -v (new pane below) or -h (new pane to the right);
                  # add b (-vb / -hb) to put it above / to the left instead
 pane_id="$2"
 
 pane_path=$(tmux display-message -p -t "$pane_id" "#{pane_current_path}")
 
-tmux split-window "$direction" -t "$pane_id" -c "$pane_path"
-
-# Same as the Alt+= binding in tmux.conf. Targets the source pane, which is a
-# direct sibling of the new (now focused) pane, so the result is the same as
-# pressing Alt+= right after the split.
-tmux select-layout -t "$pane_id" -E
+tmux split-window "$direction" -l 50% -t "$pane_id" -c "$pane_path"
 
 # --- OLD: geometry-based rebalance ---
 # What it did: after the split, rebalance every pane sharing the source
