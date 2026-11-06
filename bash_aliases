@@ -336,9 +336,22 @@ nvf() {
 # Positional args are joined into one message and auto word-wrapped (with a blank
 # line inserted at each wrap point) to fit the terminal; multiple args can also be
 # used to force a paragraph break, e.g. banner "FIGURE OUT" "HYPERSCALE".
+# The font shrinks to fit: blocky is the largest size, and if the wrapped text
+# is still too wide or too tall for the window, it steps down through
+# _BANNER_FONTS (re-evaluated on every resize).
+_BANNER_FONTS=(blocky ansi_regular smblock term)
+
+# Render text in a font, with trailing whitespace stripped from each row.
+# blocky's own space glyph is very narrow, so word gaps get tripled for it.
+_banner_render() {
+    local font="$1" text="$2" width="${3:-4096}" sp=" "
+    [[ "$font" == blocky ]] && sp="   "
+    pyfiglet -f "$font" -j left -w "$width" "${text// /$sp}" | sed 's/[[:space:]]*$//'
+}
+
 _banner_render_width() {
     local out row maxw=0
-    out=$(pyfiglet -f blocky -j left -w 4096 "${1// /   }" | sed 's/[[:space:]]*$//')
+    out=$(_banner_render "$1" "$2")
     while IFS= read -r row; do
         (( ${#row} > maxw )) && maxw=${#row}
     done <<< "$out"
@@ -346,12 +359,12 @@ _banner_render_width() {
 }
 
 _banner_wrap() {
-    local text="$1" cols="$2"
+    local font="$1" text="$2" cols="$3"
     local -a words=($text)
     local current="" candidate w word
     for word in "${words[@]}"; do
         candidate="${current:+$current }$word"
-        w=$(_banner_render_width "$candidate")
+        w=$(_banner_render_width "$font" "$candidate")
         if [[ -z "$current" || "$w" -le "$cols" ]]; then
             current="$candidate"
         else
@@ -374,57 +387,69 @@ _banner_draw() {
     cols=$(tput cols)
     rows=$(tput lines)
 
-    # Word-wrap each paragraph to fit the terminal width. Wrapped lines that
-    # came from the same paragraph stay tight together (one blank line
-    # between them); separate paragraph arguments become distinct groups
-    # whose vertical spacing gets computed further down.
-    local -a lines=() group_counts=()
-    local para wrapped count
-    for para in "${paragraphs[@]}"; do
-        count=0
-        while IFS= read -r wrapped; do
-            lines+=("$wrapped")
-            (( count++ ))
-        done < <(_banner_wrap "$para" "$cols")
-        group_counts+=("$count")
+    # Try each font from largest to smallest and keep the first whose layout
+    # fits the window. The last font is used regardless, as a fallback.
+    local -a lines group_counts blocks widths heights group_heights
+    local font para wrapped count line block row maxw w h
+    local group_width gc idx gh j needed
+    for font in "${_BANNER_FONTS[@]}"; do
+        # Word-wrap each paragraph to fit the terminal width. Wrapped lines
+        # that came from the same paragraph stay tight together (one blank
+        # line between them); separate paragraph arguments become distinct
+        # groups whose vertical spacing gets computed further down.
+        lines=() group_counts=()
+        for para in "${paragraphs[@]}"; do
+            count=0
+            while IFS= read -r wrapped; do
+                lines+=("$wrapped")
+                (( count++ ))
+            done < <(_banner_wrap "$font" "$para" "$cols")
+            group_counts+=("$count")
+        done
+
+        # Render each line.
+        blocks=() widths=() heights=()
+        for line in "${lines[@]}"; do
+            block=$(_banner_render "$font" "$line" "$cols")
+            blocks+=("$block")
+            maxw=0
+            h=0
+            while IFS= read -r row; do
+                w=${#row}
+                (( w > maxw )) && maxw=$w
+                (( h++ ))
+            done <<< "$block"
+            widths+=("$maxw")
+            heights+=("$h")
+        done
+
+        # Group width: the bounding box used to justify every line consistently.
+        group_width=0
+        for w in "${widths[@]}"; do (( w > group_width )) && group_width=$w; done
+
+        # Each paragraph's group height: its wrapped lines plus a blank line
+        # between each of them.
+        group_heights=()
+        idx=0
+        for gc in "${group_counts[@]}"; do
+            gh=0
+            for (( j=0; j<gc; j++ )); do
+                (( gh += heights[idx] ))
+                (( j < gc - 1 )) && (( gh++ ))
+                (( idx++ ))
+            done
+            group_heights+=("$gh")
+        done
+
+        # Fits if nothing is wider than the window and all groups (plus at
+        # least one blank row between separate paragraphs) fit vertically.
+        needed=$(( ${#group_heights[@]} - 1 ))
+        for h in "${group_heights[@]}"; do (( needed += h )); done
+        (( group_width <= cols && needed <= rows )) && break
     done
 
-    # Render each line, trimming trailing whitespace pyfiglet pads each row out to.
-    local -a blocks=() widths=() heights=()
-    local line block row maxw w h
-    for line in "${lines[@]}"; do
-        block=$(pyfiglet -f blocky -j left -w "$cols" "${line// /   }" | sed 's/[[:space:]]*$//')
-        blocks+=("$block")
-        maxw=0
-        h=0
-        while IFS= read -r row; do
-            w=${#row}
-            (( w > maxw )) && maxw=$w
-            (( h++ ))
-        done <<< "$block"
-        widths+=("$maxw")
-        heights+=("$h")
-    done
-
-    # Group width: the bounding box used to justify every line consistently.
-    local group_width=0
-    for w in "${widths[@]}"; do (( w > group_width )) && group_width=$w; done
     local left_pad=$(( (cols - group_width) / 2 ))
     (( left_pad < 0 )) && left_pad=0
-
-    # Each paragraph's group height: its wrapped lines plus a blank line
-    # between each of them.
-    local -a group_heights=()
-    local gc idx=0 gh j
-    for gc in "${group_counts[@]}"; do
-        gh=0
-        for (( j=0; j<gc; j++ )); do
-            (( gh += heights[idx] ))
-            (( j < gc - 1 )) && (( gh++ ))
-            (( idx++ ))
-        done
-        group_heights+=("$gh")
-    done
 
     local ngroups=${#group_heights[@]}
     local total_content_height=0
