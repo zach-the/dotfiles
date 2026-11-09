@@ -476,9 +476,12 @@ _banner_draw() {
         gaps+=("$top_pad")
     fi
 
-    tput clear
+    # Build the whole frame first, then print it with no newline after the
+    # last row: a frame exactly as tall as the window would otherwise push
+    # the cursor past the bottom edge, scrolling the top row off-screen.
+    local -a frame=()
     local i pad
-    for (( i=0; i<gaps[0]; i++ )); do echo; done
+    for (( i=0; i<gaps[0]; i++ )); do frame+=(""); done
 
     idx=0
     local gi gcount
@@ -494,14 +497,21 @@ _banner_draw() {
             esac
             (( pad < 0 )) && pad=0
             while IFS= read -r row; do
-                printf '%*s%s\n' "$pad" "" "$row"
+                frame+=("$(printf '%*s%s' "$pad" "" "$row")")
             done <<< "$block"
-            (( j < gcount - 1 )) && echo
+            (( j < gcount - 1 )) && frame+=("")
             (( idx++ ))
         done
-        (( gi < ngroups - 1 )) && for (( i=0; i<gaps[gi+1]; i++ )); do echo; done
+        (( gi < ngroups - 1 )) && for (( i=0; i<gaps[gi+1]; i++ )); do frame+=(""); done
     done
-    (( ngroups > 1 )) && for (( i=0; i<gaps[ngroups]; i++ )); do echo; done
+
+    tput clear
+    local n=${#frame[@]}
+    (( n > rows )) && n=$rows
+    for (( i=0; i<n; i++ )); do
+        (( i > 0 )) && printf '\n'
+        printf '%s' "${frame[$i]}"
+    done
 }
 
 # unalias first: this file is re-sourceable, and the self-referential
