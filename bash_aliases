@@ -11,6 +11,7 @@ alias df='tmp=$(fd --type d -d 4 | fzf) && history -s "d \"$tmp\"" && echo "$tmp
 alias e='clear && exit'
 alias ll='ls -lrth'
 alias wcl='wc -l'
+alias rmrf='rm -rf'
 alias l='ls -lh'
 alias la='ls -lah'
 alias dir='dir --color=auto'
