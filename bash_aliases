@@ -345,8 +345,18 @@ _BANNER_FONTS=(blocky ansi_regular smblock term)
 # blocky's own space glyph is very narrow, so word gaps get tripled for it.
 _banner_render() {
     local font="$1" text="$2" width="${3:-4096}" sp=" "
+    # Plain-text fallback: skip pyfiglet and hard-wrap with fold, so even a
+    # pane narrower than one word still shows readable text.
+    if [[ "$font" == term ]]; then
+        printf '%s\n' "$text" | fold -w "$width"
+        return
+    fi
+    # Never let pyfiglet wrap: when the width is narrower than a single glyph
+    # it prints a "Width is not enough" error to the screen or hangs.
+    # _banner_wrap already does the line breaking, and the fit check in
+    # _banner_draw rejects fonts that come out too wide.
     [[ "$font" == blocky ]] && sp="   "
-    pyfiglet -f "$font" -j left -w "$width" "${text// /$sp}" | sed 's/[[:space:]]*$//'
+    pyfiglet -f "$font" -j left -w 4096 "${text// /$sp}" 2>/dev/null | sed 's/[[:space:]]*$//'
 }
 
 _banner_render_width() {
@@ -463,12 +473,22 @@ _banner_draw() {
         local remaining=$(( rows - total_content_height ))
         (( remaining < 0 )) && remaining=0
         local nslots=$(( ngroups + 1 ))
+        local s
+        for (( s=0; s<nslots; s++ )); do gaps+=(0); done
+        # Every gap between paragraphs gets at least one blank row first, so
+        # separate arguments never run together when space is tight.
+        for (( s=1; s<ngroups && remaining>0; s++ )); do
+            gaps[s]=1
+            (( remaining-- ))
+        done
+        # Spread the rest evenly; leftover rows go to the between-paragraph
+        # gaps before the top/bottom margins.
         local base=$(( remaining / nslots ))
         local extra=$(( remaining % nslots ))
-        local s
-        for (( s=0; s<nslots; s++ )); do
-            gaps+=("$(( base + (s < extra ? 1 : 0) ))")
-        done
+        for (( s=0; s<nslots; s++ )); do (( gaps[s] += base )); done
+        for (( s=1; s<ngroups && extra>0; s++ )); do (( gaps[s]++, extra-- )); done
+        (( extra > 0 )) && (( gaps[0]++, extra-- ))
+        (( extra > 0 )) && (( gaps[ngroups]++, extra-- ))
     else
         local top_pad=$(( (rows - total_content_height) / 2 ))
         (( top_pad < 0 )) && top_pad=0
